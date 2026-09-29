@@ -1,6 +1,7 @@
 package com.kregosh.mtglifetracker.ui.screens
 
 import android.content.Intent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,8 +21,6 @@ import com.kregosh.mtglifetracker.network.WsState
 import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.ui.components.PlayerCard
 import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
-import com.kregosh.mtglifetracker.ui.theme.dayColorScheme
-import com.kregosh.mtglifetracker.ui.theme.nightColorScheme
 import com.kregosh.mtglifetracker.viewmodel.SessionUiState
 import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
 
@@ -58,16 +57,6 @@ fun SessionScreen(vm: SessionViewModel) {
     val context = LocalContext.current
     val hasBg   = LocalHasBackground.current
 
-    // Override MaterialTheme with a day/night palette when the global is active
-    val dayNightActive = GLOBAL_DAY_NIGHT in ui.globalStats
-    val isDaytime      = (ui.globalStats[GLOBAL_DAY_NIGHT] ?: 0u) == 0u
-    if (dayNightActive) {
-        val scheme = if (isDaytime) dayColorScheme() else nightColorScheme()
-        MaterialTheme(colorScheme = scheme) {
-            SessionContent(vm, ui, context, hasBg)
-        }
-        return
-    }
     SessionContent(vm, ui, context, hasBg)
 }
 
@@ -162,6 +151,17 @@ private fun SessionContent(
             )
         },
     ) { padding ->
+        // Subtle Day/Night brightness overlay — a faint wash that slightly brightens
+        // or darkens the existing theme without replacing it entirely.
+        val dayNightOverlay = when {
+            GLOBAL_DAY_NIGHT !in ui.globalStats -> Color.Transparent
+            (ui.globalStats[GLOBAL_DAY_NIGHT] ?: 0u) == 0u ->
+                Color.White.copy(alpha = 0.06f)   // day: barely-perceptible brightening
+            else ->
+                Color.Black.copy(alpha = 0.10f)   // night: slight darkening
+        }
+
+        Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -205,6 +205,15 @@ private fun SessionContent(
                 Spacer(Modifier.height(8.dp))
                 Text(msg, color = MaterialTheme.colorScheme.error)
             }
+        }
+        // Non-interactive overlay that subtly shifts brightness for Day/Night
+        if (dayNightOverlay != Color.Transparent) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(dayNightOverlay),
+            )
+        }
         }
     }
 }
