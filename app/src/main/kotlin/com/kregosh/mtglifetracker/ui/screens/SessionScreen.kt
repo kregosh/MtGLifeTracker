@@ -14,8 +14,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.kregosh.mtglifetracker.network.WsState
 import com.kregosh.mtglifetracker.shared.StatType
@@ -151,14 +154,22 @@ private fun SessionContent(
             )
         },
     ) { padding ->
-        // Subtle Day/Night brightness overlay — a faint wash that slightly brightens
-        // or darkens the existing theme without replacing it entirely.
-        val dayNightOverlay = when {
-            GLOBAL_DAY_NIGHT !in ui.globalStats -> Color.Transparent
-            (ui.globalStats[GLOBAL_DAY_NIGHT] ?: 0u) == 0u ->
-                Color.White.copy(alpha = 0.06f)   // day: barely-perceptible brightening
-            else ->
-                Color.Black.copy(alpha = 0.10f)   // night: slight darkening
+        // Radial gradient emanating from the sun/moon icon in the Day/Night banner.
+        // The icon sits at approximately (left-padding + icon-half, topbar-height + banner-half).
+        // Using fixed dp values avoids layout measurement while staying close enough.
+        val density = LocalDensity.current
+        val dayNightBrush: Brush? = if (GLOBAL_DAY_NIGHT !in ui.globalStats) null else {
+            val iconX = with(density) { (padding.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr) + 24.dp).toPx() }
+            val iconY = with(density) { (padding.calculateTopPadding() + 27.dp).toPx() }
+            val radius = with(density) { 420.dp.toPx() }
+            val isDaytime = (ui.globalStats[GLOBAL_DAY_NIGHT] ?: 0u) == 0u
+            val centerColor = if (isDaytime) Color.White.copy(alpha = 0.10f)
+                              else           Color.Black.copy(alpha = 0.14f)
+            Brush.radialGradient(
+                colors = listOf(centerColor, Color.Transparent),
+                center = Offset(iconX, iconY),
+                radius = radius,
+            )
         }
 
         Box(modifier = Modifier.fillMaxSize()) {
@@ -206,13 +217,8 @@ private fun SessionContent(
                 Text(msg, color = MaterialTheme.colorScheme.error)
             }
         }
-        // Non-interactive overlay that subtly shifts brightness for Day/Night
-        if (dayNightOverlay != Color.Transparent) {
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .background(dayNightOverlay),
-            )
+        if (dayNightBrush != null) {
+            Box(modifier = Modifier.matchParentSize().background(dayNightBrush))
         }
         }
     }
