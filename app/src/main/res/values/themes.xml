@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- The Compose UI provides its own theming via MtGLifeTrackerTheme.
-         This XML theme is required by the Activity window manager; it must
-         suppress the ActionBar so Compose can own the entire surface. -->
-    <style name="Theme.MtGLifeTracker" parent="Theme.Material3.DayNight.NoActionBar"/>
+    <!--
+        This is a pure Compose app — Compose owns all theming via MtGLifeTrackerTheme.
+        The XML theme is only needed by the Activity window manager. We use the
+        built-in android:Theme.Material.NoActionBar so no extra XML-theme library
+        (com.google.android.material) is required.
+    -->
+    <style name="Theme.MtGLifeTracker" parent="android:Theme.Material.NoActionBar"/>
 </resources>
