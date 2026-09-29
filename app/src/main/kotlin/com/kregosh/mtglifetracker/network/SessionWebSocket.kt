@@ -9,7 +9,7 @@ import io.ktor.client.plugins.websocket.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.receiveAsFlow
+import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
@@ -70,9 +70,12 @@ class SessionWebSocket(
 
                     // Forward outgoing commands while also reading incoming frames
                     val sendJob = launch {
-                        commandQueue.receiveAsFlow().collect { msg ->
-                            send(Frame.Text(json.encodeToString(ClientMessage.serializer(), msg)))
-                        }
+                        try {
+                            while (true) {
+                                val msg = commandQueue.receive()
+                                send(Frame.Text(json.encodeToString(ClientMessage.serializer(), msg)))
+                            }
+                        } catch (_: ClosedReceiveChannelException) { /* channel closed normally */ }
                     }
 
                     for (frame in incoming) {
