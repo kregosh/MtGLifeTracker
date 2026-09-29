@@ -7,43 +7,6 @@ on:
     branches: [ "main" ]
 
 jobs:
-  # ── Backend (pure JVM, no Android SDK needed) ────────────────────────────
-  backend:
-    name: Backend – compile & test
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: gradle
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
-      - name: Compile shared + backend
-        working-directory: backend
-        run: ../gradlew --no-daemon :shared:compileKotlin compileKotlin
-
-      - name: Run backend tests
-        working-directory: backend
-        run: ../gradlew --no-daemon test
-
-      - name: Build fat jar
-        working-directory: backend
-        run: ../gradlew --no-daemon jar
-
-      - name: Upload backend jar
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-jar
-          path: backend/build/libs/*.jar
-
-  # ── Android app (requires SDK, longer job) ──────────────────────────────
   android:
     name: Android – compile & lint
     runs-on: ubuntu-latest
@@ -58,6 +21,11 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
+      - name: Write google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: echo "$GOOGLE_SERVICES_JSON" > app/google-services.json
+
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
@@ -65,7 +33,7 @@ jobs:
         run: ./gradlew --no-daemon :app:compileDebugKotlin
 
       - name: Run unit tests
-        run: ./gradlew --no-daemon :shared:test :app:testDebugUnitTest
+        run: ./gradlew --no-daemon :app:testDebugUnitTest
 
       - name: Lint
         run: ./gradlew --no-daemon :app:lintDebug

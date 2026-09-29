@@ -21,4 +21,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "MtGLifeTracker"
-include(":shared", ":backend", ":app")
+include(":app")

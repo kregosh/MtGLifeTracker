@@ -6,10 +6,10 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.kregosh.mtglifetracker.data.UserPreferences
 import com.kregosh.mtglifetracker.data.UserPrefs
-import com.kregosh.mtglifetracker.network.ApiClient
+import com.kregosh.mtglifetracker.network.FirebaseSessionApi
+import com.kregosh.mtglifetracker.network.FirebaseSessionConnection
 import com.kregosh.mtglifetracker.network.SessionApi
 import com.kregosh.mtglifetracker.network.SessionConnection
-import com.kregosh.mtglifetracker.network.SessionWebSocket
 import com.kregosh.mtglifetracker.network.WsState
 import com.kregosh.mtglifetracker.shared.ServerMessage
 import com.kregosh.mtglifetracker.shared.UserState
@@ -277,8 +277,8 @@ class SessionViewModel(
                 override fun <T : ViewModel> create(modelClass: Class<T>): T =
                     SessionViewModel(
                         prefs     = UserPreferences(app),
-                        api       = ApiClient(),
-                        wsFactory = { id, uid, name, startLife -> SessionWebSocket(id, uid, name, startLife) },
+                        api       = FirebaseSessionApi(),
+                        wsFactory = { id, uid, name, startLife -> FirebaseSessionConnection(id, uid, name, startLife) },
                     ) as T
             }
     }
