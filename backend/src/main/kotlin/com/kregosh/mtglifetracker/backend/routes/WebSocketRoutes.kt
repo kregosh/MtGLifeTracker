@@ -14,7 +14,6 @@ private val log = LoggerFactory.getLogger("WebSocketRoutes")
 
 fun Route.webSocketRoutes(sessions: SessionManager) {
 
-    // ws://host/ws/sessions/{sessionId}
     webSocket("/ws/sessions/{sessionId}") {
         val sessionId = call.parameters["sessionId"]
         val room      = sessionId?.let { sessions.getById(it) }
@@ -28,10 +27,9 @@ fun Route.webSocketRoutes(sessions: SessionManager) {
 
         try {
             for (frame in incoming) {
-                if (frame !is Frame.Text) continue  // no inline lambda, plain for-loop ok
+                if (frame !is Frame.Text) continue
 
                 val text = frame.readText()
-
                 val msg = runCatching {
                     sharedJson.decodeFromString(ClientMessage.serializer(), text)
                 }.getOrNull()
@@ -42,9 +40,7 @@ fun Route.webSocketRoutes(sessions: SessionManager) {
                     continue
                 }
 
-                handleMessage(msg, room, connectedUser) { user ->
-                    connectedUser = user
-                }
+                handleMessage(msg, room, connectedUser) { user -> connectedUser = user }
             }
         } catch (e: Exception) {
             log.debug("WebSocket closed with exception: ${e.message}")
@@ -66,32 +62,25 @@ private suspend fun DefaultWebSocketServerSession.handleMessage(
 ) {
     when (msg) {
         is ClientMessage.Join -> {
-            if (connectedUser != null) {
-                sendError("Already joined")
-                return
-            }
-            val user = ConnectedUser(
-                userId      = msg.userId,
-                displayName = msg.displayName,
-                socket      = this,
-            )
+            if (connectedUser != null) { sendError("Already joined"); return }
+            val user = ConnectedUser(userId = msg.userId, displayName = msg.displayName, socket = this)
             setUser(user)
             room.addUser(user)
-
             val joined = ServerMessage.Joined(userId = user.userId, sessionCode = room.code)
             send(Frame.Text(sharedJson.encodeToString(ServerMessage.serializer(), joined)))
             room.broadcastState()
         }
 
-        ClientMessage.Increment -> {
+        is ClientMessage.Adjust -> {
             if (connectedUser == null) { sendError("Join first"); return }
-            room.increment(connectedUser.userId)
+            room.adjust(connectedUser.userId, msg.stat, msg.delta)
             room.broadcastState()
         }
 
-        ClientMessage.Decrement -> {
+        is ClientMessage.AddCustomStat -> {
             if (connectedUser == null) { sendError("Join first"); return }
-            room.decrement(connectedUser.userId)
+            if (msg.name.isBlank() || msg.name.length > 32) { sendError("Invalid stat name"); return }
+            room.addCustomStat(msg.name)
             room.broadcastState()
         }
     }

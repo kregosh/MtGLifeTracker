@@ -7,16 +7,14 @@ import kotlinx.serialization.Serializable
 // Shared domain objects
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * A single player's current state inside a session.
- *
- * [value] is an unsigned 32-bit integer — it cannot go below 0.
- */
 @Serializable
 data class UserState(
     val id: String,
     val displayName: String,
-    val value: UInt = 0u,
+    val life: UInt = 20u,
+    val commanderDamage: UInt = 0u,
+    val poisonDamage: UInt = 0u,
+    val customStats: Map<String, UInt> = emptyMap(),
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -26,17 +24,20 @@ data class UserState(
 @Serializable
 sealed class ServerMessage {
 
-    /** Full snapshot of every player in the session. Sent after any change. */
+    /** Full snapshot of every player in the session plus the session's custom stat names. */
     @Serializable
     @SerialName("state")
-    data class State(val users: List<UserState>) : ServerMessage()
+    data class State(
+        val users: List<UserState>,
+        val customStatNames: List<String> = emptyList(),
+    ) : ServerMessage()
 
-    /** Sent to the joining client to confirm its assigned userId. */
+    /** Sent to the joining client to confirm its userId and the session code. */
     @Serializable
     @SerialName("joined")
     data class Joined(val userId: String, val sessionCode: String) : ServerMessage()
 
-    /** Error feedback for the client that caused the problem. */
+    /** Error feedback for the client that triggered the problem. */
     @Serializable
     @SerialName("error")
     data class Error(val message: String) : ServerMessage()
@@ -53,20 +54,24 @@ sealed class ClientMessage {
     @Serializable
     @SerialName("join")
     data class Join(
-        /** Stable UUID generated once per device install and stored locally. */
         val userId: String,
         val displayName: String,
     ) : ClientMessage()
 
-    /** Increment the caller's [UserState.value] by 1. */
+    /**
+     * Adjust one stat for the sender by [delta] (positive or negative).
+     *
+     * [stat] is one of: "life", "commander", "poison", or a custom stat name
+     * that was previously added via [AddCustomStat].
+     */
     @Serializable
-    @SerialName("increment")
-    object Increment : ClientMessage()
+    @SerialName("adjust")
+    data class Adjust(val stat: String, val delta: Int) : ClientMessage()
 
-    /** Decrement the caller's [UserState.value] by 1 (clamped at 0). */
+    /** Register a new custom-stat column for the whole session. */
     @Serializable
-    @SerialName("decrement")
-    object Decrement : ClientMessage()
+    @SerialName("add_custom_stat")
+    data class AddCustomStat(val name: String) : ClientMessage()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -76,7 +81,6 @@ sealed class ClientMessage {
 @Serializable
 data class CreateSessionResponse(
     val sessionId: String,
-    /** Short, human-readable invite code (e.g. "ABC123"). */
     val sessionCode: String,
 )
 

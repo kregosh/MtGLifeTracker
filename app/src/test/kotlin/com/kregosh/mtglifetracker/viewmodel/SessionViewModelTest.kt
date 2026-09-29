@@ -26,8 +26,8 @@ class SessionViewModelTest {
     private val wsMessages = MutableSharedFlow<ServerMessage>(extraBufferCapacity = 16)
     private val wsState    = MutableStateFlow<WsState>(WsState.Connecting)
     private val ws         = mockk<SessionConnection>(relaxed = true) {
-        every { messages }         returns wsMessages
-        every { connectionState }  returns wsState
+        every { messages }        returns wsMessages
+        every { connectionState } returns wsState
     }
     private val wsFactory  = mockk<(String, String, String) -> SessionConnection>()
 
@@ -38,6 +38,7 @@ class SessionViewModelTest {
         Dispatchers.setMain(testDispatcher)
         every { prefs.userId }      returns "test-user-id"
         every { prefs.displayName } returns "Test Player"
+        every { prefs.backgroundImageUri } returns null
         every { wsFactory(any(), any(), any()) } returns ws
     }
 
@@ -99,18 +100,19 @@ class SessionViewModelTest {
     }
 
     @Test
-    fun `State message updates sessionUi users`() = runTest {
+    fun `State message updates sessionUi users and customStatNames`() = runTest {
         coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
 
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
 
-        val users = listOf(UserState("test-user-id", "Test Player", 20u))
-        wsMessages.emit(ServerMessage.State(users))
+        val users = listOf(UserState("test-user-id", "Test Player", life = 20u))
+        wsMessages.emit(ServerMessage.State(users, customStatNames = listOf("Energy")))
         advanceUntilIdle()
 
         assertEquals(users, vm.sessionUi.value.users)
+        assertEquals(listOf("Energy"), vm.sessionUi.value.customStatNames)
     }
 
     @Test
@@ -128,15 +130,30 @@ class SessionViewModelTest {
     }
 
     @Test
-    fun `increment delegates to websocket`() = runTest {
+    fun `adjust delegates to websocket`() = runTest {
         coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
 
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
 
-        vm.increment()
-        verify { ws.increment() }
+        vm.adjust("life", 1)
+        verify { ws.adjust("life", 1) }
+
+        vm.adjust("commander", -1)
+        verify { ws.adjust("commander", -1) }
+    }
+
+    @Test
+    fun `addCustomStat delegates to websocket`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        vm.addCustomStat("Energy")
+        verify { ws.addCustomStat("Energy") }
     }
 
     @Test
@@ -155,12 +172,10 @@ class SessionViewModelTest {
         vm.leaveSession()
         advanceUntilIdle()
 
-        // Any update from the old ws should not reach sessionUi after teardown
-        val staleUsers = listOf(UserState("test-user-id", "Test Player", 99u))
+        val staleUsers = listOf(UserState("test-user-id", "Test Player", life = 99u))
         wsMessages.emit(ServerMessage.State(staleUsers))
         advanceUntilIdle()
 
-        // sessionUi.users should NOT be updated with the stale emission
         assertNotEquals(staleUsers, vm.sessionUi.value.users)
     }
 
@@ -185,15 +200,14 @@ class SessionViewModelTest {
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
-        vm.createSession()      // rejoin: tears down old ws, sets up ws2
+        vm.createSession()
         advanceUntilIdle()
 
-        // Stale emission from first ws should not reach current sessionUi
-        val staleUsers = listOf(UserState("test-user-id", "Old Session", 5u))
+        val staleUsers = listOf(UserState("test-user-id", "Old Session", life = 5u))
         wsMessages.emit(ServerMessage.State(staleUsers))
         advanceUntilIdle()
 
         assertNotEquals(staleUsers, vm.sessionUi.value.users)
-        verify { ws.close() }   // first ws was torn down
+        verify { ws.close() }
     }
 }

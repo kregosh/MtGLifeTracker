@@ -8,7 +8,7 @@ interface SessionConnection {
     val messages: SharedFlow<ServerMessage>
     val connectionState: StateFlow<WsState>
     fun connect()
-    fun increment()
-    fun decrement()
+    fun adjust(stat: String, delta: Int)
+    fun addCustomStat(name: String)
     fun close()
 }

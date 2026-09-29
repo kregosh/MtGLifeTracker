@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -22,6 +23,18 @@ import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
 fun SessionScreen(vm: SessionViewModel) {
     val ui      by vm.sessionUi.collectAsState()
     val context = LocalContext.current
+
+    var showAddStatDialog by remember { mutableStateOf(false) }
+
+    if (showAddStatDialog) {
+        AddCustomStatDialog(
+            onConfirm = { name ->
+                vm.addCustomStat(name)
+                showAddStatDialog = false
+            },
+            onDismiss = { showAddStatDialog = false },
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -40,10 +53,7 @@ fun SessionScreen(vm: SessionViewModel) {
                 },
                 navigationIcon = {
                     IconButton(onClick = vm::leaveSession) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Leave session",
-                        )
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Leave session")
                     }
                 },
                 actions = {
@@ -65,15 +75,21 @@ fun SessionScreen(vm: SessionViewModel) {
                     }
                 },
             )
-        }
+        },
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = { showAddStatDialog = true },
+                icon    = { Icon(Icons.Default.Add, contentDescription = null) },
+                text    = { Text("Add stat") },
+            )
+        },
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = 12.dp),
         ) {
-            // Connection state banner
             ConnectionBanner(ui.wsState)
 
             Spacer(Modifier.height(8.dp))
@@ -85,21 +101,22 @@ fun SessionScreen(vm: SessionViewModel) {
             } else {
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding      = PaddingValues(bottom = 16.dp),
+                    contentPadding      = PaddingValues(bottom = 80.dp), // clear FAB
                 ) {
                     items(ui.users, key = { it.id }) { user ->
                         val isMe = user.id == ui.myUserId
                         PlayerCard(
-                            user        = user,
-                            isMe        = isMe,
-                            onIncrement = { if (isMe) vm.increment() },
-                            onDecrement = { if (isMe) vm.decrement() },
+                            user       = user,
+                            isMe       = isMe,
+                            sessionUi  = ui,
+                            onAdjust   = { stat, delta ->
+                                if (isMe) vm.adjust(stat, delta)
+                            },
                         )
                     }
                 }
             }
 
-            // Inline error toast
             ui.error?.let { msg ->
                 Spacer(Modifier.height(8.dp))
                 Text(msg, color = MaterialTheme.colorScheme.error)
@@ -108,12 +125,17 @@ fun SessionScreen(vm: SessionViewModel) {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Connection state banner
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
 private fun ConnectionBanner(state: WsState) {
     val (text, color) = when (state) {
-        WsState.Connected    -> return  // no banner when healthy
-        WsState.Connecting   -> "Connecting…" to MaterialTheme.colorScheme.tertiary
-        WsState.Reconnecting -> "Reconnecting…" to MaterialTheme.colorScheme.secondary
+        WsState.Connected    -> return
+        WsState.Closed       -> return  // intentional leave — no banner
+        WsState.Connecting   -> "Connecting…"       to MaterialTheme.colorScheme.tertiary
+        WsState.Reconnecting -> "Reconnecting…"     to MaterialTheme.colorScheme.secondary
         is WsState.Failed    -> "Disconnected: ${state.reason}" to MaterialTheme.colorScheme.error
     }
     Surface(
@@ -127,4 +149,39 @@ private fun ConnectionBanner(state: WsState) {
             style    = MaterialTheme.typography.labelMedium,
         )
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Add custom stat dialog
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun AddCustomStatDialog(
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var name by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add custom stat") },
+        text  = {
+            OutlinedTextField(
+                value         = name,
+                onValueChange = { if (it.length <= 32) name = it },
+                label         = { Text("Stat name") },
+                placeholder   = { Text("e.g. Energy, Infect…") },
+                singleLine    = true,
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick  = { if (name.isNotBlank()) onConfirm(name.trim()) },
+                enabled  = name.isNotBlank(),
+            ) { Text("Add") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
 }

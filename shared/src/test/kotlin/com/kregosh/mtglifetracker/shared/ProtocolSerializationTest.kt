@@ -24,16 +24,27 @@ class ProtocolSerializationTest {
     }
 
     @Test
-    fun `Increment serializes with correct type discriminator`() {
-        val encoded = json.encodeToString(ClientMessage.serializer(), ClientMessage.Increment)
-        assert(encoded.contains("\"type\":\"increment\"")) { "Expected type discriminator in: $encoded" }
+    fun `Adjust serializes with correct type discriminator`() {
+        val msg     = ClientMessage.Adjust(stat = "life", delta = -1)
+        val encoded = json.encodeToString(ClientMessage.serializer(), msg)
+        assert(encoded.contains("\"type\":\"adjust\"")) { "Expected type discriminator in: $encoded" }
+        assert(encoded.contains("\"stat\":\"life\""))   { "Expected stat field in: $encoded" }
     }
 
     @Test
-    fun `Decrement round-trips through JSON`() {
-        val encoded = json.encodeToString(ClientMessage.serializer(), ClientMessage.Decrement)
-        val decoded = json.decodeFromString(ClientMessage.serializer(), encoded)
-        assertIs<ClientMessage.Decrement>(decoded)
+    fun `Adjust round-trips through JSON`() {
+        val original = ClientMessage.Adjust(stat = "commander", delta = 3)
+        val encoded  = json.encodeToString(ClientMessage.serializer(), original)
+        val decoded  = json.decodeFromString(ClientMessage.serializer(), encoded)
+        assertEquals(original, decoded)
+    }
+
+    @Test
+    fun `AddCustomStat round-trips through JSON`() {
+        val original = ClientMessage.AddCustomStat(name = "Energy")
+        val encoded  = json.encodeToString(ClientMessage.serializer(), original)
+        val decoded  = json.decodeFromString(ClientMessage.serializer(), encoded)
+        assertEquals(original, decoded)
     }
 
     // ── ServerMessage ────────────────────────────────────────────────
@@ -41,10 +52,26 @@ class ProtocolSerializationTest {
     @Test
     fun `State message round-trips through JSON`() {
         val users = listOf(
-            UserState("u1", "Alice", 20u),
-            UserState("u2", "Bob",   18u),
+            UserState("u1", "Alice"),
+            UserState("u2", "Bob", life = 18u),
         )
-        val original = ServerMessage.State(users)
+        val original = ServerMessage.State(users, customStatNames = listOf("Energy"))
+        val encoded  = json.encodeToString(ServerMessage.serializer(), original)
+        val decoded  = json.decodeFromString(ServerMessage.serializer(), encoded)
+        assertEquals(original, decoded)
+    }
+
+    @Test
+    fun `State message with custom stats round-trips`() {
+        val user = UserState(
+            id             = "u1",
+            displayName    = "Alice",
+            life           = 20u,
+            commanderDamage = 3u,
+            poisonDamage   = 0u,
+            customStats    = mapOf("Energy" to 5u),
+        )
+        val original = ServerMessage.State(listOf(user), listOf("Energy"))
         val encoded  = json.encodeToString(ServerMessage.serializer(), original)
         val decoded  = json.decodeFromString(ServerMessage.serializer(), encoded)
         assertEquals(original, decoded)
@@ -77,10 +104,19 @@ class ProtocolSerializationTest {
     // ── UInt boundary ────────────────────────────────────────────────
 
     @Test
-    fun `UserState with max UInt value round-trips`() {
-        val state   = UserState("u1", "Max", UInt.MAX_VALUE)
+    fun `UserState with max UInt life round-trips`() {
+        val state   = UserState("u1", "Max", life = UInt.MAX_VALUE)
         val encoded = json.encodeToString(UserState.serializer(), state)
         val decoded = json.decodeFromString(UserState.serializer(), encoded)
         assertEquals(state, decoded)
+    }
+
+    @Test
+    fun `UserState defaults: life=20, no damage, no custom stats`() {
+        val state = UserState("u1", "Alice")
+        assertEquals(20u,         state.life)
+        assertEquals(0u,          state.commanderDamage)
+        assertEquals(0u,          state.poisonDamage)
+        assertEquals(emptyMap(),  state.customStats)
     }
 }

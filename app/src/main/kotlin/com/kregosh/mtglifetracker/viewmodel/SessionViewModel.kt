@@ -31,12 +31,22 @@ sealed interface Screen {
 // ─────────────────────────────────────────────────────────────────────────────
 
 data class SessionUiState(
-    val sessionCode : String        = "",
-    val myUserId    : String        = "",
-    val users       : List<UserState> = emptyList(),
-    val wsState     : WsState       = WsState.Connecting,
-    val error       : String?       = null,
+    val sessionCode      : String          = "",
+    val myUserId         : String          = "",
+    val users            : List<UserState> = emptyList(),
+    val customStatNames  : List<String>    = emptyList(),
+    val wsState          : WsState         = WsState.Connecting,
+    val error            : String?         = null,
+    /** Players are eliminated at or above this commander damage total. */
+    val commanderDeathThreshold: UInt = 21u,
+    /** Players are eliminated at or above this poison counter total. */
+    val poisonDeathThreshold   : UInt = 10u,
 )
+
+fun UserState.isDead(state: SessionUiState): Boolean =
+    life == 0u
+        || commanderDamage >= state.commanderDeathThreshold
+        || poisonDamage    >= state.poisonDeathThreshold
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ViewModel
@@ -60,6 +70,9 @@ class SessionViewModel(
     private val _homeError = MutableStateFlow<String?>(null)
     val homeError: StateFlow<String?> = _homeError.asStateFlow()
 
+    private val _backgroundImageUri = MutableStateFlow(prefs.backgroundImageUri)
+    val backgroundImageUri: StateFlow<String?> = _backgroundImageUri.asStateFlow()
+
     private var webSocket: SessionConnection? = null
     private var wsCollectorJob: Job? = null
 
@@ -68,6 +81,13 @@ class SessionViewModel(
     val displayName: String get() = prefs.displayName
 
     fun setDisplayName(name: String) { prefs.displayName = name.trim() }
+
+    // ── background image ─────────────────────────────────────────────
+
+    fun setBackgroundImage(uri: String?) {
+        prefs.backgroundImageUri = uri
+        _backgroundImageUri.value = uri
+    }
 
     // ── home screen actions ──────────────────────────────────────────
 
@@ -99,8 +119,9 @@ class SessionViewModel(
 
     // ── session screen actions ───────────────────────────────────────
 
-    fun increment() = webSocket?.increment()
-    fun decrement() = webSocket?.decrement()
+    fun adjust(stat: String, delta: Int) = webSocket?.adjust(stat, delta)
+
+    fun addCustomStat(name: String) = webSocket?.addCustomStat(name)
 
     fun leaveSession() {
         tearDownWebSocket()
@@ -115,11 +136,8 @@ class SessionViewModel(
         val myId = prefs.userId
         val name = prefs.displayName.ifBlank { "Player" }
 
-        _sessionUi.value = SessionUiState(
-            sessionCode = sessionCode,
-            myUserId    = myId,
-        )
-        _screen.value = Screen.Session(sessionId)
+        _sessionUi.value = SessionUiState(sessionCode = sessionCode, myUserId = myId)
+        _screen.value    = Screen.Session(sessionId)
 
         val ws = wsFactory(sessionId, myId, name)
         webSocket = ws
@@ -133,8 +151,12 @@ class SessionViewModel(
             launch {
                 ws.messages.collect { msg ->
                     when (msg) {
-                        is ServerMessage.State  -> _sessionUi.update { it.copy(users = msg.users) }
-                        is ServerMessage.Joined -> _sessionUi.update { it.copy(sessionCode = msg.sessionCode) }
+                        is ServerMessage.State  -> _sessionUi.update {
+                            it.copy(users = msg.users, customStatNames = msg.customStatNames)
+                        }
+                        is ServerMessage.Joined -> _sessionUi.update {
+                            it.copy(sessionCode = msg.sessionCode)
+                        }
                         is ServerMessage.Error  -> _sessionUi.update { it.copy(error = msg.message) }
                     }
                 }
