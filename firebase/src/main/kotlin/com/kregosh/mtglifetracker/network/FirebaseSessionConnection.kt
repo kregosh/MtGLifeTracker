@@ -28,8 +28,8 @@ class FirebaseSessionConnection(
     private val _state    = MutableStateFlow<WsState>(WsState.Connecting)
     private val scope     = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    override val messages         : SharedFlow<ServerMessage> = _messages
-    override val connectionState  : StateFlow<WsState>        = _state
+    override val messages        : SharedFlow<ServerMessage> = _messages
+    override val connectionState : StateFlow<WsState>        = _state
 
     private var connectedListener : ValueEventListener? = null
     private var sessionListener   : ValueEventListener? = null

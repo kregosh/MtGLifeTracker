@@ -23,6 +23,11 @@ import com.kregosh.mtglifetracker.ui.theme.AppColorScheme
 import com.kregosh.mtglifetracker.ui.theme.LocalCardBackground
 import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
 import com.kregosh.mtglifetracker.ui.theme.MtGLifeTrackerTheme
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import com.kregosh.mtglifetracker.data.UserPreferences
+import com.kregosh.mtglifetracker.network.FirebaseSessionApi
+import com.kregosh.mtglifetracker.network.FirebaseSessionConnection
 import com.kregosh.mtglifetracker.viewmodel.Screen
 import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
 import kotlinx.coroutines.Dispatchers
@@ -30,7 +35,17 @@ import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
 
-    private val vm: SessionViewModel by viewModels { SessionViewModel.factory(application) }
+    private val vm: SessionViewModel by viewModels {
+        object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                SessionViewModel(
+                    prefs     = UserPreferences(application),
+                    api       = FirebaseSessionApi(),
+                    wsFactory = { id, uid, name, startLife -> FirebaseSessionConnection(id, uid, name, startLife) },
+                ) as T
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

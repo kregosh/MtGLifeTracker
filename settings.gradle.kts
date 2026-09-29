@@ -21,4 +21,6 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "MtGLifeTracker"
+include(":core")
+include(":firebase")
 include(":app")
