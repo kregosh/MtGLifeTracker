@@ -12,17 +12,20 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.kregosh.mtglifetracker.network.WsState
 import com.kregosh.mtglifetracker.ui.components.PlayerCard
+import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
 import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SessionScreen(vm: SessionViewModel) {
-    val ui      by vm.sessionUi.collectAsState()
-    val context = LocalContext.current
+    val ui           by vm.sessionUi.collectAsState()
+    val context      = LocalContext.current
+    val hasBg        = LocalHasBackground.current
 
     var showAddStatDialog by remember { mutableStateOf(false) }
 
@@ -36,9 +39,18 @@ fun SessionScreen(vm: SessionViewModel) {
         )
     }
 
+    val topBarColors = if (hasBg) TopAppBarDefaults.topAppBarColors(
+        containerColor         = Color.Black.copy(alpha = 0.45f),
+        titleContentColor      = Color.White,
+        navigationIconContentColor = Color.White,
+        actionIconContentColor = Color.White,
+    ) else TopAppBarDefaults.topAppBarColors()
+
     Scaffold(
+        containerColor = if (hasBg) Color.Transparent else MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
+                colors = topBarColors,
                 title = {
                     Column {
                         Text("Session")
@@ -46,7 +58,8 @@ fun SessionScreen(vm: SessionViewModel) {
                             Text(
                                 text  = "Code: ${ui.sessionCode}",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary,
+                                color = if (hasBg) Color.White.copy(alpha = 0.7f)
+                                        else MaterialTheme.colorScheme.primary,
                             )
                         }
                     }

@@ -17,6 +17,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kregosh.mtglifetracker.shared.UserState
+import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
 import com.kregosh.mtglifetracker.viewmodel.SessionUiState
 import com.kregosh.mtglifetracker.viewmodel.isDead
 
@@ -28,12 +29,13 @@ fun PlayerCard(
     onAdjust  : (stat: String, delta: Int) -> Unit = { _, _ -> },
     modifier  : Modifier = Modifier,
 ) {
-    val dead = user.isDead(sessionUi)
+    val dead  = user.isDead(sessionUi)
+    val hasBg = LocalHasBackground.current
 
     val containerColor = when {
-        dead  -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f)
-        isMe  -> MaterialTheme.colorScheme.primaryContainer
-        else  -> MaterialTheme.colorScheme.surfaceVariant
+        dead  -> MaterialTheme.colorScheme.errorContainer.copy(alpha = if (hasBg) 0.45f else 0.6f)
+        isMe  -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (hasBg) 0.72f else 1f)
+        else  -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (hasBg) 0.60f else 1f)
     }
 
     Box(modifier = modifier.fillMaxWidth()) {

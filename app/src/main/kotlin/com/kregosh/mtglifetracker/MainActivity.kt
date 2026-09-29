@@ -18,6 +18,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import com.kregosh.mtglifetracker.ui.screens.HomeScreen
 import com.kregosh.mtglifetracker.ui.screens.SessionScreen
+import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
 import com.kregosh.mtglifetracker.ui.theme.MtGLifeTrackerTheme
 import com.kregosh.mtglifetracker.viewmodel.Screen
 import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
@@ -56,19 +57,23 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                Box(modifier = Modifier.fillMaxSize()) {
-                    bgBitmap?.let { bmp ->
-                        Image(
-                            bitmap      = bmp,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier     = Modifier.fillMaxSize(),
-                        )
-                    }
+                androidx.compose.runtime.CompositionLocalProvider(
+                    LocalHasBackground provides (bgBitmap != null),
+                ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        bgBitmap?.let { bmp ->
+                            Image(
+                                bitmap             = bmp,
+                                contentDescription = null,
+                                contentScale       = ContentScale.Crop,
+                                modifier           = Modifier.fillMaxSize(),
+                            )
+                        }
 
-                    when (screen) {
-                        is Screen.Home    -> HomeScreen(vm)
-                        is Screen.Session -> SessionScreen(vm)
+                        when (screen) {
+                            is Screen.Home    -> HomeScreen(vm)
+                            is Screen.Session -> SessionScreen(vm)
+                        }
                     }
                 }
             }

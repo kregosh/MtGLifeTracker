@@ -14,10 +14,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
+import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
 import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -26,6 +28,7 @@ fun HomeScreen(vm: SessionViewModel) {
     val loading by vm.homeLoading.collectAsState()
     val error   by vm.homeError.collectAsState()
     val context = LocalContext.current
+    val hasBg   = LocalHasBackground.current
 
     var codeInput      by remember { mutableStateOf("") }
     var nameInput      by remember { mutableStateOf(vm.displayName) }
@@ -57,7 +60,16 @@ fun HomeScreen(vm: SessionViewModel) {
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("MtG Life Tracker") }) }
+        containerColor = if (hasBg) Color.Transparent else MaterialTheme.colorScheme.background,
+        topBar = {
+            TopAppBar(
+                title = { Text("MtG Life Tracker") },
+                colors = if (hasBg) TopAppBarDefaults.topAppBarColors(
+                    containerColor    = Color.Black.copy(alpha = 0.45f),
+                    titleContentColor = Color.White,
+                ) else TopAppBarDefaults.topAppBarColors(),
+            )
+        },
     ) { padding ->
         Column(
             modifier            = Modifier
