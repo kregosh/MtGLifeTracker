@@ -14,12 +14,12 @@ class UserPreferences(context: Context) : UserPrefs {
     private val prefs = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
 
     /** Stable UUID identifying this device/install. Generated once, never changed. */
-    val userId: String
+    override val userId: String
         get() = prefs.getString(KEY_USER_ID, null) ?: UUID.randomUUID().toString().also { id ->
             prefs.edit().putString(KEY_USER_ID, id).apply()
         }
 
-    var displayName: String
+    override var displayName: String
         get() = prefs.getString(KEY_DISPLAY_NAME, "") ?: ""
         set(value) { prefs.edit().putString(KEY_DISPLAY_NAME, value).apply() }
 

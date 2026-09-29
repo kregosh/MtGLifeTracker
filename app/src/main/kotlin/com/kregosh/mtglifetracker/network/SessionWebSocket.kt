@@ -23,15 +23,6 @@ sealed interface WsState {
     data class Failed(val reason: String) : WsState
 }
 
-/**
- * Manages the WebSocket connection to one session.
- *
- * Exposes:
- * - [messages] — a shared flow of [ServerMessage] from the server.
- * - [connectionState] — current connection lifecycle state.
- *
- * Call [connect] to start and [close] to tear down.
- */
 class SessionWebSocket(
     private val sessionId: String,
     private val userId: String,
@@ -50,17 +41,17 @@ class SessionWebSocket(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val _messages   = MutableSharedFlow<ServerMessage>(extraBufferCapacity = 64)
-    val messages: SharedFlow<ServerMessage> = _messages.asSharedFlow()
+    override val messages: SharedFlow<ServerMessage> = _messages.asSharedFlow()
 
     private val _state      = MutableStateFlow<WsState>(WsState.Connecting)
-    val connectionState: StateFlow<WsState> = _state.asStateFlow()
+    override val connectionState: StateFlow<WsState> = _state.asStateFlow()
 
-    /** Outgoing commands queued by [increment] / [decrement]. */
-    private val outgoing = Channel<ClientMessage>(Channel.BUFFERED)
+    // Renamed from 'outgoing' to avoid shadowing the WebSocket session's outgoing SendChannel
+    private val commandQueue = Channel<ClientMessage>(Channel.BUFFERED)
 
     private var wsSession: DefaultClientWebSocketSession? = null
 
-    fun connect() {
+    override fun connect() {
         scope.launch { runWithRetry() }
     }
 
@@ -79,7 +70,7 @@ class SessionWebSocket(
 
                     // Forward outgoing commands while also reading incoming frames
                     val sendJob = launch {
-                        outgoing.receiveAsFlow().collect { msg ->
+                        commandQueue.receiveAsFlow().collect { msg ->
                             send(Frame.Text(json.encodeToString(ClientMessage.serializer(), msg)))
                         }
                     }
@@ -111,11 +102,11 @@ class SessionWebSocket(
         _state.value = WsState.Failed("Disconnected")
     }
 
-    fun increment() { scope.launch { outgoing.send(ClientMessage.Increment) } }
-    fun decrement() { scope.launch { outgoing.send(ClientMessage.Decrement) } }
+    override fun increment() { scope.launch { commandQueue.send(ClientMessage.Increment) } }
+    override fun decrement() { scope.launch { commandQueue.send(ClientMessage.Decrement) } }
 
-    fun close() {
-        outgoing.close()
+    override fun close() {
+        commandQueue.close()
         scope.cancel()
         client.close()
     }

@@ -32,17 +32,14 @@ class ApiClient : SessionApi {
 
     private val base = BuildConfig.SERVER_BASE_URL
 
-    /** Creates a new session and returns its ID and invite code. */
-    suspend fun createSession(): CreateSessionResponse =
+    override suspend fun createSession(): CreateSessionResponse =
         client.post("$base/api/sessions").body()
 
-    /** Looks up a session by its short invite code (e.g. "ABC123"). */
-    suspend fun getSessionByCode(code: String): SessionInfoResponse =
+    override suspend fun getSessionByCode(code: String): SessionInfoResponse =
         client.get("$base/api/join/$code").body()
 
-    /** Looks up a session by its internal UUID. */
-    suspend fun getSessionById(sessionId: String): SessionInfoResponse =
+    override suspend fun getSessionById(sessionId: String): SessionInfoResponse =
         client.get("$base/api/sessions/$sessionId").body()
 
-    fun close() = client.close()
+    override fun close() = client.close()
 }
