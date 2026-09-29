@@ -1,14 +1,13 @@
 {
-  "_comment": "Replace with the real google-services.json from Firebase Console > Project settings > Your apps.",
   "project_info": {
-    "project_number": "000000000000",
-    "project_id": "your-firebase-project-id",
-    "storage_bucket": "your-firebase-project-id.appspot.com"
+    "project_number": "549917843923",
+    "project_id": "mtg-lifetracker-7866f",
+    "storage_bucket": "mtg-lifetracker-7866f.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
+        "mobilesdk_app_id": "1:549917843923:android:c94b9ff63541443a8a4f26",
         "android_client_info": {
           "package_name": "com.kregosh.mtglifetracker"
         }
@@ -16,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "replace-with-your-firebase-api-key"
+          "current_key": "AIzaSyDewQfp9Khw61EtN-iePksClk8x_vy5aQQ"
         }
       ],
       "services": {
