@@ -10,7 +10,9 @@ import com.kregosh.mtglifetracker.shared.ServerMessage
 import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.shared.UserState
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -119,8 +121,8 @@ class SessionViewModel(
         _timerRunning.value = true
         timerJob = viewModelScope.launch {
             val limit = if (prefs.timerCountDown) prefs.timerLimitMinutes.toLong().minutes else null
-            while (kotlinx.coroutines.isActive) {
-                kotlinx.coroutines.delay(500)
+            while (isActive) {
+                delay(500)
                 val now = timerAccumulated + (timerMark?.elapsedNow() ?: Duration.ZERO)
                 if (limit != null && now >= limit) {
                     _timerElapsed.value = limit
@@ -236,7 +238,7 @@ class SessionViewModel(
         _sessionUi.update { it.copy(users = applyPendingDeltas(serverUsers)) }
         debounceJobs[stat]?.cancel()
         debounceJobs[stat] = viewModelScope.launch {
-            kotlinx.coroutines.delay(400)
+            delay(400)
             val accumulated = pendingDeltas.remove(stat) ?: return@launch
             debounceJobs.remove(stat)
             webSocket?.adjust(stat, accumulated)
