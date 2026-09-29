@@ -196,9 +196,10 @@ fun SettingsScreen(vm: SessionViewModel) {
 
                     if (countDown) {
                         Spacer(Modifier.height(12.dp))
+                        val timerLimitMinutes by vm.timerLimitMinutes.collectAsState()
                         PresetRow(
                             label    = "Time limit (minutes)",
-                            current  = vm.timerLimitMinutes.value,
+                            current  = timerLimitMinutes,
                             presets  = listOf(30u, 45u, 60u, 90u),
                             onSelect = vm::setTimerLimitMinutes,
                         )
