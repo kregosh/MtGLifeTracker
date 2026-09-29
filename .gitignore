@@ -17,6 +17,7 @@ local.properties
 # Android
 *.apk
 *.aab
+app/google-services.json
 
 # OS
 .DS_Store
