@@ -143,4 +143,57 @@ class SessionViewModelTest {
     fun `displayName comes from prefs`() {
         assertEquals("Test Player", makeVm().displayName)
     }
+
+    @Test
+    fun `stale collectors do not fire after leaveSession`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        vm.leaveSession()
+        advanceUntilIdle()
+
+        // Any update from the old ws should not reach sessionUi after teardown
+        val staleUsers = listOf(UserState("test-user-id", "Test Player", 99u))
+        wsMessages.emit(ServerMessage.State(staleUsers))
+        advanceUntilIdle()
+
+        // sessionUi.users should NOT be updated with the stale emission
+        assertNotEquals(staleUsers, vm.sessionUi.value.users)
+    }
+
+    @Test
+    fun `rejoin cancels collectors from previous session`() = runTest {
+        val ws2Messages = MutableSharedFlow<ServerMessage>(extraBufferCapacity = 16)
+        val ws2State    = MutableStateFlow<WsState>(WsState.Connecting)
+        val ws2         = mockk<SessionConnection>(relaxed = true) {
+            every { messages }        returns ws2Messages
+            every { connectionState } returns ws2State
+        }
+
+        coEvery { api.createSession() } returnsMany listOf(
+            CreateSessionResponse("sid-1", "CODE01"),
+            CreateSessionResponse("sid-2", "CODE02"),
+        )
+        var callCount = 0
+        every { wsFactory(any(), any(), any()) } answers {
+            if (callCount++ == 0) ws else ws2
+        }
+
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+        vm.createSession()      // rejoin: tears down old ws, sets up ws2
+        advanceUntilIdle()
+
+        // Stale emission from first ws should not reach current sessionUi
+        val staleUsers = listOf(UserState("test-user-id", "Old Session", 5u))
+        wsMessages.emit(ServerMessage.State(staleUsers))
+        advanceUntilIdle()
+
+        assertNotEquals(staleUsers, vm.sessionUi.value.users)
+        verify { ws.close() }   // first ws was torn down
+    }
 }

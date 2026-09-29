@@ -17,9 +17,10 @@ import org.slf4j.LoggerFactory
 private val log = LoggerFactory.getLogger("SessionWebSocket")
 
 sealed interface WsState {
-    object Connecting  : WsState
-    object Connected   : WsState
-    object Reconnecting: WsState
+    object Connecting   : WsState
+    object Connected    : WsState
+    object Reconnecting : WsState
+    object Closed       : WsState   // intentional user-driven teardown
     data class Failed(val reason: String) : WsState
 }
 
@@ -102,13 +103,16 @@ class SessionWebSocket(
             log.info("Reconnecting in ${delayMs}ms …")
             delay(delayMs)
         }
-        _state.value = WsState.Failed("Disconnected")
+        if (_state.value !is WsState.Closed) {
+            _state.value = WsState.Failed("Disconnected")
+        }
     }
 
     override fun increment() { scope.launch { commandQueue.send(ClientMessage.Increment) } }
     override fun decrement() { scope.launch { commandQueue.send(ClientMessage.Decrement) } }
 
     override fun close() {
+        _state.value = WsState.Closed
         commandQueue.close()
         scope.cancel()
         client.close()

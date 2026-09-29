@@ -13,6 +13,7 @@ import com.kregosh.mtglifetracker.network.SessionWebSocket
 import com.kregosh.mtglifetracker.network.WsState
 import com.kregosh.mtglifetracker.shared.ServerMessage
 import com.kregosh.mtglifetracker.shared.UserState
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -60,6 +61,7 @@ class SessionViewModel(
     val homeError: StateFlow<String?> = _homeError.asStateFlow()
 
     private var webSocket: SessionConnection? = null
+    private var wsCollectorJob: Job? = null
 
     // ── display name ─────────────────────────────────────────────────
 
@@ -122,18 +124,19 @@ class SessionViewModel(
         val ws = wsFactory(sessionId, myId, name)
         webSocket = ws
 
-        viewModelScope.launch {
-            ws.connectionState.collect { state ->
-                _sessionUi.update { it.copy(wsState = state) }
+        wsCollectorJob = viewModelScope.launch {
+            launch {
+                ws.connectionState.collect { state ->
+                    _sessionUi.update { it.copy(wsState = state) }
+                }
             }
-        }
-
-        viewModelScope.launch {
-            ws.messages.collect { msg ->
-                when (msg) {
-                    is ServerMessage.State  -> _sessionUi.update { it.copy(users = msg.users) }
-                    is ServerMessage.Joined -> _sessionUi.update { it.copy(sessionCode = msg.sessionCode) }
-                    is ServerMessage.Error  -> _sessionUi.update { it.copy(error = msg.message) }
+            launch {
+                ws.messages.collect { msg ->
+                    when (msg) {
+                        is ServerMessage.State  -> _sessionUi.update { it.copy(users = msg.users) }
+                        is ServerMessage.Joined -> _sessionUi.update { it.copy(sessionCode = msg.sessionCode) }
+                        is ServerMessage.Error  -> _sessionUi.update { it.copy(error = msg.message) }
+                    }
                 }
             }
         }
@@ -142,6 +145,8 @@ class SessionViewModel(
     }
 
     private fun tearDownWebSocket() {
+        wsCollectorJob?.cancel()
+        wsCollectorJob = null
         webSocket?.close()
         webSocket = null
     }
