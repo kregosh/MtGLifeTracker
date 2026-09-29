@@ -1,0 +1,23 @@
+# Gradle
+.gradle/
+build/
+**/build/
+
+# Local Gradle wrapper jars (not needed in VCS)
+gradle/wrapper/gradle-wrapper.jar
+backend/gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+local.properties
+
+# Android
+*.apk
+*.aab
+
+# OS
+.DS_Store
+Thumbs.db
