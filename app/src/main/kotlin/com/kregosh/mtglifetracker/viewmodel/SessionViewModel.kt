@@ -76,6 +76,11 @@ class SessionViewModel(
     private var webSocket: SessionConnection? = null
     private var wsCollectorJob: Job? = null
 
+    // Debounce state: last server-confirmed snapshot + per-stat pending deltas
+    private var serverUsers   = emptyList<UserState>()
+    private val pendingDeltas = mutableMapOf<String, Int>()
+    private val debounceJobs  = mutableMapOf<String, Job>()
+
     // ── display name ─────────────────────────────────────────────────
 
     val displayName: String get() = prefs.displayName
@@ -119,7 +124,39 @@ class SessionViewModel(
 
     // ── session screen actions ───────────────────────────────────────
 
-    fun adjust(stat: String, delta: Int) = webSocket?.adjust(stat, delta)
+    fun adjust(stat: String, delta: Int) {
+        webSocket ?: return
+        pendingDeltas[stat] = (pendingDeltas[stat] ?: 0) + delta
+        _sessionUi.update { it.copy(users = applyPendingDeltas(serverUsers)) }
+        debounceJobs[stat]?.cancel()
+        debounceJobs[stat] = viewModelScope.launch {
+            kotlinx.coroutines.delay(400)
+            val accumulated = pendingDeltas.remove(stat) ?: return@launch
+            debounceJobs.remove(stat)
+            webSocket?.adjust(stat, accumulated)
+        }
+    }
+
+    private fun applyPendingDeltas(users: List<UserState>): List<UserState> {
+        if (pendingDeltas.isEmpty()) return users
+        val myId = _sessionUi.value.myUserId
+        return users.map { user ->
+            if (user.id != myId) user
+            else pendingDeltas.entries.fold(user) { u, (stat, delta) -> u.withDelta(stat, delta) }
+        }
+    }
+
+    private fun UserState.withDelta(stat: String, delta: Int): UserState {
+        fun clamp(v: Long) = v.coerceIn(0L, UInt.MAX_VALUE.toLong()).toUInt()
+        return when (stat) {
+            "life"      -> copy(life = clamp(life.toLong() + delta))
+            "commander" -> copy(commanderDamage = clamp(commanderDamage.toLong() + delta))
+            "poison"    -> copy(poisonDamage = clamp(poisonDamage.toLong() + delta))
+            else        -> copy(customStats = customStats.toMutableMap().also { map ->
+                map[stat]?.let { map[stat] = clamp(it.toLong() + delta) }
+            })
+        }
+    }
 
     fun addCustomStat(name: String) = webSocket?.addCustomStat(name)
 
@@ -151,8 +188,14 @@ class SessionViewModel(
             launch {
                 ws.messages.collect { msg ->
                     when (msg) {
-                        is ServerMessage.State  -> _sessionUi.update {
-                            it.copy(users = msg.users, customStatNames = msg.customStatNames)
+                        is ServerMessage.State  -> {
+                            serverUsers = msg.users
+                            _sessionUi.update {
+                                it.copy(
+                                    users           = applyPendingDeltas(msg.users),
+                                    customStatNames = msg.customStatNames,
+                                )
+                            }
                         }
                         is ServerMessage.Joined -> _sessionUi.update {
                             it.copy(sessionCode = msg.sessionCode)
@@ -167,6 +210,10 @@ class SessionViewModel(
     }
 
     private fun tearDownWebSocket() {
+        debounceJobs.values.forEach { it.cancel() }
+        debounceJobs.clear()
+        pendingDeltas.clear()
+        serverUsers = emptyList()
         wsCollectorJob?.cancel()
         wsCollectorJob = null
         webSocket?.close()

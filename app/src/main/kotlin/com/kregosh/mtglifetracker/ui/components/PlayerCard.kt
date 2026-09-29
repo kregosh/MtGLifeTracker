@@ -133,8 +133,8 @@ fun PlayerCard(
             }
         }
 
-        // ── Skull overlay ─────────────────────────────────────────────
-        if (dead) {
+        // ── Skull overlay — only for others; your own card stays interactive ──
+        if (dead && !isMe) {
             Box(
                 modifier = Modifier
                     .matchParentSize()
