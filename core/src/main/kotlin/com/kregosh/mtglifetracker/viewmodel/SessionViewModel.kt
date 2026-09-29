@@ -12,6 +12,10 @@ import com.kregosh.mtglifetracker.shared.UserState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Navigation state
@@ -78,6 +82,45 @@ class SessionViewModel(
     private var webSocket: SessionConnection? = null
     private var wsCollectorJob: Job? = null
     private var settingsReturnTo: Screen = Screen.Home
+
+    // ── game timer ────────────────────────────────────────────────────
+
+    private val _timerRunning = MutableStateFlow(false)
+    val timerRunning: StateFlow<Boolean> = _timerRunning.asStateFlow()
+
+    private val _timerElapsed = MutableStateFlow(Duration.ZERO)
+    val timerElapsed: StateFlow<Duration> = _timerElapsed.asStateFlow()
+
+    private var timerJob: Job? = null
+    private var timerMark: TimeMark? = null
+    private var timerAccumulated: Duration = Duration.ZERO
+
+    fun startPauseTimer() {
+        if (_timerRunning.value) {
+            timerAccumulated += timerMark?.elapsedNow() ?: Duration.ZERO
+            timerMark = null
+            _timerRunning.value = false
+            timerJob?.cancel()
+        } else {
+            timerMark = TimeSource.Monotonic.markNow()
+            _timerRunning.value = true
+            timerJob = viewModelScope.launch {
+                while (kotlinx.coroutines.isActive) {
+                    kotlinx.coroutines.delay(500)
+                    _timerElapsed.value = timerAccumulated + (timerMark?.elapsedNow() ?: Duration.ZERO)
+                }
+            }
+        }
+    }
+
+    fun resetTimer() {
+        timerJob?.cancel()
+        timerJob = null
+        timerMark = null
+        timerAccumulated = Duration.ZERO
+        _timerRunning.value = false
+        _timerElapsed.value = Duration.ZERO
+    }
 
     // Debounce state: last server-confirmed snapshot + per-stat pending deltas
     private var serverUsers   = emptyList<UserState>()
@@ -273,6 +316,7 @@ class SessionViewModel(
         wsCollectorJob = null
         webSocket?.close()
         webSocket = null
+        resetTimer()
     }
 
     override fun onCleared() {

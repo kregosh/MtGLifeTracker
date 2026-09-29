@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import kotlin.time.Duration
 import com.kregosh.mtglifetracker.network.WsState
 import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.ui.components.PlayerCard
@@ -56,20 +57,24 @@ private const val GLOBAL_DAY_NIGHT = "daynight"
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SessionScreen(vm: SessionViewModel) {
-    val ui      by vm.sessionUi.collectAsState()
+    val ui           by vm.sessionUi.collectAsState()
+    val timerElapsed by vm.timerElapsed.collectAsState()
+    val timerRunning by vm.timerRunning.collectAsState()
     val context = LocalContext.current
     val hasBg   = LocalHasBackground.current
 
-    SessionContent(vm, ui, context, hasBg)
+    SessionContent(vm, ui, timerElapsed, timerRunning, context, hasBg)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SessionContent(
-    vm      : SessionViewModel,
-    ui      : SessionUiState,
-    context : android.content.Context,
-    hasBg   : Boolean,
+    vm           : SessionViewModel,
+    ui           : SessionUiState,
+    timerElapsed : Duration,
+    timerRunning : Boolean,
+    context      : android.content.Context,
+    hasBg        : Boolean,
 ) {
 
     var showStatPicker   by remember { mutableStateOf(false) }
@@ -189,6 +194,13 @@ private fun SessionContent(
                 )
             }
 
+            GameTimerRow(
+                elapsed  = timerElapsed,
+                running  = timerRunning,
+                onToggle = vm::startPauseTimer,
+                onReset  = vm::resetTimer,
+            )
+
             Spacer(Modifier.height(8.dp))
 
             if (ui.users.isEmpty()) {
@@ -269,6 +281,57 @@ private fun DayNightBanner(isDaytime: Boolean, onToggle: () -> Unit) {
             }
         }
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Game timer row
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun GameTimerRow(
+    elapsed  : Duration,
+    running  : Boolean,
+    onToggle : () -> Unit,
+    onReset  : () -> Unit,
+) {
+    val hasStarted = elapsed > Duration.ZERO || running
+    Row(
+        modifier          = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(
+            imageVector        = Icons.Default.Timer,
+            contentDescription = null,
+            tint               = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier           = Modifier.size(18.dp),
+        )
+        Text(
+            text     = elapsed.toTimerString(),
+            style    = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.weight(1f),
+        )
+        IconButton(onClick = onToggle, modifier = Modifier.size(36.dp)) {
+            val icon = if (running) Icons.Default.Pause else Icons.Default.PlayArrow
+            Icon(icon, contentDescription = if (running) "Pause" else "Start")
+        }
+        if (hasStarted) {
+            IconButton(onClick = onReset, modifier = Modifier.size(36.dp)) {
+                Icon(Icons.Default.Replay, contentDescription = "Reset timer",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+private fun Duration.toTimerString(): String {
+    val total = inWholeSeconds
+    val h = total / 3600
+    val m = (total % 3600) / 60
+    val s = total % 60
+    return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%02d:%02d".format(m, s)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
