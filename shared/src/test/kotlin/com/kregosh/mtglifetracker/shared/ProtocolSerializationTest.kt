@@ -112,7 +112,7 @@ class ProtocolSerializationTest {
     }
 
     @Test
-    fun `UserState defaults: life=20, no damage, no custom stats`() {
+    fun `UserState defaults to life 20 with no damage and no custom stats`() {
         val state = UserState("u1", "Alice")
         assertEquals(20u,         state.life)
         assertEquals(0u,          state.commanderDamage)
