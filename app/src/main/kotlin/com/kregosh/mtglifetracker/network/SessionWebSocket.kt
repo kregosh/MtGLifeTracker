@@ -9,6 +9,7 @@ import io.ktor.client.plugins.websocket.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.receiveAsFlow
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
@@ -35,7 +36,7 @@ class SessionWebSocket(
     private val sessionId: String,
     private val userId: String,
     private val displayName: String,
-) {
+) : SessionConnection {
     private val json = Json {
         classDiscriminator = "type"
         encodeDefaults     = true
@@ -78,7 +79,7 @@ class SessionWebSocket(
 
                     // Forward outgoing commands while also reading incoming frames
                     val sendJob = launch {
-                        for (msg in outgoing) {
+                        outgoing.receiveAsFlow().collect { msg ->
                             send(Frame.Text(json.encodeToString(ClientMessage.serializer(), msg)))
                         }
                     }

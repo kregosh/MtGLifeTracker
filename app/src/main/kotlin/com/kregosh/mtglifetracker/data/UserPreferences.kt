@@ -9,7 +9,7 @@ import java.util.UUID
  * Stores the stable [userId] UUID (generated once per install) and the user's
  * chosen [displayName] so they survive app restarts.
  */
-class UserPreferences(context: Context) {
+class UserPreferences(context: Context) : UserPrefs {
 
     private val prefs = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
 

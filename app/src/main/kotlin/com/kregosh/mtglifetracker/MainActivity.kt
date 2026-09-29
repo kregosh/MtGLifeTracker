@@ -15,7 +15,7 @@ import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
 
 class MainActivity : ComponentActivity() {
 
-    private val vm: SessionViewModel by viewModels()
+    private val vm: SessionViewModel by viewModels { SessionViewModel.factory(application) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

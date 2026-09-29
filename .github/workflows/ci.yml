@@ -64,6 +64,9 @@ jobs:
       - name: Compile app (debug)
         run: ./gradlew --no-daemon :app:compileDebugKotlin
 
+      - name: Run unit tests
+        run: ./gradlew --no-daemon :shared:test :app:testDebugUnitTest
+
       - name: Lint
         run: ./gradlew --no-daemon :app:lintDebug
 

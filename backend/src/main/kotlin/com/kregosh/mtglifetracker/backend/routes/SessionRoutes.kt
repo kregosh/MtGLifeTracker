@@ -8,13 +8,13 @@ import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 
-fun Route.sessionRoutes() {
+fun Route.sessionRoutes(sessions: SessionManager) {
 
     route("/api/sessions") {
 
         // POST /api/sessions  →  create a new session
         post {
-            val room = SessionManager.create()
+            val room = sessions.create()
             call.respond(
                 HttpStatusCode.Created,
                 CreateSessionResponse(sessionId = room.sessionId, sessionCode = room.code),
@@ -24,7 +24,7 @@ fun Route.sessionRoutes() {
         // GET /api/sessions/{id}  →  query by internal UUID
         get("{id}") {
             val id   = call.parameters["id"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val room = SessionManager.getById(id)
+            val room = sessions.getById(id)
                 ?: return@get call.respond(HttpStatusCode.NotFound, "Session not found")
             call.respond(SessionInfoResponse(room.sessionId, room.code, room.userCount()))
         }
@@ -36,7 +36,7 @@ fun Route.sessionRoutes() {
         get("{code}") {
             val code = call.parameters["code"]?.uppercase()
                 ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val room = SessionManager.getByCode(code)
+            val room = sessions.getByCode(code)
                 ?: return@get call.respond(HttpStatusCode.NotFound, "Session not found")
             call.respond(SessionInfoResponse(room.sessionId, room.code, room.userCount()))
         }

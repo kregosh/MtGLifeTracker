@@ -1,10 +1,14 @@
 package com.kregosh.mtglifetracker.viewmodel
 
 import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.kregosh.mtglifetracker.data.UserPreferences
+import com.kregosh.mtglifetracker.data.UserPrefs
 import com.kregosh.mtglifetracker.network.ApiClient
+import com.kregosh.mtglifetracker.network.SessionApi
+import com.kregosh.mtglifetracker.network.SessionConnection
 import com.kregosh.mtglifetracker.network.SessionWebSocket
 import com.kregosh.mtglifetracker.network.WsState
 import com.kregosh.mtglifetracker.shared.ServerMessage
@@ -37,10 +41,11 @@ data class SessionUiState(
 // ViewModel
 // ─────────────────────────────────────────────────────────────────────────────
 
-class SessionViewModel(app: Application) : AndroidViewModel(app) {
-
-    private val prefs  = UserPreferences(app)
-    private val api    = ApiClient()
+class SessionViewModel(
+    private val prefs: UserPrefs,
+    private val api: SessionApi,
+    private val wsFactory: (sessionId: String, userId: String, displayName: String) -> SessionConnection,
+) : ViewModel() {
 
     private val _screen = MutableStateFlow<Screen>(Screen.Home)
     val screen: StateFlow<Screen> = _screen.asStateFlow()
@@ -48,14 +53,13 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
     private val _sessionUi = MutableStateFlow(SessionUiState())
     val sessionUi: StateFlow<SessionUiState> = _sessionUi.asStateFlow()
 
-    /** Loading / error state for the home screen. */
     private val _homeLoading = MutableStateFlow(false)
     val homeLoading: StateFlow<Boolean> = _homeLoading.asStateFlow()
 
     private val _homeError = MutableStateFlow<String?>(null)
     val homeError: StateFlow<String?> = _homeError.asStateFlow()
 
-    private var webSocket: SessionWebSocket? = null
+    private var webSocket: SessionConnection? = null
 
     // ── display name ─────────────────────────────────────────────────
 
@@ -87,10 +91,6 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /**
-     * Called when the app is opened via a deep link:
-     * `mtgtracker://join/{code}`
-     */
     fun handleInviteLink(code: String) {
         if (code.isNotBlank()) joinByCode(code)
     }
@@ -119,7 +119,7 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
         )
         _screen.value = Screen.Session(sessionId)
 
-        val ws = SessionWebSocket(sessionId, myId, name)
+        val ws = wsFactory(sessionId, myId, name)
         webSocket = ws
 
         viewModelScope.launch {
@@ -150,5 +150,20 @@ class SessionViewModel(app: Application) : AndroidViewModel(app) {
         super.onCleared()
         tearDownWebSocket()
         api.close()
+    }
+
+    // ── production factory ────────────────────────────────────────────
+
+    companion object {
+        fun factory(app: Application): ViewModelProvider.Factory =
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                    SessionViewModel(
+                        prefs     = UserPreferences(app),
+                        api       = ApiClient(),
+                        wsFactory = { id, uid, name -> SessionWebSocket(id, uid, name) },
+                    ) as T
+            }
     }
 }

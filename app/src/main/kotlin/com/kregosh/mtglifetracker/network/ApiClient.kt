@@ -17,7 +17,7 @@ import kotlinx.serialization.json.Json
  *
  * WebSocket communication is handled separately by [SessionWebSocket].
  */
-class ApiClient {
+class ApiClient : SessionApi {
 
     private val json = Json {
         classDiscriminator  = "type"

@@ -2,6 +2,7 @@ package com.kregosh.mtglifetracker.backend
 
 import com.kregosh.mtglifetracker.backend.routes.sessionRoutes
 import com.kregosh.mtglifetracker.backend.routes.webSocketRoutes
+import com.kregosh.mtglifetracker.backend.session.SessionManager
 import com.kregosh.mtglifetracker.backend.session.sharedJson
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
@@ -42,8 +43,10 @@ fun Application.module() {
 
     install(CallLogging)
 
+    val sessions = SessionManager()
+
     routing {
-        sessionRoutes()
-        webSocketRoutes()
+        sessionRoutes(sessions)
+        webSocketRoutes(sessions)
     }
 }

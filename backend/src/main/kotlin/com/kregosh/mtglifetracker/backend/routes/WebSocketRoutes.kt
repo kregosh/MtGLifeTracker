@@ -12,12 +12,12 @@ import org.slf4j.LoggerFactory
 
 private val log = LoggerFactory.getLogger("WebSocketRoutes")
 
-fun Route.webSocketRoutes() {
+fun Route.webSocketRoutes(sessions: SessionManager) {
 
     // ws://host/ws/sessions/{sessionId}
     webSocket("/ws/sessions/{sessionId}") {
         val sessionId = call.parameters["sessionId"]
-        val room      = sessionId?.let { SessionManager.getById(it) }
+        val room      = sessionId?.let { sessions.getById(it) }
 
         if (room == null) {
             close(CloseReason(CloseReason.Codes.CANNOT_ACCEPT, "Session not found"))
@@ -52,7 +52,7 @@ fun Route.webSocketRoutes() {
             connectedUser?.let {
                 room.removeUser(it.userId)
                 room.broadcastState()
-                SessionManager.pruneIfEmpty(room)
+                sessions.pruneIfEmpty(room)
             }
         }
     }

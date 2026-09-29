@@ -70,7 +70,7 @@ class SessionRoom(val sessionId: String, val code: String) {
 // Singleton manager
 // ─────────────────────────────────────────────────────────────────────────────
 
-object SessionManager {
+class SessionManager {
 
     private val byId   = ConcurrentHashMap<String, SessionRoom>()
     private val byCode = ConcurrentHashMap<String, SessionRoom>() // code → room
