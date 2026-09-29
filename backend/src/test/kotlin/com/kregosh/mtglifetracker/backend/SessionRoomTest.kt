@@ -151,6 +151,9 @@ class SessionRoomTest {
         val room = makeRoom()
         room.addUser(makeUser("u1"))
         room.addCustomStat("Energy")
+        // Two Int.MAX_VALUE adds reach 4_294_967_294 (still below UInt.MAX_VALUE).
+        // A third add would overflow — clampAdd should cap it at UInt.MAX_VALUE.
+        room.adjust("u1", "Energy", Int.MAX_VALUE)
         room.adjust("u1", "Energy", Int.MAX_VALUE)
         room.adjust("u1", "Energy", Int.MAX_VALUE)
         assertEquals(UInt.MAX_VALUE, room.currentState().first { it.id == "u1" }.customStats["Energy"])

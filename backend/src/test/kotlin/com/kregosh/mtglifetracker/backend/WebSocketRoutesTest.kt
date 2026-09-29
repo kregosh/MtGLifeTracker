@@ -176,6 +176,9 @@ class WebSocketRoutesTest {
             incoming.receive() // Joined
             incoming.receive() // State
         }
+        // The server's finally block (removeUser → pruneIfEmpty) runs in a separate
+        // coroutine after the close handshake; yield briefly to let it complete.
+        kotlinx.coroutines.delay(200)
         assertNull(sessions.getById(sessionId))
     }
 }
