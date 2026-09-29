@@ -1,13 +1,8 @@
 package com.kregosh.mtglifetracker.viewmodel
 
-import android.app.Application
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.kregosh.mtglifetracker.data.UserPreferences
 import com.kregosh.mtglifetracker.data.UserPrefs
-import com.kregosh.mtglifetracker.network.FirebaseSessionApi
-import com.kregosh.mtglifetracker.network.FirebaseSessionConnection
 import com.kregosh.mtglifetracker.network.SessionApi
 import com.kregosh.mtglifetracker.network.SessionConnection
 import com.kregosh.mtglifetracker.network.WsState
@@ -266,20 +261,5 @@ class SessionViewModel(
         super.onCleared()
         tearDownWebSocket()
         api.close()
-    }
-
-    // ── production factory ────────────────────────────────────────────
-
-    companion object {
-        fun factory(app: Application): ViewModelProvider.Factory =
-            object : ViewModelProvider.Factory {
-                @Suppress("UNCHECKED_CAST")
-                override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                    SessionViewModel(
-                        prefs     = UserPreferences(app),
-                        api       = FirebaseSessionApi(),
-                        wsFactory = { id, uid, name, startLife -> FirebaseSessionConnection(id, uid, name, startLife) },
-                    ) as T
-            }
     }
 }

@@ -37,10 +37,9 @@ android {
 }
 
 dependencies {
-    // ── Firebase ─────────────────────────────────────────────────────
-    implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.database)
-    implementation(libs.kotlinx.coroutines.play.services)
+    // ── Modules ──────────────────────────────────────────────────────
+    implementation(project(":core"))
+    implementation(project(":firebase"))
 
     // ── Coroutines ───────────────────────────────────────────────────
     implementation(libs.kotlinx.coroutines.android)
@@ -58,8 +57,4 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.compose.icons.extended)
     debugImplementation(libs.compose.ui.tooling)
-
-    testImplementation(kotlin("test"))
-    testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation(libs.mockk)
 }

@@ -21,6 +21,7 @@ kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "ko
 # ── Jetpack ──────────────────────────────────────────────────────────
 core-ktx                    = { group = "androidx.core",              name = "core-ktx",                    version.ref = "coreKtx" }
 lifecycle-runtime-ktx       = { group = "androidx.lifecycle",         name = "lifecycle-runtime-ktx",       version.ref = "lifecycle" }
+lifecycle-viewmodel         = { group = "androidx.lifecycle",         name = "lifecycle-viewmodel-ktx",      version.ref = "lifecycle" }
 lifecycle-viewmodel-compose = { group = "androidx.lifecycle",         name = "lifecycle-viewmodel-compose",  version.ref = "lifecycle" }
 activity-compose            = { group = "androidx.activity",          name = "activity-compose",             version.ref = "activityCompose" }
 compose-bom                 = { group = "androidx.compose",           name = "compose-bom",                  version.ref = "composeBom" }
@@ -36,6 +37,7 @@ kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 
 [plugins]
 android-application = { id = "com.android.application",              version.ref = "agp" }
+android-library     = { id = "com.android.library",                  version.ref = "agp" }
 kotlin-android      = { id = "org.jetbrains.kotlin.android",         version.ref = "kotlin" }
 kotlin-compose      = { id = "org.jetbrains.kotlin.plugin.compose",  version.ref = "kotlin" }
 google-services     = { id = "com.google.gms.google-services",       version.ref = "google-services" }
