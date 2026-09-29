@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 import com.kregosh.mtglifetracker.network.WsState
 import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.ui.components.PlayerCard
@@ -306,9 +307,9 @@ private fun GameTimerRow(
     onToggle     : () -> Unit,
     onReset      : () -> Unit,
 ) {
-    val limit      = kotlin.time.Duration.Companion.minutes(limitMinutes.toLong())
+    val limit      = limitMinutes.toLong().minutes
     val display    = if (countDown) (limit - elapsed).coerceAtLeast(Duration.ZERO) else elapsed
-    val urgent     = countDown && display < kotlin.time.Duration.Companion.minutes(1) &&
+    val urgent     = countDown && display < 1.minutes &&
                      (running || elapsed > Duration.ZERO)
     val hasStarted = elapsed > Duration.ZERO || running
     val tint       = if (urgent) MaterialTheme.colorScheme.error
