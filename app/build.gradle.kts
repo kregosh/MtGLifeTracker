@@ -2,24 +2,19 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.google.services)
 }
 
 android {
-    namespace   = "com.kregosh.mtglifetracker"
-    compileSdk  = 35
+    namespace  = "com.kregosh.mtglifetracker"
+    compileSdk = 35
 
     defaultConfig {
-        applicationId  = "com.kregosh.mtglifetracker"
-        minSdk         = 26
-        targetSdk      = 35
-        versionCode    = 1
-        versionName    = "1.0"
-
-        // Override at build time for a real deployment.
-        // For the Android emulator use 10.0.2.2; for a physical device use your LAN IP.
-        buildConfigField("String", "SERVER_BASE_URL", "\"http://10.0.2.2:8080\"")
-        buildConfigField("String", "SERVER_WS_URL",   "\"ws://10.0.2.2:8080\"")
+        applicationId = "com.kregosh.mtglifetracker"
+        minSdk        = 26
+        targetSdk     = 35
+        versionCode   = 1
+        versionName   = "1.0"
     }
 
     buildTypes {
@@ -30,8 +25,7 @@ android {
     }
 
     buildFeatures {
-        compose      = true
-        buildConfig  = true
+        compose = true
     }
 
     compileOptions {
@@ -43,15 +37,10 @@ android {
 }
 
 dependencies {
-    implementation(project(":shared"))
-
-    // ── Ktor client ──────────────────────────────────────────────────
-    implementation(libs.ktor.client.core)
-    implementation(libs.ktor.client.okhttp)
-    implementation(libs.ktor.client.websockets)
-    implementation(libs.ktor.client.content.negotiation)
-    implementation(libs.ktor.client.logging)
-    implementation(libs.ktor.serialization.kotlinx.json)
+    // ── Firebase ─────────────────────────────────────────────────────
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.database)
+    implementation(libs.kotlinx.coroutines.play.services)
 
     // ── Coroutines ───────────────────────────────────────────────────
     implementation(libs.kotlinx.coroutines.android)
