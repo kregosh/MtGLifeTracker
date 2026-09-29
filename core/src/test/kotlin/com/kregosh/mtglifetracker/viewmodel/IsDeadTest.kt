@@ -16,7 +16,15 @@ class IsDeadTest {
         life            : UInt = 20u,
         commanderDamage : UInt = 0u,
         poisonDamage    : UInt = 0u,
-    ) = UserState("u1", "Alice", life, commanderDamage, poisonDamage)
+    ) = UserState(
+        id          = "u1",
+        displayName = "Alice",
+        life        = life,
+        customStats = buildMap {
+            if (commanderDamage > 0u) put("commander", commanderDamage)
+            if (poisonDamage    > 0u) put("poison",    poisonDamage)
+        },
+    )
 
     @Test
     fun `alive player is not dead`() {

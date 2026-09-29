@@ -181,6 +181,29 @@ fun SettingsScreen(vm: SessionViewModel) {
                     presets  = listOf(10u, 7u, 5u),
                     onSelect = vm::setInfectThreshold,
                 )
+                Spacer(Modifier.height(12.dp))
+                var commanderDefault by remember { mutableStateOf(vm.commanderDefaultEnabled) }
+                Row(
+                    modifier             = Modifier.fillMaxWidth(),
+                    verticalAlignment    = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Commander damage by default", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "Auto-add commander damage when joining a session",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked         = commanderDefault,
+                        onCheckedChange = { v ->
+                            commanderDefault = v
+                            vm.setCommanderDefaultEnabled(v)
+                        },
+                    )
+                }
             }
         }
     }

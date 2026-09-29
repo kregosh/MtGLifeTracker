@@ -7,6 +7,7 @@ import com.kregosh.mtglifetracker.network.SessionApi
 import com.kregosh.mtglifetracker.network.SessionConnection
 import com.kregosh.mtglifetracker.network.WsState
 import com.kregosh.mtglifetracker.shared.ServerMessage
+import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.shared.UserState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
@@ -27,20 +28,21 @@ sealed interface Screen {
 // ─────────────────────────────────────────────────────────────────────────────
 
 data class SessionUiState(
-    val sessionCode      : String          = "",
-    val myUserId         : String          = "",
-    val users            : List<UserState> = emptyList(),
-    val customStatNames  : List<String>    = emptyList(),
-    val wsState          : WsState         = WsState.Connecting,
-    val error            : String?         = null,
-    val commanderDeathThreshold: UInt = 21u,
-    val infectDeathThreshold   : UInt = 10u,
+    val sessionCode              : String               = "",
+    val myUserId                 : String               = "",
+    val users                    : List<UserState>      = emptyList(),
+    val statDefs                 : Map<String, StatType> = emptyMap(),
+    val globalStats              : Map<String, UInt>    = emptyMap(),
+    val wsState                  : WsState              = WsState.Connecting,
+    val error                    : String?              = null,
+    val commanderDeathThreshold  : UInt                 = 21u,
+    val infectDeathThreshold     : UInt                 = 10u,
 )
 
 fun UserState.isDead(state: SessionUiState): Boolean =
     life == 0u
-        || commanderDamage >= state.commanderDeathThreshold
-        || poisonDamage    >= state.infectDeathThreshold
+        || (customStats["commander"] ?: 0u) >= state.commanderDeathThreshold
+        || (customStats["poison"]    ?: 0u) >= state.infectDeathThreshold
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ViewModel
@@ -105,10 +107,12 @@ class SessionViewModel(
     val startLife: UInt get() = prefs.startLife
     val commanderThreshold: UInt get() = prefs.commanderDeathThreshold
     val infectThreshold: UInt get() = prefs.infectDeathThreshold
+    val commanderDefaultEnabled: Boolean get() = prefs.commanderDefaultEnabled
 
     fun setStartLife(v: UInt) { prefs.startLife = v }
     fun setCommanderThreshold(v: UInt) { prefs.commanderDeathThreshold = v }
     fun setInfectThreshold(v: UInt) { prefs.infectDeathThreshold = v }
+    fun setCommanderDefaultEnabled(v: Boolean) { prefs.commanderDefaultEnabled = v }
 
     fun setColorScheme(scheme: String) {
         prefs.colorScheme = scheme
@@ -169,6 +173,25 @@ class SessionViewModel(
         }
     }
 
+    fun addCustomStat(name: String, type: StatType = StatType.NUMERIC) =
+        webSocket?.addCustomStat(name, type)
+
+    fun removeCustomStat(name: String) = webSocket?.removeCustomStat(name)
+
+    fun setGlobal(stat: String, value: UInt) = webSocket?.setGlobal(stat, value)
+
+    fun toggleGlobal(stat: String) {
+        val current = _sessionUi.value.globalStats[stat] ?: 0u
+        setGlobal(stat, if (current == 0u) 1u else 0u)
+    }
+
+    fun leaveSession() {
+        tearDownWebSocket()
+        _screen.value = Screen.Home
+    }
+
+    // ── internal ─────────────────────────────────────────────────────
+
     private fun applyPendingDeltas(users: List<UserState>): List<UserState> {
         if (pendingDeltas.isEmpty()) return users
         val myId = _sessionUi.value.myUserId
@@ -181,23 +204,13 @@ class SessionViewModel(
     private fun UserState.withDelta(stat: String, delta: Int): UserState {
         fun clamp(v: Long) = v.coerceIn(0L, UInt.MAX_VALUE.toLong()).toUInt()
         return when (stat) {
-            "life"      -> copy(life = clamp(life.toLong() + delta))
-            "commander" -> copy(commanderDamage = clamp(commanderDamage.toLong() + delta))
-            "poison"    -> copy(poisonDamage = clamp(poisonDamage.toLong() + delta))
-            else        -> copy(customStats = customStats.toMutableMap().also { map ->
-                map[stat]?.let { map[stat] = clamp(it.toLong() + delta) }
+            "life" -> copy(life = clamp(life.toLong() + delta))
+            else   -> copy(customStats = customStats.toMutableMap().also { map ->
+                val current = map[stat] ?: 0u
+                map[stat] = clamp(current.toLong() + delta)
             })
         }
     }
-
-    fun addCustomStat(name: String) = webSocket?.addCustomStat(name)
-
-    fun leaveSession() {
-        tearDownWebSocket()
-        _screen.value = Screen.Home
-    }
-
-    // ── internal ─────────────────────────────────────────────────────
 
     private fun joinSession(sessionId: String, sessionCode: String) {
         tearDownWebSocket()
@@ -206,10 +219,10 @@ class SessionViewModel(
         val name = prefs.displayName.ifBlank { "Player" }
 
         _sessionUi.value = SessionUiState(
-            sessionCode              = sessionCode,
-            myUserId                 = myId,
-            commanderDeathThreshold  = prefs.commanderDeathThreshold,
-            infectDeathThreshold     = prefs.infectDeathThreshold,
+            sessionCode             = sessionCode,
+            myUserId                = myId,
+            commanderDeathThreshold = prefs.commanderDeathThreshold,
+            infectDeathThreshold    = prefs.infectDeathThreshold,
         )
         _screen.value = Screen.Session(sessionId)
 
@@ -229,8 +242,9 @@ class SessionViewModel(
                             serverUsers = msg.users
                             _sessionUi.update {
                                 it.copy(
-                                    users           = applyPendingDeltas(msg.users),
-                                    customStatNames = msg.customStatNames,
+                                    users       = applyPendingDeltas(msg.users),
+                                    statDefs    = msg.statDefs,
+                                    globalStats = msg.globalStats,
                                 )
                             }
                         }
@@ -244,6 +258,10 @@ class SessionViewModel(
         }
 
         ws.connect()
+
+        if (prefs.commanderDefaultEnabled) {
+            ws.addCustomStat("commander", StatType.NUMERIC)
+        }
     }
 
     private fun tearDownWebSocket() {

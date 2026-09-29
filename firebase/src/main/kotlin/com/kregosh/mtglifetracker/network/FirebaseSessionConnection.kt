@@ -2,6 +2,7 @@ package com.kregosh.mtglifetracker.network
 
 import com.google.firebase.database.*
 import com.kregosh.mtglifetracker.shared.ServerMessage
+import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.shared.UserState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,11 +38,9 @@ class FirebaseSessionConnection(
     override fun connect() {
         myUserRef.setValue(
             mapOf(
-                "displayName"     to displayName,
-                "life"            to startLife.toLong(),
-                "commanderDamage" to 0L,
-                "poisonDamage"    to 0L,
-                "customStats"     to emptyMap<String, Any>(),
+                "displayName" to displayName,
+                "life"        to startLife.toLong(),
+                "customStats" to emptyMap<String, Any>(),
             )
         )
         myUserRef.onDisconnect().removeValue()
@@ -64,20 +63,23 @@ class FirebaseSessionConnection(
             override fun onDataChange(snapshot: DataSnapshot) {
                 val users = snapshot.child("users").children.map { userSnap ->
                     UserState(
-                        id              = userSnap.key ?: "",
-                        displayName     = userSnap.child("displayName").getValue(String::class.java) ?: "",
-                        life            = userSnap.child("life").longOrZero(startLife.toLong()).toUInt(),
-                        commanderDamage = userSnap.child("commanderDamage").longOrZero().toUInt(),
-                        poisonDamage    = userSnap.child("poisonDamage").longOrZero().toUInt(),
-                        customStats     = userSnap.child("customStats").children.associate { stat ->
+                        id          = userSnap.key ?: "",
+                        displayName = userSnap.child("displayName").getValue(String::class.java) ?: "",
+                        life        = userSnap.child("life").longOrZero(startLife.toLong()).toUInt(),
+                        customStats = userSnap.child("customStats").children.associate { stat ->
                             (stat.key ?: "") to (stat.getValue(Long::class.java) ?: 0L).toUInt()
                         },
                     )
                 }
-                val customStatNames = snapshot.child("customStatNames").children
-                    .mapNotNull { it.key }
-                    .toList()
-                scope.launch { _messages.emit(ServerMessage.State(users, customStatNames)) }
+                val statDefs = snapshot.child("customStatNames").children.associate { child ->
+                    (child.key ?: "") to child.getValue(String::class.java).toStatType()
+                }
+                val globalStats = snapshot.child("globalStats").children.associate { child ->
+                    (child.key ?: "") to (child.getValue(Long::class.java) ?: 0L).toUInt()
+                }
+                scope.launch {
+                    _messages.emit(ServerMessage.State(users, statDefs, globalStats))
+                }
             }
             override fun onCancelled(error: DatabaseError) {
                 scope.launch { _messages.emit(ServerMessage.Error(error.message)) }
@@ -89,10 +91,8 @@ class FirebaseSessionConnection(
 
     override fun adjust(stat: String, delta: Int) {
         val fieldRef = when (stat) {
-            "life"      -> myUserRef.child("life")
-            "commander" -> myUserRef.child("commanderDamage")
-            "poison"    -> myUserRef.child("poisonDamage")
-            else        -> myUserRef.child("customStats/$stat")
+            "life" -> myUserRef.child("life")
+            else   -> myUserRef.child("customStats/$stat")
         }
         fieldRef.runTransaction(object : Transaction.Handler {
             override fun doTransaction(data: MutableData): Transaction.Result {
@@ -104,12 +104,22 @@ class FirebaseSessionConnection(
         })
     }
 
-    override fun addCustomStat(name: String) {
-        sessionRef.child("customStatNames/$name").setValue(true)
+    override fun addCustomStat(name: String, type: StatType) {
+        sessionRef.child("customStatNames/$name").setValue(type.name)
+    }
+
+    override fun removeCustomStat(name: String) {
+        sessionRef.child("customStatNames/$name").removeValue()
         sessionRef.child("users").get().addOnSuccessListener { snapshot ->
-            val updates = snapshot.children.associate { "users/${it.key}/customStats/$name" to (0L as Any) }
+            val updates = snapshot.children
+                .mapNotNull { it.key }
+                .associate { uid -> "users/$uid/customStats/$name" to null as Any? }
             if (updates.isNotEmpty()) sessionRef.updateChildren(updates)
         }
+    }
+
+    override fun setGlobal(stat: String, value: UInt) {
+        sessionRef.child("globalStats/$stat").setValue(value.toLong())
     }
 
     override fun close() {
@@ -124,3 +134,9 @@ class FirebaseSessionConnection(
 
 private fun DataSnapshot.longOrZero(default: Long = 0L): Long =
     getValue(Long::class.java) ?: default
+
+private fun String?.toStatType(): StatType = when (this) {
+    "TOGGLE"     -> StatType.TOGGLE
+    "RING_STAGE" -> StatType.RING_STAGE
+    else         -> StatType.NUMERIC
+}
