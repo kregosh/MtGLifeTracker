@@ -10,4 +10,7 @@ interface UserPrefs {
     var infectDeathThreshold    : UInt
     var colorScheme             : String
     var commanderDefaultEnabled : Boolean
+    var timerVisible            : Boolean
+    var timerCountDown          : Boolean
+    var timerLimitMinutes       : UInt
 }

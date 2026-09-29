@@ -13,7 +13,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
@@ -83,6 +83,21 @@ class SessionViewModel(
     private var wsCollectorJob: Job? = null
     private var settingsReturnTo: Screen = Screen.Home
 
+    // ── timer settings ────────────────────────────────────────────────
+
+    private val _timerVisible    = MutableStateFlow(prefs.timerVisible)
+    val timerVisible: StateFlow<Boolean> = _timerVisible.asStateFlow()
+
+    private val _timerCountDown  = MutableStateFlow(prefs.timerCountDown)
+    val timerCountDown: StateFlow<Boolean> = _timerCountDown.asStateFlow()
+
+    private val _timerLimitMinutes = MutableStateFlow(prefs.timerLimitMinutes)
+    val timerLimitMinutes: StateFlow<UInt> = _timerLimitMinutes.asStateFlow()
+
+    fun setTimerVisible(v: Boolean)       { prefs.timerVisible = v;      _timerVisible.value = v }
+    fun setTimerCountDown(v: Boolean)     { prefs.timerCountDown = v;    _timerCountDown.value = v; resetTimer() }
+    fun setTimerLimitMinutes(v: UInt)     { prefs.timerLimitMinutes = v; _timerLimitMinutes.value = v; resetTimer() }
+
     // ── game timer ────────────────────────────────────────────────────
 
     private val _timerRunning = MutableStateFlow(false)
@@ -96,21 +111,33 @@ class SessionViewModel(
     private var timerAccumulated: Duration = Duration.ZERO
 
     fun startPauseTimer() {
-        if (_timerRunning.value) {
-            timerAccumulated += timerMark?.elapsedNow() ?: Duration.ZERO
-            timerMark = null
-            _timerRunning.value = false
-            timerJob?.cancel()
-        } else {
-            timerMark = TimeSource.Monotonic.markNow()
-            _timerRunning.value = true
-            timerJob = viewModelScope.launch {
-                while (kotlinx.coroutines.isActive) {
-                    kotlinx.coroutines.delay(500)
-                    _timerElapsed.value = timerAccumulated + (timerMark?.elapsedNow() ?: Duration.ZERO)
+        if (_timerRunning.value) pauseTimer() else startTimer()
+    }
+
+    private fun startTimer() {
+        timerMark = TimeSource.Monotonic.markNow()
+        _timerRunning.value = true
+        timerJob = viewModelScope.launch {
+            val limit = if (prefs.timerCountDown) prefs.timerLimitMinutes.toLong().minutes else null
+            while (kotlinx.coroutines.isActive) {
+                kotlinx.coroutines.delay(500)
+                val now = timerAccumulated + (timerMark?.elapsedNow() ?: Duration.ZERO)
+                if (limit != null && now >= limit) {
+                    _timerElapsed.value = limit
+                    pauseTimer()
+                    break
                 }
+                _timerElapsed.value = now
             }
         }
+    }
+
+    private fun pauseTimer() {
+        timerAccumulated += timerMark?.elapsedNow() ?: Duration.ZERO
+        timerMark = null
+        _timerRunning.value = false
+        timerJob?.cancel()
+        timerJob = null
     }
 
     fun resetTimer() {

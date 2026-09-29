@@ -159,6 +159,53 @@ fun SettingsScreen(vm: SessionViewModel) {
                 }
             }
 
+            // ── Timer ─────────────────────────────────────────────────────────
+            SettingsSection(title = "Timer") {
+                var timerVisible by remember { mutableStateOf(vm.timerVisible.value) }
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    verticalAlignment     = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text("Show game timer", style = MaterialTheme.typography.bodyMedium)
+                    Switch(
+                        checked         = timerVisible,
+                        onCheckedChange = { v -> timerVisible = v; vm.setTimerVisible(v) },
+                    )
+                }
+
+                if (timerVisible) {
+                    Spacer(Modifier.height(12.dp))
+
+                    var countDown by remember { mutableStateOf(vm.timerCountDown.value) }
+                    Text("Mode", style = MaterialTheme.typography.labelMedium)
+                    Spacer(Modifier.height(4.dp))
+                    @OptIn(ExperimentalMaterial3Api::class)
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        SegmentedButton(
+                            selected = !countDown,
+                            onClick  = { countDown = false; vm.setTimerCountDown(false) },
+                            shape    = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                        ) { Text("Stopwatch") }
+                        SegmentedButton(
+                            selected = countDown,
+                            onClick  = { countDown = true; vm.setTimerCountDown(true) },
+                            shape    = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                        ) { Text("Countdown") }
+                    }
+
+                    if (countDown) {
+                        Spacer(Modifier.height(12.dp))
+                        PresetRow(
+                            label    = "Time limit (minutes)",
+                            current  = vm.timerLimitMinutes.value,
+                            presets  = listOf(30u, 45u, 60u, 90u),
+                            onSelect = vm::setTimerLimitMinutes,
+                        )
+                    }
+                }
+            }
+
             // ── Game rules ────────────────────────────────────────────────────
             SettingsSection(title = "Game Rules") {
                 PresetRow(

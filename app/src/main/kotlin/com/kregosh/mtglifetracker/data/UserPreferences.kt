@@ -52,6 +52,18 @@ class UserPreferences(context: Context) : UserPrefs {
         get() = prefs.getBoolean(KEY_COMMANDER_DEFAULT, false)
         set(value) { prefs.edit().putBoolean(KEY_COMMANDER_DEFAULT, value).apply() }
 
+    override var timerVisible: Boolean
+        get() = prefs.getBoolean(KEY_TIMER_VISIBLE, true)
+        set(value) { prefs.edit().putBoolean(KEY_TIMER_VISIBLE, value).apply() }
+
+    override var timerCountDown: Boolean
+        get() = prefs.getBoolean(KEY_TIMER_COUNTDOWN, false)
+        set(value) { prefs.edit().putBoolean(KEY_TIMER_COUNTDOWN, value).apply() }
+
+    override var timerLimitMinutes: UInt
+        get() = prefs.getInt(KEY_TIMER_LIMIT_MINUTES, 60).toUInt()
+        set(value) { prefs.edit().putInt(KEY_TIMER_LIMIT_MINUTES, value.toInt()).apply() }
+
     companion object {
         private const val KEY_USER_ID               = "user_id"
         private const val KEY_DISPLAY_NAME          = "display_name"
@@ -62,5 +74,8 @@ class UserPreferences(context: Context) : UserPrefs {
         private const val KEY_INFECT_THRESHOLD      = "infect_death_threshold"
         private const val KEY_COLOR_SCHEME          = "color_scheme"
         private const val KEY_COMMANDER_DEFAULT     = "commander_default_enabled"
+        private const val KEY_TIMER_VISIBLE         = "timer_visible"
+        private const val KEY_TIMER_COUNTDOWN       = "timer_countdown"
+        private const val KEY_TIMER_LIMIT_MINUTES   = "timer_limit_minutes"
     }
 }

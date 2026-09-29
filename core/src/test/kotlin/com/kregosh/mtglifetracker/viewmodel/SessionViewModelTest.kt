@@ -47,6 +47,9 @@ class SessionViewModelTest {
         every { prefs.infectDeathThreshold }    returns 10u
         every { prefs.colorScheme }             returns "dark"
         every { prefs.commanderDefaultEnabled } returns false
+        every { prefs.timerVisible }            returns true
+        every { prefs.timerCountDown }          returns false
+        every { prefs.timerLimitMinutes }       returns 60u
         every { wsFactory(any(), any(), any(), any()) } returns ws
     }
 
