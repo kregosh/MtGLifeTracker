@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The Compose UI provides its own theming via MtGLifeTrackerTheme.
+         This XML theme is required by the Activity window manager; it must
+         suppress the ActionBar so Compose can own the entire surface. -->
+    <style name="Theme.MtGLifeTracker" parent="Theme.Material3.DayNight.NoActionBar"/>
+</resources>
