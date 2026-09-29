@@ -48,14 +48,19 @@ class UserPreferences(context: Context) : UserPrefs {
         get() = prefs.getString(KEY_COLOR_SCHEME, "dark") ?: "dark"
         set(value) { prefs.edit().putString(KEY_COLOR_SCHEME, value).apply() }
 
+    override var commanderDefaultEnabled: Boolean
+        get() = prefs.getBoolean(KEY_COMMANDER_DEFAULT, false)
+        set(value) { prefs.edit().putBoolean(KEY_COMMANDER_DEFAULT, value).apply() }
+
     companion object {
-        private const val KEY_USER_ID              = "user_id"
-        private const val KEY_DISPLAY_NAME         = "display_name"
-        private const val KEY_BACKGROUND_IMAGE     = "background_image_uri"
+        private const val KEY_USER_ID               = "user_id"
+        private const val KEY_DISPLAY_NAME          = "display_name"
+        private const val KEY_BACKGROUND_IMAGE      = "background_image_uri"
         private const val KEY_CARD_BACKGROUND_IMAGE = "card_background_image_uri"
-        private const val KEY_START_LIFE           = "start_life"
-        private const val KEY_COMMANDER_THRESHOLD  = "commander_death_threshold"
-        private const val KEY_INFECT_THRESHOLD     = "infect_death_threshold"
-        private const val KEY_COLOR_SCHEME         = "color_scheme"
+        private const val KEY_START_LIFE            = "start_life"
+        private const val KEY_COMMANDER_THRESHOLD   = "commander_death_threshold"
+        private const val KEY_INFECT_THRESHOLD      = "infect_death_threshold"
+        private const val KEY_COLOR_SCHEME          = "color_scheme"
+        private const val KEY_COMMANDER_DEFAULT     = "commander_default_enabled"
     }
 }

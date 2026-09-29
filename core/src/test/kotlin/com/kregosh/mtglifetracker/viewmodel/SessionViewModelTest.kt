@@ -8,6 +8,7 @@ import io.mockk.coVerify
 import com.kregosh.mtglifetracker.shared.CreateSessionResponse
 import com.kregosh.mtglifetracker.shared.ServerMessage
 import com.kregosh.mtglifetracker.shared.SessionInfoResponse
+import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.shared.UserState
 import io.mockk.*
 import kotlinx.coroutines.Dispatchers
@@ -15,7 +16,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.*
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.test.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -40,12 +40,13 @@ class SessionViewModelTest {
         Dispatchers.setMain(testDispatcher)
         every { prefs.userId }      returns "test-user-id"
         every { prefs.displayName } returns "Test Player"
-        every { prefs.backgroundImageUri }    returns null
-        every { prefs.cardBackgroundImageUri } returns null
-        every { prefs.startLife }             returns 20u
+        every { prefs.backgroundImageUri }      returns null
+        every { prefs.cardBackgroundImageUri }  returns null
+        every { prefs.startLife }               returns 20u
         every { prefs.commanderDeathThreshold } returns 21u
-        every { prefs.infectDeathThreshold }  returns 10u
-        every { prefs.colorScheme }           returns "dark"
+        every { prefs.infectDeathThreshold }    returns 10u
+        every { prefs.colorScheme }             returns "dark"
+        every { prefs.commanderDefaultEnabled } returns false
         every { wsFactory(any(), any(), any(), any()) } returns ws
     }
 
@@ -107,7 +108,7 @@ class SessionViewModelTest {
     }
 
     @Test
-    fun `State message updates sessionUi users and customStatNames`() = runTest {
+    fun `State message updates sessionUi users and statDefs`() = runTest {
         coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
 
         val vm = makeVm()
@@ -115,11 +116,11 @@ class SessionViewModelTest {
         advanceUntilIdle()
 
         val users = listOf(UserState("test-user-id", "Test Player", life = 20u))
-        wsMessages.emit(ServerMessage.State(users, customStatNames = listOf("Energy")))
+        wsMessages.emit(ServerMessage.State(users, statDefs = mapOf("energy" to StatType.NUMERIC)))
         advanceUntilIdle()
 
         assertEquals(users, vm.sessionUi.value.users)
-        assertEquals(listOf("Energy"), vm.sessionUi.value.customStatNames)
+        assertEquals(mapOf("energy" to StatType.NUMERIC), vm.sessionUi.value.statDefs)
     }
 
     @Test
@@ -161,7 +162,6 @@ class SessionViewModelTest {
         vm.createSession()
         advanceUntilIdle()
 
-        // Five rapid taps on life — should collapse to one send with delta=5
         repeat(5) { vm.adjust("life", 1) }
         advanceTimeBy(500)
         verify(exactly = 1) { ws.adjust("life", 5) }
@@ -175,12 +175,10 @@ class SessionViewModelTest {
         vm.createSession()
         advanceUntilIdle()
 
-        // Seed a server state: life=20
         val base = listOf(UserState("test-user-id", "Test Player", life = 20u))
         wsMessages.emit(ServerMessage.State(base))
         advanceUntilIdle()
 
-        // Tap -3 — optimistic update must appear before debounce fires
         vm.adjust("life", -3)
         assertEquals(17u, vm.sessionUi.value.users.first().life)
     }
@@ -197,14 +195,11 @@ class SessionViewModelTest {
         wsMessages.emit(ServerMessage.State(base))
         advanceUntilIdle()
 
-        vm.adjust("life", -3)  // pending: -3 (debounce not yet fired)
+        vm.adjust("life", -3)
 
-        // Server broadcasts a concurrent update (another player triggered a State snapshot)
-        // reflecting the old life=20 because our delta hasn't been sent yet
         wsMessages.emit(ServerMessage.State(base))
         advanceUntilIdle()
 
-        // Pending delta must be reapplied on top → still shows 17
         assertEquals(17u, vm.sessionUi.value.users.first().life)
     }
 
@@ -216,8 +211,20 @@ class SessionViewModelTest {
         vm.createSession()
         advanceUntilIdle()
 
-        vm.addCustomStat("Energy")
-        verify { ws.addCustomStat("Energy") }
+        vm.addCustomStat("Energy", StatType.NUMERIC)
+        verify { ws.addCustomStat("Energy", StatType.NUMERIC) }
+    }
+
+    @Test
+    fun `removeCustomStat delegates to websocket`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        vm.removeCustomStat("Energy")
+        verify { ws.removeCustomStat("Energy") }
     }
 
     @Test
@@ -341,7 +348,7 @@ class SessionViewModelTest {
     @Test
     fun `addCustomStat when no session active is silent no-op`() {
         val vm = makeVm()
-        vm.addCustomStat("Energy")
+        vm.addCustomStat("Energy", StatType.NUMERIC)
     }
 
     @Test
@@ -374,5 +381,65 @@ class SessionViewModelTest {
 
         assertNotEquals(staleUsers, vm.sessionUi.value.users)
         verify { ws.close() }
+    }
+
+    @Test
+    fun `commanderDefaultEnabled auto-adds commander stat when joining`() = runTest {
+        every { prefs.commanderDefaultEnabled } returns true
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        verify { ws.addCustomStat("commander", StatType.NUMERIC) }
+    }
+
+    @Test
+    fun `globalStats are updated from State message`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        wsMessages.emit(ServerMessage.State(emptyList(), globalStats = mapOf("daynight" to 1u)))
+        advanceUntilIdle()
+
+        assertEquals(1u, vm.sessionUi.value.globalStats["daynight"])
+    }
+
+    @Test
+    fun `toggleGlobal flips global stat value`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        // seed daynight = 0 (day)
+        wsMessages.emit(ServerMessage.State(emptyList(), globalStats = mapOf("daynight" to 0u)))
+        advanceUntilIdle()
+
+        vm.toggleGlobal("daynight")
+        verify { ws.setGlobal("daynight", 1u) }
+    }
+
+    @Test
+    fun `isDead uses commander in customStats`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        val deadUser = UserState(
+            id          = "test-user-id",
+            displayName = "Test Player",
+            life        = 20u,
+            customStats = mapOf("commander" to 21u),
+        )
+        wsMessages.emit(ServerMessage.State(listOf(deadUser)))
+        advanceUntilIdle()
+
+        val uiState = vm.sessionUi.value
+        assertTrue(deadUser.isDead(uiState))
     }
 }

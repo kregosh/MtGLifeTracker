@@ -1,9 +1,12 @@
 package com.kregosh.mtglifetracker.shared
 
+enum class StatType { NUMERIC, TOGGLE, RING_STAGE }
+
 sealed interface ServerMessage {
     data class State(
-        val users           : List<UserState>,
-        val customStatNames : List<String> = emptyList(),
+        val users       : List<UserState>,
+        val statDefs    : Map<String, StatType> = emptyMap(),
+        val globalStats : Map<String, UInt>     = emptyMap(),
     ) : ServerMessage
 
     data class Joined(
