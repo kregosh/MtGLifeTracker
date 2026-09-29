@@ -138,6 +138,25 @@ class SessionRoomTest {
     }
 
     @Test
+    fun `adjust custom stat clamped at zero`() = runTest {
+        val room = makeRoom()
+        room.addUser(makeUser("u1"))
+        room.addCustomStat("Energy")
+        room.adjust("u1", "Energy", -100)
+        assertEquals(0u, room.currentState().first { it.id == "u1" }.customStats["Energy"])
+    }
+
+    @Test
+    fun `adjust custom stat clamped at MAX VALUE`() = runTest {
+        val room = makeRoom()
+        room.addUser(makeUser("u1"))
+        room.addCustomStat("Energy")
+        room.adjust("u1", "Energy", Int.MAX_VALUE)
+        room.adjust("u1", "Energy", Int.MAX_VALUE)
+        assertEquals(UInt.MAX_VALUE, room.currentState().first { it.id == "u1" }.customStats["Energy"])
+    }
+
+    @Test
     fun `currentState reflects multiple users`() = runTest {
         val room = makeRoom()
         room.addUser(makeUser("u1", "Alice", life = 20u))

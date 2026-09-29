@@ -4,6 +4,7 @@ import com.kregosh.mtglifetracker.data.UserPrefs
 import com.kregosh.mtglifetracker.network.SessionApi
 import com.kregosh.mtglifetracker.network.SessionConnection
 import com.kregosh.mtglifetracker.network.WsState
+import io.mockk.coVerify
 import com.kregosh.mtglifetracker.shared.CreateSessionResponse
 import com.kregosh.mtglifetracker.shared.ServerMessage
 import com.kregosh.mtglifetracker.shared.SessionInfoResponse
@@ -177,6 +178,107 @@ class SessionViewModelTest {
         advanceUntilIdle()
 
         assertNotEquals(staleUsers, vm.sessionUi.value.users)
+    }
+
+    @Test
+    fun `homeLoading is false after createSession completes`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+        assertFalse(vm.homeLoading.value)
+    }
+
+    @Test
+    fun `Joined message updates sessionCode in sessionUi`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        wsMessages.emit(ServerMessage.Joined("test-user-id", "NEWCOD"))
+        advanceUntilIdle()
+
+        assertEquals("NEWCOD", vm.sessionUi.value.sessionCode)
+    }
+
+    @Test
+    fun `Error message updates error field in sessionUi`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        wsMessages.emit(ServerMessage.Error("Join first"))
+        advanceUntilIdle()
+
+        assertEquals("Join first", vm.sessionUi.value.error)
+    }
+
+    @Test
+    fun `wsState change propagates to sessionUi`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        wsState.value = WsState.Connected
+        advanceUntilIdle()
+
+        assertEquals(WsState.Connected, vm.sessionUi.value.wsState)
+    }
+
+    @Test
+    fun `setDisplayName trims whitespace and persists to prefs`() {
+        val vm = makeVm()
+        vm.setDisplayName("  Alice  ")
+        verify { prefs.displayName = "Alice" }
+    }
+
+    @Test
+    fun `setBackgroundImage persists uri to prefs and updates flow`() {
+        val vm = makeVm()
+        vm.setBackgroundImage("content://image/1")
+        verify { prefs.backgroundImageUri = "content://image/1" }
+        assertEquals("content://image/1", vm.backgroundImageUri.value)
+    }
+
+    @Test
+    fun `setBackgroundImage null clears prefs and flow`() {
+        val vm = makeVm()
+        vm.setBackgroundImage(null)
+        verify { prefs.backgroundImageUri = null }
+        assertNull(vm.backgroundImageUri.value)
+    }
+
+    @Test
+    fun `handleInviteLink with blank code is a no-op`() = runTest {
+        val vm = makeVm()
+        vm.handleInviteLink("   ")
+        advanceUntilIdle()
+        assertEquals(Screen.Home, vm.screen.value)
+        coVerify(exactly = 0) { api.getSessionByCode(any()) }
+    }
+
+    @Test
+    fun `handleInviteLink with non-blank code joins session`() = runTest {
+        coEvery { api.getSessionByCode("XYZABC") } returns SessionInfoResponse("sid-3", "XYZABC", 0)
+        val vm = makeVm()
+        vm.handleInviteLink("xyzabc")
+        advanceUntilIdle()
+        assertIs<Screen.Session>(vm.screen.value)
+    }
+
+    @Test
+    fun `adjust when no session active is silent no-op`() {
+        val vm = makeVm()
+        vm.adjust("life", 1)
+    }
+
+    @Test
+    fun `addCustomStat when no session active is silent no-op`() {
+        val vm = makeVm()
+        vm.addCustomStat("Energy")
     }
 
     @Test
