@@ -20,14 +20,42 @@ class UserPreferences(context: Context) : UserPrefs {
         get() = prefs.getString(KEY_BACKGROUND_IMAGE, null)
         set(value) {
             prefs.edit().apply {
-                if (value != null) putString(KEY_BACKGROUND_IMAGE, value)
-                else remove(KEY_BACKGROUND_IMAGE)
+                if (value != null) putString(KEY_BACKGROUND_IMAGE, value) else remove(KEY_BACKGROUND_IMAGE)
             }.apply()
         }
 
+    override var cardBackgroundImageUri: String?
+        get() = prefs.getString(KEY_CARD_BACKGROUND_IMAGE, null)
+        set(value) {
+            prefs.edit().apply {
+                if (value != null) putString(KEY_CARD_BACKGROUND_IMAGE, value) else remove(KEY_CARD_BACKGROUND_IMAGE)
+            }.apply()
+        }
+
+    override var startLife: UInt
+        get() = prefs.getInt(KEY_START_LIFE, 20).toUInt()
+        set(value) { prefs.edit().putInt(KEY_START_LIFE, value.toInt()).apply() }
+
+    override var commanderDeathThreshold: UInt
+        get() = prefs.getInt(KEY_COMMANDER_THRESHOLD, 21).toUInt()
+        set(value) { prefs.edit().putInt(KEY_COMMANDER_THRESHOLD, value.toInt()).apply() }
+
+    override var infectDeathThreshold: UInt
+        get() = prefs.getInt(KEY_INFECT_THRESHOLD, 10).toUInt()
+        set(value) { prefs.edit().putInt(KEY_INFECT_THRESHOLD, value.toInt()).apply() }
+
+    override var colorScheme: String
+        get() = prefs.getString(KEY_COLOR_SCHEME, "dark") ?: "dark"
+        set(value) { prefs.edit().putString(KEY_COLOR_SCHEME, value).apply() }
+
     companion object {
-        private const val KEY_USER_ID         = "user_id"
-        private const val KEY_DISPLAY_NAME    = "display_name"
-        private const val KEY_BACKGROUND_IMAGE = "background_image_uri"
+        private const val KEY_USER_ID              = "user_id"
+        private const val KEY_DISPLAY_NAME         = "display_name"
+        private const val KEY_BACKGROUND_IMAGE     = "background_image_uri"
+        private const val KEY_CARD_BACKGROUND_IMAGE = "card_background_image_uri"
+        private const val KEY_START_LIFE           = "start_life"
+        private const val KEY_COMMANDER_THRESHOLD  = "commander_death_threshold"
+        private const val KEY_INFECT_THRESHOLD     = "infect_death_threshold"
+        private const val KEY_COLOR_SCHEME         = "color_scheme"
     }
 }

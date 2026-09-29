@@ -22,8 +22,9 @@ import kotlinx.coroutines.launch
 // ─────────────────────────────────────────────────────────────────────────────
 
 sealed interface Screen {
-    object Home : Screen
+    object Home     : Screen
     data class Session(val sessionId: String) : Screen
+    object Settings : Screen
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -37,16 +38,14 @@ data class SessionUiState(
     val customStatNames  : List<String>    = emptyList(),
     val wsState          : WsState         = WsState.Connecting,
     val error            : String?         = null,
-    /** Players are eliminated at or above this commander damage total. */
     val commanderDeathThreshold: UInt = 21u,
-    /** Players are eliminated at or above this poison counter total. */
-    val poisonDeathThreshold   : UInt = 10u,
+    val infectDeathThreshold   : UInt = 10u,
 )
 
 fun UserState.isDead(state: SessionUiState): Boolean =
     life == 0u
         || commanderDamage >= state.commanderDeathThreshold
-        || poisonDamage    >= state.poisonDeathThreshold
+        || poisonDamage    >= state.infectDeathThreshold
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ViewModel
@@ -55,7 +54,7 @@ fun UserState.isDead(state: SessionUiState): Boolean =
 class SessionViewModel(
     private val prefs: UserPrefs,
     private val api: SessionApi,
-    private val wsFactory: (sessionId: String, userId: String, displayName: String) -> SessionConnection,
+    private val wsFactory: (sessionId: String, userId: String, displayName: String, startLife: UInt) -> SessionConnection,
 ) : ViewModel() {
 
     private val _screen = MutableStateFlow<Screen>(Screen.Home)
@@ -73,8 +72,15 @@ class SessionViewModel(
     private val _backgroundImageUri = MutableStateFlow(prefs.backgroundImageUri)
     val backgroundImageUri: StateFlow<String?> = _backgroundImageUri.asStateFlow()
 
+    private val _cardBackgroundImageUri = MutableStateFlow(prefs.cardBackgroundImageUri)
+    val cardBackgroundImageUri: StateFlow<String?> = _cardBackgroundImageUri.asStateFlow()
+
+    private val _colorScheme = MutableStateFlow(prefs.colorScheme)
+    val colorScheme: StateFlow<String> = _colorScheme.asStateFlow()
+
     private var webSocket: SessionConnection? = null
     private var wsCollectorJob: Job? = null
+    private var settingsReturnTo: Screen = Screen.Home
 
     // Debounce state: last server-confirmed snapshot + per-stat pending deltas
     private var serverUsers   = emptyList<UserState>()
@@ -87,11 +93,42 @@ class SessionViewModel(
 
     fun setDisplayName(name: String) { prefs.displayName = name.trim() }
 
-    // ── background image ─────────────────────────────────────────────
+    // ── background images ─────────────────────────────────────────────
 
     fun setBackgroundImage(uri: String?) {
         prefs.backgroundImageUri = uri
         _backgroundImageUri.value = uri
+    }
+
+    fun setCardBackgroundImage(uri: String?) {
+        prefs.cardBackgroundImageUri = uri
+        _cardBackgroundImageUri.value = uri
+    }
+
+    // ── game settings ─────────────────────────────────────────────────
+
+    val startLife: UInt get() = prefs.startLife
+    val commanderThreshold: UInt get() = prefs.commanderDeathThreshold
+    val infectThreshold: UInt get() = prefs.infectDeathThreshold
+
+    fun setStartLife(v: UInt) { prefs.startLife = v }
+    fun setCommanderThreshold(v: UInt) { prefs.commanderDeathThreshold = v }
+    fun setInfectThreshold(v: UInt) { prefs.infectDeathThreshold = v }
+
+    fun setColorScheme(scheme: String) {
+        prefs.colorScheme = scheme
+        _colorScheme.value = scheme
+    }
+
+    // ── navigation ────────────────────────────────────────────────────
+
+    fun openSettings() {
+        settingsReturnTo = _screen.value
+        _screen.value = Screen.Settings
+    }
+
+    fun closeSettings() {
+        _screen.value = settingsReturnTo
     }
 
     // ── home screen actions ──────────────────────────────────────────
@@ -173,10 +210,15 @@ class SessionViewModel(
         val myId = prefs.userId
         val name = prefs.displayName.ifBlank { "Player" }
 
-        _sessionUi.value = SessionUiState(sessionCode = sessionCode, myUserId = myId)
-        _screen.value    = Screen.Session(sessionId)
+        _sessionUi.value = SessionUiState(
+            sessionCode              = sessionCode,
+            myUserId                 = myId,
+            commanderDeathThreshold  = prefs.commanderDeathThreshold,
+            infectDeathThreshold     = prefs.infectDeathThreshold,
+        )
+        _screen.value = Screen.Session(sessionId)
 
-        val ws = wsFactory(sessionId, myId, name)
+        val ws = wsFactory(sessionId, myId, name, prefs.startLife)
         webSocket = ws
 
         wsCollectorJob = viewModelScope.launch {
@@ -236,7 +278,7 @@ class SessionViewModel(
                     SessionViewModel(
                         prefs     = UserPreferences(app),
                         api       = ApiClient(),
-                        wsFactory = { id, uid, name -> SessionWebSocket(id, uid, name) },
+                        wsFactory = { id, uid, name, startLife -> SessionWebSocket(id, uid, name, startLife) },
                     ) as T
             }
     }

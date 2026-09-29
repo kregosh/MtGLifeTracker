@@ -31,7 +31,7 @@ class SessionViewModelTest {
         every { messages }        returns wsMessages
         every { connectionState } returns wsState
     }
-    private val wsFactory  = mockk<(String, String, String) -> SessionConnection>()
+    private val wsFactory  = mockk<(String, String, String, UInt) -> SessionConnection>()
 
     private fun makeVm() = SessionViewModel(prefs, api, wsFactory)
 
@@ -40,8 +40,13 @@ class SessionViewModelTest {
         Dispatchers.setMain(testDispatcher)
         every { prefs.userId }      returns "test-user-id"
         every { prefs.displayName } returns "Test Player"
-        every { prefs.backgroundImageUri } returns null
-        every { wsFactory(any(), any(), any()) } returns ws
+        every { prefs.backgroundImageUri }    returns null
+        every { prefs.cardBackgroundImageUri } returns null
+        every { prefs.startLife }             returns 20u
+        every { prefs.commanderDeathThreshold } returns 21u
+        every { prefs.infectDeathThreshold }  returns 10u
+        every { prefs.colorScheme }           returns "dark"
+        every { wsFactory(any(), any(), any(), any()) } returns ws
     }
 
     @AfterTest
@@ -353,7 +358,7 @@ class SessionViewModelTest {
             CreateSessionResponse("sid-2", "CODE02"),
         )
         var callCount = 0
-        every { wsFactory(any(), any(), any()) } answers {
+        every { wsFactory(any(), any(), any(), any()) } answers {
             if (callCount++ == 0) ws else ws2
         }
 

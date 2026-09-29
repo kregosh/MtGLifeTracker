@@ -16,7 +16,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
 import com.kregosh.mtglifetracker.shared.UserState
+import com.kregosh.mtglifetracker.ui.theme.LocalCardBackground
 import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
 import com.kregosh.mtglifetracker.viewmodel.SessionUiState
 import com.kregosh.mtglifetracker.viewmodel.isDead
@@ -29,12 +32,15 @@ fun PlayerCard(
     onAdjust  : (stat: String, delta: Int) -> Unit = { _, _ -> },
     modifier  : Modifier = Modifier,
 ) {
-    val dead  = user.isDead(sessionUi)
-    val hasBg = LocalHasBackground.current
+    val dead       = user.isDead(sessionUi)
+    val hasBg      = LocalHasBackground.current
+    val cardBg     = LocalCardBackground.current
+
+    val hasCardBg  = isMe && cardBg != null
 
     val containerColor = when {
-        dead  -> MaterialTheme.colorScheme.errorContainer.copy(alpha = if (hasBg) 0.45f else 0.6f)
-        isMe  -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (hasBg) 0.72f else 1f)
+        dead  -> MaterialTheme.colorScheme.errorContainer.copy(alpha = if (hasBg || hasCardBg) 0.45f else 0.6f)
+        isMe  -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (hasCardBg) 0.65f else if (hasBg) 0.72f else 1f)
         else  -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (hasBg) 0.60f else 1f)
     }
 
@@ -43,7 +49,17 @@ fun PlayerCard(
             colors   = CardDefaults.cardColors(containerColor = containerColor),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Column(modifier = Modifier.padding(12.dp)) {
+            Box {
+                if (hasCardBg) {
+                    Image(
+                        bitmap             = cardBg!!,
+                        contentDescription = null,
+                        contentScale       = ContentScale.Crop,
+                        modifier           = Modifier.matchParentSize(),
+                        alpha              = 0.55f,
+                    )
+                }
+                Column(modifier = Modifier.padding(12.dp)) {
 
                 // ── Header: name + badge ──────────────────────────────
                 Row(
@@ -116,10 +132,10 @@ fun PlayerCard(
                         onAdjust = { d -> onAdjust("commander", d) },
                     )
                     StatRow(
-                        label    = "PSN",
+                        label    = "INF",
                         value    = user.poisonDamage,
                         isMe     = isMe,
-                        dead     = user.poisonDamage >= sessionUi.poisonDeathThreshold,
+                        dead     = user.poisonDamage >= sessionUi.infectDeathThreshold,
                         onAdjust = { d -> onAdjust("poison", d) },
                     )
                     user.customStats.forEach { (name, value) ->
@@ -132,7 +148,8 @@ fun PlayerCard(
                         )
                     }
                 }
-            }
+                }
+            } // Box
         }
 
         // ── Skull overlay — only for others; your own card stays interactive ──

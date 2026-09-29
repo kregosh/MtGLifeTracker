@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -85,6 +86,9 @@ fun SessionScreen(vm: SessionViewModel) {
                         ) {
                             Icon(Icons.Default.Share, contentDescription = "Share invite")
                         }
+                    }
+                    IconButton(onClick = vm::openSettings) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
                 },
             )

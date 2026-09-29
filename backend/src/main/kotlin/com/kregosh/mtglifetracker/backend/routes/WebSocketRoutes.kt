@@ -63,7 +63,7 @@ private suspend fun DefaultWebSocketServerSession.handleMessage(
     when (msg) {
         is ClientMessage.Join -> {
             if (connectedUser != null) { sendError("Already joined"); return }
-            val user = ConnectedUser(userId = msg.userId, displayName = msg.displayName, socket = this)
+            val user = ConnectedUser(userId = msg.userId, displayName = msg.displayName, socket = this, life = msg.startLife)
             setUser(user)
             room.addUser(user)
             val joined = ServerMessage.Joined(userId = user.userId, sessionCode = room.code)

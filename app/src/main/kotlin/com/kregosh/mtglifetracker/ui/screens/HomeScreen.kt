@@ -1,21 +1,17 @@
 package com.kregosh.mtglifetracker.ui.screens
 
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
@@ -27,37 +23,9 @@ import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
 fun HomeScreen(vm: SessionViewModel) {
     val loading by vm.homeLoading.collectAsState()
     val error   by vm.homeError.collectAsState()
-    val context = LocalContext.current
     val hasBg   = LocalHasBackground.current
 
-    var codeInput      by remember { mutableStateOf("") }
-    var nameInput      by remember { mutableStateOf(vm.displayName) }
-    var showNameDialog by remember { mutableStateOf(vm.displayName.isBlank()) }
-
-    val imagePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let {
-            // Persist the read permission so the URI survives restarts
-            runCatching {
-                context.contentResolver.takePersistableUriPermission(
-                    it, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-            }
-            vm.setBackgroundImage(it.toString())
-        }
-    }
-
-    if (showNameDialog) {
-        DisplayNameDialog(
-            initial   = nameInput,
-            onConfirm = { name ->
-                vm.setDisplayName(name)
-                nameInput      = name
-                showNameDialog = false
-            },
-        )
-    }
+    var codeInput by remember { mutableStateOf("") }
 
     Scaffold(
         containerColor = if (hasBg) Color.Transparent else MaterialTheme.colorScheme.background,
@@ -65,9 +33,15 @@ fun HomeScreen(vm: SessionViewModel) {
             TopAppBar(
                 title = { Text("MtG Life Tracker") },
                 colors = if (hasBg) TopAppBarDefaults.topAppBarColors(
-                    containerColor    = Color.Black.copy(alpha = 0.45f),
-                    titleContentColor = Color.White,
+                    containerColor         = Color.Black.copy(alpha = 0.45f),
+                    titleContentColor      = Color.White,
+                    actionIconContentColor = Color.White,
                 ) else TopAppBarDefaults.topAppBarColors(),
+                actions = {
+                    IconButton(onClick = vm::openSettings) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                    }
+                },
             )
         },
     ) { padding ->
@@ -83,23 +57,6 @@ fun HomeScreen(vm: SessionViewModel) {
                 text  = "Welcome, ${vm.displayName.ifBlank { "Player" }}",
                 style = MaterialTheme.typography.headlineSmall,
             )
-
-            Spacer(Modifier.height(4.dp))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = { showNameDialog = true }) { Text("Change name") }
-                TextButton(onClick = { imagePicker.launch("image/*") }) {
-                    Icon(Icons.Default.Image, contentDescription = null)
-                    Spacer(Modifier.width(4.dp))
-                    Text("Background")
-                }
-                val hasBackground by vm.backgroundImageUri.collectAsState()
-                if (hasBackground != null) {
-                    TextButton(onClick = { vm.setBackgroundImage(null) }) {
-                        Text("Clear BG", color = MaterialTheme.colorScheme.error)
-                    }
-                }
-            }
 
             Spacer(Modifier.height(24.dp))
 
@@ -156,33 +113,3 @@ fun HomeScreen(vm: SessionViewModel) {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Display name dialog
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun DisplayNameDialog(
-    initial  : String,
-    onConfirm: (String) -> Unit,
-) {
-    var name by remember { mutableStateOf(initial) }
-
-    AlertDialog(
-        onDismissRequest = { if (name.isNotBlank()) onConfirm(name) },
-        title    = { Text("Your display name") },
-        text     = {
-            OutlinedTextField(
-                value         = name,
-                onValueChange = { name = it },
-                singleLine    = true,
-                placeholder   = { Text("e.g. Alice") },
-            )
-        },
-        confirmButton = {
-            TextButton(
-                onClick  = { if (name.isNotBlank()) onConfirm(name) },
-                enabled  = name.isNotBlank(),
-            ) { Text("OK") }
-        },
-    )
-}

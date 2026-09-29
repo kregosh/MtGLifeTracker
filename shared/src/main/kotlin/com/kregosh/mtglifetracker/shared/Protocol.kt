@@ -56,6 +56,7 @@ sealed class ClientMessage {
     data class Join(
         val userId: String,
         val displayName: String,
+        val startLife: UInt = 20u,
     ) : ClientMessage()
 
     /**

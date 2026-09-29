@@ -28,6 +28,7 @@ class SessionWebSocket(
     private val sessionId: String,
     private val userId: String,
     private val displayName: String,
+    private val startLife: UInt = 20u,
 ) : SessionConnection {
 
     private val json = Json {
@@ -59,7 +60,7 @@ class SessionWebSocket(
                 client.webSocket("${BuildConfig.SERVER_WS_URL}/ws/sessions/$sessionId") {
                     _state.value = WsState.Connected
 
-                    val join = ClientMessage.Join(userId = userId, displayName = displayName)
+                    val join = ClientMessage.Join(userId = userId, displayName = displayName, startLife = startLife)
                     send(Frame.Text(json.encodeToString(ClientMessage.serializer(), join)))
 
                     val sendJob = launch {

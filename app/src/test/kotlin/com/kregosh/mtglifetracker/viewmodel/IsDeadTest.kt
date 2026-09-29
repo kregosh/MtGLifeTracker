@@ -9,7 +9,7 @@ class IsDeadTest {
 
     private val defaultUi = SessionUiState(
         commanderDeathThreshold = 21u,
-        poisonDeathThreshold    = 10u,
+        infectDeathThreshold    = 10u,
     )
 
     private fun user(
@@ -62,7 +62,7 @@ class IsDeadTest {
 
     @Test
     fun `custom poison threshold of 5 applies correctly`() {
-        val ui = defaultUi.copy(poisonDeathThreshold = 5u)
+        val ui = defaultUi.copy(infectDeathThreshold = 5u)
         assertFalse(user(poisonDamage = 4u).isDead(ui))
         assertTrue(user(poisonDamage = 5u).isDead(ui))
     }

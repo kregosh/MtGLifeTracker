@@ -18,6 +18,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import com.kregosh.mtglifetracker.ui.screens.HomeScreen
 import com.kregosh.mtglifetracker.ui.screens.SessionScreen
+import com.kregosh.mtglifetracker.ui.screens.SettingsScreen
+import com.kregosh.mtglifetracker.ui.theme.AppColorScheme
+import com.kregosh.mtglifetracker.ui.theme.LocalCardBackground
 import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
 import com.kregosh.mtglifetracker.ui.theme.MtGLifeTrackerTheme
 import com.kregosh.mtglifetracker.viewmodel.Screen
@@ -40,25 +43,47 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            MtGLifeTrackerTheme {
-                val screen       by vm.screen.collectAsState()
-                val bgUriString  by vm.backgroundImageUri.collectAsState()
-                val context      = LocalContext.current
+            val screen          by vm.screen.collectAsState()
+            val bgUriString     by vm.backgroundImageUri.collectAsState()
+            val cardBgUriString by vm.cardBackgroundImageUri.collectAsState()
+            val colorSchemePref by vm.colorScheme.collectAsState()
+            val context         = LocalContext.current
 
-                var bgBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
-                LaunchedEffect(bgUriString) {
-                    bgBitmap = withContext(Dispatchers.IO) {
-                        bgUriString?.let { uriStr ->
-                            runCatching {
-                                context.contentResolver.openInputStream(Uri.parse(uriStr))
-                                    ?.use { BitmapFactory.decodeStream(it)?.asImageBitmap() }
-                            }.getOrNull()
-                        }
+            val appColorScheme = when (colorSchemePref) {
+                "light"  -> AppColorScheme.LIGHT
+                "system" -> AppColorScheme.SYSTEM
+                else     -> AppColorScheme.DARK
+            }
+
+            var bgBitmap     by remember { mutableStateOf<ImageBitmap?>(null) }
+            var cardBgBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+
+            LaunchedEffect(bgUriString) {
+                bgBitmap = withContext(Dispatchers.IO) {
+                    bgUriString?.let { uriStr ->
+                        runCatching {
+                            context.contentResolver.openInputStream(Uri.parse(uriStr))
+                                ?.use { BitmapFactory.decodeStream(it)?.asImageBitmap() }
+                        }.getOrNull()
                     }
                 }
+            }
 
-                androidx.compose.runtime.CompositionLocalProvider(
-                    LocalHasBackground provides (bgBitmap != null),
+            LaunchedEffect(cardBgUriString) {
+                cardBgBitmap = withContext(Dispatchers.IO) {
+                    cardBgUriString?.let { uriStr ->
+                        runCatching {
+                            context.contentResolver.openInputStream(Uri.parse(uriStr))
+                                ?.use { BitmapFactory.decodeStream(it)?.asImageBitmap() }
+                        }.getOrNull()
+                    }
+                }
+            }
+
+            MtGLifeTrackerTheme(colorScheme = appColorScheme) {
+                CompositionLocalProvider(
+                    LocalHasBackground  provides (bgBitmap != null),
+                    LocalCardBackground provides cardBgBitmap,
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
                         bgBitmap?.let { bmp ->
@@ -71,8 +96,9 @@ class MainActivity : ComponentActivity() {
                         }
 
                         when (screen) {
-                            is Screen.Home    -> HomeScreen(vm)
-                            is Screen.Session -> SessionScreen(vm)
+                            is Screen.Home     -> HomeScreen(vm)
+                            is Screen.Session  -> SessionScreen(vm)
+                            is Screen.Settings -> SettingsScreen(vm)
                         }
                     }
                 }
