@@ -20,6 +20,8 @@ import com.kregosh.mtglifetracker.network.WsState
 import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.ui.components.PlayerCard
 import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
+import com.kregosh.mtglifetracker.ui.theme.dayColorScheme
+import com.kregosh.mtglifetracker.ui.theme.nightColorScheme
 import com.kregosh.mtglifetracker.viewmodel.SessionUiState
 import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
 
@@ -55,6 +57,28 @@ fun SessionScreen(vm: SessionViewModel) {
     val ui      by vm.sessionUi.collectAsState()
     val context = LocalContext.current
     val hasBg   = LocalHasBackground.current
+
+    // Override MaterialTheme with a day/night palette when the global is active
+    val dayNightActive = GLOBAL_DAY_NIGHT in ui.globalStats
+    val isDaytime      = (ui.globalStats[GLOBAL_DAY_NIGHT] ?: 0u) == 0u
+    if (dayNightActive) {
+        val scheme = if (isDaytime) dayColorScheme() else nightColorScheme()
+        MaterialTheme(colorScheme = scheme) {
+            SessionContent(vm, ui, context, hasBg)
+        }
+        return
+    }
+    SessionContent(vm, ui, context, hasBg)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SessionContent(
+    vm      : SessionViewModel,
+    ui      : SessionUiState,
+    context : android.content.Context,
+    hasBg   : Boolean,
+) {
 
     var showStatPicker   by remember { mutableStateOf(false) }
     var showCustomDialog by remember { mutableStateOf(false) }
@@ -148,9 +172,8 @@ fun SessionScreen(vm: SessionViewModel) {
 
             // Day/Night banner — only shown once the global has been initialised
             if (GLOBAL_DAY_NIGHT in ui.globalStats) {
-                val isDaytime = (ui.globalStats[GLOBAL_DAY_NIGHT] ?: 0u) == 0u
                 DayNightBanner(
-                    isDaytime = isDaytime,
+                    isDaytime = (ui.globalStats[GLOBAL_DAY_NIGHT] ?: 0u) == 0u,
                     onToggle  = { vm.toggleGlobal(GLOBAL_DAY_NIGHT) },
                 )
             }
@@ -195,27 +218,39 @@ private fun DayNightBanner(isDaytime: Boolean, onToggle: () -> Unit) {
     val icon  = if (isDaytime) Icons.Default.WbSunny else Icons.Default.Bedtime
     val label = if (isDaytime) "Day" else "Night"
     val color = if (isDaytime) MaterialTheme.colorScheme.tertiary
-                else           MaterialTheme.colorScheme.secondary
+                else           MaterialTheme.colorScheme.primary
     Surface(
-        color    = color.copy(alpha = 0.15f),
+        color    = color.copy(alpha = 0.18f),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
             modifier              = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 4.dp),
+                .padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(
                 verticalAlignment     = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(16.dp))
-                Text(label, color = color, style = MaterialTheme.typography.labelMedium)
+                Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(22.dp))
+                Text(
+                    text  = label,
+                    color = color,
+                    style = MaterialTheme.typography.titleSmall,
+                )
             }
-            TextButton(onClick = onToggle) {
-                Text("Toggle", style = MaterialTheme.typography.labelSmall)
+            FilledTonalButton(
+                onClick      = onToggle,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                modifier     = Modifier.height(32.dp),
+            ) {
+                val nextIcon  = if (isDaytime) Icons.Default.Bedtime else Icons.Default.WbSunny
+                val nextLabel = if (isDaytime) "Night" else "Day"
+                Icon(nextIcon, contentDescription = null, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(nextLabel, style = MaterialTheme.typography.labelSmall)
             }
         }
     }
