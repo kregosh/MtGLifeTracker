@@ -19,7 +19,10 @@ data class ConnectedUser(
     val userId: String,
     var displayName: String,
     val socket: DefaultWebSocketSession,
-    var value: UInt = 0u,
+    var life: UInt = 20u,
+    var commanderDamage: UInt = 0u,
+    var poisonDamage: UInt = 0u,
+    val customStats: MutableMap<String, UInt> = mutableMapOf(),
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -30,8 +33,11 @@ class SessionRoom(val sessionId: String, val code: String) {
 
     private val mutex = Mutex()
     private val users = ConcurrentHashMap<String, ConnectedUser>()
+    private val customStatNames = mutableListOf<String>()
 
     suspend fun addUser(user: ConnectedUser) = mutex.withLock {
+        // seed any existing custom stats at 0 for the new user
+        customStatNames.forEach { stat -> user.customStats.putIfAbsent(stat, 0u) }
         users[user.userId] = user
         log.debug("Session $code: {} joined ({} total)", user.displayName, users.size)
     }
@@ -41,39 +47,95 @@ class SessionRoom(val sessionId: String, val code: String) {
         log.debug("Session $code: user {} left ({} total)", userId, users.size)
     }
 
-    suspend fun increment(userId: String) = mutex.withLock {
+    /**
+     * Adjust [stat] for [userId] by [delta]. Clamped to [0, UInt.MAX_VALUE].
+     * Unknown stat names for custom stats are silently ignored.
+     */
+    suspend fun adjust(userId: String, stat: String, delta: Int) = mutex.withLock {
         val u = users[userId] ?: return@withLock
-        if (u.value < UInt.MAX_VALUE) u.value++
-    }
-
-    suspend fun decrement(userId: String) = mutex.withLock {
-        val u = users[userId] ?: return@withLock
-        if (u.value > 0u) u.value--
-    }
-
-    suspend fun broadcastState() {
-        val snapshot = users.values.map { UserState(it.userId, it.displayName, it.value) }
-        val msg = ServerMessage.State(snapshot)
-        val json = sharedJson.encodeToString(ServerMessage.serializer(), msg)
-        users.values.forEach { u ->
-            try { u.socket.send(Frame.Text(json)) }
-            catch (e: Exception) { /* closed mid-send — will be cleaned up by the handler */ }
+        when (stat) {
+            "life"      -> u.life            = clampAdd(u.life, delta)
+            "commander" -> u.commanderDamage = clampAdd(u.commanderDamage, delta)
+            "poison"    -> u.poisonDamage    = clampAdd(u.poisonDamage, delta)
+            else        -> {
+                if (customStatNames.contains(stat)) {
+                    u.customStats[stat] = clampAdd(u.customStats.getOrDefault(stat, 0u), delta)
+                }
+            }
         }
     }
 
-    fun isEmpty() = users.isEmpty()
-    fun userCount() = users.size
-    fun currentState() = users.values.map { UserState(it.userId, it.displayName, it.value) }
+    /**
+     * Add a new custom stat column to this session. Returns true if newly added,
+     * false if it already existed.
+     */
+    suspend fun addCustomStat(name: String): Boolean = mutex.withLock {
+        if (customStatNames.contains(name)) return@withLock false
+        customStatNames.add(name)
+        users.values.forEach { u -> u.customStats.putIfAbsent(name, 0u) }
+        log.debug("Session $code: added custom stat '{}'", name)
+        true
+    }
+
+    suspend fun broadcastState() {
+        val statNames = customStatNames.toList()
+        val snapshot = users.values.map { u ->
+            UserState(
+                id             = u.userId,
+                displayName    = u.displayName,
+                life           = u.life,
+                commanderDamage = u.commanderDamage,
+                poisonDamage   = u.poisonDamage,
+                customStats    = statNames.associateWith { u.customStats.getOrDefault(it, 0u) },
+            )
+        }
+        val msg  = ServerMessage.State(snapshot, statNames)
+        val json = sharedJson.encodeToString(ServerMessage.serializer(), msg)
+        users.values.forEach { u ->
+            try { u.socket.send(Frame.Text(json)) }
+            catch (e: Exception) { /* closed mid-send — cleaned up by the handler */ }
+        }
+    }
+
+    fun isEmpty()    = users.isEmpty()
+    fun userCount()  = users.size
+
+    fun currentState(): List<UserState> {
+        val statNames = customStatNames.toList()
+        return users.values.map { u ->
+            UserState(
+                id             = u.userId,
+                displayName    = u.displayName,
+                life           = u.life,
+                commanderDamage = u.commanderDamage,
+                poisonDamage   = u.poisonDamage,
+                customStats    = statNames.associateWith { u.customStats.getOrDefault(it, 0u) },
+            )
+        }
+    }
+
+    // ── helpers ───────────────────────────────────────────────────────
+
+    private fun clampAdd(value: UInt, delta: Int): UInt = when {
+        delta >= 0 -> {
+            val d = delta.toUInt()
+            if (value > UInt.MAX_VALUE - d) UInt.MAX_VALUE else value + d
+        }
+        else -> {
+            val d = (-delta).toUInt()
+            if (value < d) 0u else value - d
+        }
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Singleton manager
+// Manager
 // ─────────────────────────────────────────────────────────────────────────────
 
 class SessionManager {
 
     private val byId   = ConcurrentHashMap<String, SessionRoom>()
-    private val byCode = ConcurrentHashMap<String, SessionRoom>() // code → room
+    private val byCode = ConcurrentHashMap<String, SessionRoom>()
 
     fun create(): SessionRoom {
         val id   = java.util.UUID.randomUUID().toString()
@@ -85,10 +147,9 @@ class SessionManager {
         return room
     }
 
-    fun getById(sessionId: String)   = byId[sessionId]
-    fun getByCode(code: String)      = byCode[code.uppercase()]
+    fun getById(sessionId: String)  = byId[sessionId]
+    fun getByCode(code: String)     = byCode[code.uppercase()]
 
-    /** Remove empty sessions to free memory. */
     fun pruneIfEmpty(room: SessionRoom) {
         if (room.isEmpty()) {
             byId.remove(room.sessionId)
@@ -97,7 +158,6 @@ class SessionManager {
         }
     }
 
-    // 6-char uppercase alphanumeric codes, excluding visually ambiguous chars
     private val codeChars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
     private fun generateCode(): String {
         var code: String

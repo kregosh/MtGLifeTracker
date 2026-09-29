@@ -17,9 +17,10 @@ import org.slf4j.LoggerFactory
 private val log = LoggerFactory.getLogger("SessionWebSocket")
 
 sealed interface WsState {
-    object Connecting  : WsState
-    object Connected   : WsState
-    object Reconnecting: WsState
+    object Connecting   : WsState
+    object Connected    : WsState
+    object Reconnecting : WsState
+    object Closed       : WsState   // intentional user-driven teardown
     data class Failed(val reason: String) : WsState
 }
 
@@ -27,29 +28,25 @@ class SessionWebSocket(
     private val sessionId: String,
     private val userId: String,
     private val displayName: String,
+    private val startLife: UInt = 20u,
 ) : SessionConnection {
+
     private val json = Json {
         classDiscriminator = "type"
         encodeDefaults     = true
         ignoreUnknownKeys  = true
     }
 
-    private val client = HttpClient(OkHttp) {
-        install(WebSockets)
-    }
+    private val client = HttpClient(OkHttp) { install(WebSockets) }
+    private val scope  = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
-    private val _messages   = MutableSharedFlow<ServerMessage>(extraBufferCapacity = 64)
+    private val _messages = MutableSharedFlow<ServerMessage>(extraBufferCapacity = 64)
     override val messages: SharedFlow<ServerMessage> = _messages.asSharedFlow()
 
-    private val _state      = MutableStateFlow<WsState>(WsState.Connecting)
+    private val _state = MutableStateFlow<WsState>(WsState.Connecting)
     override val connectionState: StateFlow<WsState> = _state.asStateFlow()
 
-    // Renamed from 'outgoing' to avoid shadowing the WebSocket session's outgoing SendChannel
     private val commandQueue = Channel<ClientMessage>(Channel.BUFFERED)
-
-    private var wsSession: DefaultClientWebSocketSession? = null
 
     override fun connect() {
         scope.launch { runWithRetry() }
@@ -61,30 +58,26 @@ class SessionWebSocket(
             _state.value = if (attempt == 0) WsState.Connecting else WsState.Reconnecting
             try {
                 client.webSocket("${BuildConfig.SERVER_WS_URL}/ws/sessions/$sessionId") {
-                    wsSession = this
                     _state.value = WsState.Connected
 
-                    // Send join message immediately
-                    val join = ClientMessage.Join(userId = userId, displayName = displayName)
+                    val join = ClientMessage.Join(userId = userId, displayName = displayName, startLife = startLife)
                     send(Frame.Text(json.encodeToString(ClientMessage.serializer(), join)))
 
-                    // Forward outgoing commands while also reading incoming frames
                     val sendJob = launch {
                         try {
                             while (true) {
                                 val msg = commandQueue.receive()
                                 send(Frame.Text(json.encodeToString(ClientMessage.serializer(), msg)))
                             }
-                        } catch (_: ClosedReceiveChannelException) { /* channel closed normally */ }
+                        } catch (_: ClosedReceiveChannelException) {}
                     }
 
                     for (frame in incoming) {
                         if (frame !is Frame.Text) continue
                         val text = frame.readText()
-                        runCatching {
-                            json.decodeFromString(ServerMessage.serializer(), text)
-                        }.onSuccess { _messages.emit(it) }
-                         .onFailure { log.warn("Unrecognised server message: $text") }
+                        runCatching { json.decodeFromString(ServerMessage.serializer(), text) }
+                            .onSuccess { _messages.emit(it) }
+                            .onFailure { log.warn("Unrecognised server message: $text") }
                     }
                     sendJob.cancel()
                 }
@@ -92,23 +85,28 @@ class SessionWebSocket(
                 break
             } catch (e: Exception) {
                 log.warn("WebSocket error (attempt ${++attempt}): ${e.message}")
-            } finally {
-                wsSession = null
             }
 
             if (!scope.isActive) break
-            // Back-off: 2 s, 4 s, 8 s … capped at 30 s
             val delayMs = minOf(2_000L * (1 shl minOf(attempt - 1, 4)), 30_000L)
             log.info("Reconnecting in ${delayMs}ms …")
             delay(delayMs)
         }
-        _state.value = WsState.Failed("Disconnected")
+        if (_state.value !is WsState.Closed) {
+            _state.value = WsState.Failed("Disconnected")
+        }
     }
 
-    override fun increment() { scope.launch { commandQueue.send(ClientMessage.Increment) } }
-    override fun decrement() { scope.launch { commandQueue.send(ClientMessage.Decrement) } }
+    override fun adjust(stat: String, delta: Int) {
+        scope.launch { commandQueue.send(ClientMessage.Adjust(stat, delta)) }
+    }
+
+    override fun addCustomStat(name: String) {
+        scope.launch { commandQueue.send(ClientMessage.AddCustomStat(name)) }
+    }
 
     override fun close() {
+        _state.value = WsState.Closed
         commandQueue.close()
         scope.cancel()
         client.close()

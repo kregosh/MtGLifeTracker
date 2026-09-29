@@ -4,6 +4,14 @@ A shared life-total tracker for Magic: The Gathering. Multiple players join the
 same session; each player sees everyone's counter in real time and can use
 **+** / **−** buttons to change their own value.
 
+## UI Mockup
+
+Interactive HTML mock of all app screens:
+**[https://claude.ai/artifact/FDwKP6PLyLT7dUc1NKhWiP](https://claude.ai/artifact/FDwKP6PLyLT7dUc1NKhWiP)**
+
+Covers Home, Session (4-player, death states), Settings, Add-stat dialog, and all
+connection-state banners. Toggle light/dark in the top-right corner.
+
 ## Architecture
 
 ```

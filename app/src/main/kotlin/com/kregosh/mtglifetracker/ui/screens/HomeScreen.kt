@@ -6,13 +6,16 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
+import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
 import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -20,25 +23,27 @@ import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
 fun HomeScreen(vm: SessionViewModel) {
     val loading by vm.homeLoading.collectAsState()
     val error   by vm.homeError.collectAsState()
+    val hasBg   = LocalHasBackground.current
 
-    var codeInput   by remember { mutableStateOf("") }
-    var nameInput   by remember { mutableStateOf(vm.displayName) }
-    var showNameDialog by remember { mutableStateOf(vm.displayName.isBlank()) }
-
-    // Prompt for a display name the first time
-    if (showNameDialog) {
-        DisplayNameDialog(
-            initial  = nameInput,
-            onConfirm = { name ->
-                vm.setDisplayName(name)
-                nameInput      = name
-                showNameDialog = false
-            },
-        )
-    }
+    var codeInput by remember { mutableStateOf("") }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("MtG Life Tracker") }) }
+        containerColor = if (hasBg) Color.Transparent else MaterialTheme.colorScheme.background,
+        topBar = {
+            TopAppBar(
+                title = { Text("MtG Life Tracker") },
+                colors = if (hasBg) TopAppBarDefaults.topAppBarColors(
+                    containerColor         = Color.Black.copy(alpha = 0.45f),
+                    titleContentColor      = Color.White,
+                    actionIconContentColor = Color.White,
+                ) else TopAppBarDefaults.topAppBarColors(),
+                actions = {
+                    IconButton(onClick = vm::openSettings) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                    }
+                },
+            )
+        },
     ) { padding ->
         Column(
             modifier            = Modifier
@@ -53,15 +58,8 @@ fun HomeScreen(vm: SessionViewModel) {
                 style = MaterialTheme.typography.headlineSmall,
             )
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(24.dp))
 
-            TextButton(onClick = { showNameDialog = true }) {
-                Text("Change display name")
-            }
-
-            Spacer(Modifier.height(32.dp))
-
-            // ── Create session ────────────────────────────────────
             Button(
                 onClick  = vm::createSession,
                 enabled  = !loading,
@@ -74,7 +72,6 @@ fun HomeScreen(vm: SessionViewModel) {
 
             Spacer(Modifier.height(16.dp))
 
-            // ── Join by code ──────────────────────────────────────
             OutlinedTextField(
                 value          = codeInput,
                 onValueChange  = { codeInput = it.uppercase() },
@@ -103,7 +100,6 @@ fun HomeScreen(vm: SessionViewModel) {
                 Text("Join session")
             }
 
-            // ── Error ─────────────────────────────────────────────
             error?.let { msg ->
                 Spacer(Modifier.height(16.dp))
                 Text(msg, color = MaterialTheme.colorScheme.error)
@@ -117,33 +113,3 @@ fun HomeScreen(vm: SessionViewModel) {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Display name dialog
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun DisplayNameDialog(
-    initial   : String,
-    onConfirm : (String) -> Unit,
-) {
-    var name by remember { mutableStateOf(initial) }
-
-    AlertDialog(
-        onDismissRequest = { if (name.isNotBlank()) onConfirm(name) },
-        title    = { Text("Your display name") },
-        text     = {
-            OutlinedTextField(
-                value         = name,
-                onValueChange = { name = it },
-                singleLine    = true,
-                placeholder   = { Text("e.g. Alice") },
-            )
-        },
-        confirmButton = {
-            TextButton(
-                onClick  = { if (name.isNotBlank()) onConfirm(name) },
-                enabled  = name.isNotBlank(),
-            ) { Text("OK") }
-        },
-    )
-}
