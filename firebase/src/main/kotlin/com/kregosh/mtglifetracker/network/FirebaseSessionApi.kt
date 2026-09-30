@@ -16,9 +16,7 @@ private val CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 class FirebaseSessionApi : SessionApi {
 
-    private val db get() = FirebaseDatabase.getInstance(
-        "https://mtg-lifetracker-7866f-default-rtdb.europe-west1.firebasedatabase.app"
-    )
+    private val db get() = FirebaseDatabase.getInstance()
 
     override suspend fun createSession(): CreateSessionResponse {
         val sessionId = UUID.randomUUID().toString()
