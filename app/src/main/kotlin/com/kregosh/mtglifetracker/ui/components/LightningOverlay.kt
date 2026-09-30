@@ -1,6 +1,7 @@
 package com.kregosh.mtglifetracker.ui.components
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
@@ -16,7 +17,6 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlin.math.hypot
 import kotlin.random.Random
 
@@ -109,23 +109,20 @@ fun LightningOverlay(modifier: Modifier = Modifier) {
     var bolt    by remember { mutableStateOf<BoltSpec?>(null) }
     var canvasW by remember { mutableStateOf(0f) }
     var canvasH by remember { mutableStateOf(0f) }
-    val scope   = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         while (true) {
-            // wait a random 500 ms – 10 s between strikes
-            delay(Random.nextLong(500L, 10_000L))
+            // wait a random 300 ms – 5 s between strikes
+            delay(Random.nextLong(300L, 5_000L))
             if (canvasW == 0f || canvasH == 0f) continue
             bolt = makeBolt(canvasW, canvasH, Random)
-            // flash in fast, fade out slower
-            scope.launch {
-                alpha.snapTo(0f)
-                alpha.animateTo(1f,   androidx.compose.animation.core.tween(120))
-                alpha.animateTo(0.6f, androidx.compose.animation.core.tween(80))
-                alpha.animateTo(1f,   androidx.compose.animation.core.tween(60))
-                alpha.animateTo(0f,   androidx.compose.animation.core.tween(350))
-                bolt = null
-            }
+            // flash in fast, fade out slower — run inline so bolt stays alive for the full flash
+            alpha.snapTo(0f)
+            alpha.animateTo(1f,   tween(120))
+            alpha.animateTo(0.6f, tween(80))
+            alpha.animateTo(1f,   tween(60))
+            alpha.animateTo(0f,   tween(350))
+            bolt = null
         }
     }
 
