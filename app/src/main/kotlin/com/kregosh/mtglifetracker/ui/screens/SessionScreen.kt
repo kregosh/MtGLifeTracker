@@ -226,10 +226,12 @@ private fun SessionContent(
                     items(ui.users, key = { it.id }) { user ->
                         val isMe = user.id == ui.myUserId
                         PlayerCard(
-                            user      = user,
-                            isMe      = isMe,
-                            sessionUi = ui,
-                            onAdjust  = { stat, delta -> if (isMe) vm.adjust(stat, delta) },
+                            user        = user,
+                            isMe        = isMe,
+                            sessionUi   = ui,
+                            onAdjust    = { stat, delta -> if (isMe) vm.adjust(stat, delta) },
+                            onConcede   = if (isMe) vm::concede   else null,
+                            onUnconcede = if (isMe) vm::unconcede else null,
                         )
                     }
                 }

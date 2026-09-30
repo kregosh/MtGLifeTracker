@@ -68,6 +68,7 @@ class FirebaseSessionConnection(
                         customStats = userSnap.child("customStats").children.associate { stat ->
                             (stat.key ?: "") to (stat.getValue(Long::class.java) ?: 0L).toUInt()
                         },
+                        conceded    = userSnap.child("conceded").getValue(Boolean::class.java) ?: false,
                     )
                 }
                 val statDefs = snapshot.child("customStatNames").children.associate { child ->
@@ -119,6 +120,10 @@ class FirebaseSessionConnection(
 
     override fun setGlobal(stat: String, value: UInt) {
         sessionRef.child("globalStats/$stat").setValue(value.toLong())
+    }
+
+    override fun setConceded(conceded: Boolean) {
+        myUserRef.child("conceded").setValue(conceded)
     }
 
     override fun close() {

@@ -190,6 +190,14 @@ class SessionViewModel(
 
     val commanderDefaultEnabled: Boolean get() = prefs.commanderDefaultEnabled
 
+    private val _knownPlayers = MutableStateFlow(prefs.knownPlayers)
+    val knownPlayers: StateFlow<Map<String, String>> = _knownPlayers.asStateFlow()
+
+    fun forgetPlayer(userId: String) {
+        prefs.knownPlayers = prefs.knownPlayers - userId
+        _knownPlayers.value = prefs.knownPlayers
+    }
+
     fun setStartLife(v: UInt)          { prefs.startLife = v;                _startLife.value = v }
     fun setCommanderThreshold(v: UInt) { prefs.commanderDeathThreshold = v;  _commanderThreshold.value = v }
     fun setInfectThreshold(v: UInt)    { prefs.infectDeathThreshold = v;     _infectThreshold.value = v }
@@ -261,6 +269,20 @@ class SessionViewModel(
 
     fun setGlobal(stat: String, value: UInt) = webSocket?.setGlobal(stat, value)
 
+    fun concede() {
+        val myId = _sessionUi.value.myUserId
+        serverUsers = serverUsers.map { if (it.id == myId) it.copy(conceded = true) else it }
+        _sessionUi.update { it.copy(users = applyPendingDeltas(serverUsers)) }
+        webSocket?.setConceded(true)
+    }
+
+    fun unconcede() {
+        val myId = _sessionUi.value.myUserId
+        serverUsers = serverUsers.map { if (it.id == myId) it.copy(conceded = false) else it }
+        _sessionUi.update { it.copy(users = applyPendingDeltas(serverUsers)) }
+        webSocket?.setConceded(false)
+    }
+
     fun toggleGlobal(stat: String) {
         val current = _sessionUi.value.globalStats[stat] ?: 0u
         setGlobal(stat, if (current == 0u) 1u else 0u)
@@ -330,6 +352,14 @@ class SessionViewModel(
                                     statDefs    = msg.statDefs,
                                     globalStats = msg.globalStats,
                                 )
+                            }
+                            val myId = _sessionUi.value.myUserId
+                            val newEntries = msg.users
+                                .filter { it.id != myId && it.displayName.isNotBlank() }
+                                .associate { it.id to it.displayName }
+                            if (newEntries.isNotEmpty()) {
+                                prefs.knownPlayers = prefs.knownPlayers + newEntries
+                                _knownPlayers.value = prefs.knownPlayers
                             }
                         }
                         is ServerMessage.Joined -> _sessionUi.update {

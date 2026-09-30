@@ -13,4 +13,5 @@ interface UserPrefs {
     var timerVisible            : Boolean
     var timerCountDown          : Boolean
     var timerLimitMinutes       : UInt
+    var knownPlayers            : Map<String, String>
 }

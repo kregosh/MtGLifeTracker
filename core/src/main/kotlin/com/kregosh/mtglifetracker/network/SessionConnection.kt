@@ -13,5 +13,6 @@ interface SessionConnection {
     fun addCustomStat(name: String, type: StatType = StatType.NUMERIC)
     fun removeCustomStat(name: String)
     fun setGlobal(stat: String, value: UInt)
+    fun setConceded(conceded: Boolean)
     fun close()
 }

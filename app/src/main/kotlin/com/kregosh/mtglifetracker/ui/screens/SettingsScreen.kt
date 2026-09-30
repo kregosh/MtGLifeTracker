@@ -8,7 +8,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -218,6 +220,53 @@ fun SettingsScreen(vm: SessionViewModel) {
                             presets  = listOf(30u, 45u, 60u, 90u),
                             onSelect = vm::setTimerLimitMinutes,
                         )
+                    }
+                }
+            }
+
+            // ── Known players ─────────────────────────────────────────────────
+            val knownPlayers by vm.knownPlayers.collectAsState()
+            if (knownPlayers.isNotEmpty()) {
+                SettingsSection(title = "Known Players") {
+                    Text(
+                        "Players you've shared a session with",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        knownPlayers.entries.sortedBy { it.value }.forEach { (uid, name) ->
+                            Row(
+                                modifier              = Modifier.fillMaxWidth(),
+                                verticalAlignment     = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Row(
+                                    verticalAlignment     = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    Icon(
+                                        imageVector        = Icons.Default.People,
+                                        contentDescription = null,
+                                        modifier           = Modifier.size(16.dp),
+                                        tint               = MaterialTheme.colorScheme.primary,
+                                    )
+                                    Text(name, style = MaterialTheme.typography.bodyMedium)
+                                }
+                                IconButton(
+                                    onClick  = { vm.forgetPlayer(uid) },
+                                    modifier = Modifier.size(32.dp),
+                                ) {
+                                    Icon(
+                                        imageVector        = Icons.Default.Close,
+                                        contentDescription = "Forget $name",
+                                        modifier           = Modifier.size(16.dp),
+                                        tint               = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

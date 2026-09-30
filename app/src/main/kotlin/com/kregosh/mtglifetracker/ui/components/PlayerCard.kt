@@ -28,26 +28,35 @@ import com.kregosh.mtglifetracker.viewmodel.isDead
 
 @Composable
 fun PlayerCard(
-    user      : UserState,
-    isMe      : Boolean,
-    sessionUi : SessionUiState,
-    onAdjust  : (stat: String, delta: Int) -> Unit = { _, _ -> },
-    modifier  : Modifier = Modifier,
+    user       : UserState,
+    isMe       : Boolean,
+    sessionUi  : SessionUiState,
+    onAdjust   : (stat: String, delta: Int) -> Unit = { _, _ -> },
+    onConcede  : (() -> Unit)?  = null,
+    onUnconcede: (() -> Unit)?  = null,
+    modifier   : Modifier = Modifier,
 ) {
     val dead      = user.isDead(sessionUi)
+    val conceded  = user.conceded
     val hasBg     = LocalHasBackground.current
     val cardBg    = LocalCardBackground.current
     val hasCardBg = isMe && cardBg != null
 
     val containerColor = when {
-        dead  -> MaterialTheme.colorScheme.errorContainer.copy(alpha = if (hasBg || hasCardBg) 0.45f else 0.6f)
-        isMe  -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (hasCardBg) 0.65f else if (hasBg) 0.72f else 1f)
-        else  -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (hasBg) 0.60f else 1f)
+        conceded -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (hasBg) 0.35f else 0.5f)
+        dead     -> MaterialTheme.colorScheme.errorContainer.copy(alpha = if (hasBg || hasCardBg) 0.45f else 0.6f)
+        isMe     -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (hasCardBg) 0.65f else if (hasBg) 0.72f else 1f)
+        else     -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (hasBg) 0.60f else 1f)
     }
+
+    val contentColor = if (hasBg || hasCardBg) Color.White else Color.Unspecified
 
     Box(modifier = modifier.fillMaxWidth()) {
         Card(
-            colors   = CardDefaults.cardColors(containerColor = containerColor),
+            colors   = CardDefaults.cardColors(
+                containerColor = containerColor,
+                contentColor   = contentColor,
+            ),
             modifier = Modifier.fillMaxWidth(),
         ) {
             Box {
@@ -74,7 +83,24 @@ fun PlayerCard(
                             fontWeight = if (isMe) FontWeight.Bold else FontWeight.Normal,
                             modifier   = Modifier.weight(1f),
                         )
-                        if (isMe) {
+                        if (isMe && conceded) {
+                            TextButton(
+                                onClick      = { onUnconcede?.invoke() },
+                                modifier     = Modifier.height(28.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                            ) {
+                                Text("Undo", style = MaterialTheme.typography.labelSmall)
+                            }
+                        } else if (isMe && !dead) {
+                            TextButton(
+                                onClick      = { onConcede?.invoke() },
+                                modifier     = Modifier.height(28.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                            ) {
+                                Text("Concede", style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.error)
+                            }
+                        } else if (isMe) {
                             SuggestionChip(
                                 onClick  = {},
                                 label    = { Text("You", style = MaterialTheme.typography.labelSmall) },
@@ -154,16 +180,17 @@ fun PlayerCard(
             }
         }
 
-        // ── Skull overlay for eliminated opponents ────────────────────────
-        if (dead && !isMe) {
+        // ── Overlays for eliminated / conceded opponents ──────────────────
+        if (!isMe && (dead || conceded)) {
+            val overlayAlpha = if (dead) 0.65f else 0.50f
             Box(
                 modifier = Modifier
                     .matchParentSize()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color.Black.copy(alpha = 0.65f)),
+                    .background(Color.Black.copy(alpha = overlayAlpha)),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(text = "💀", fontSize = 64.sp)
+                Text(text = if (dead) "💀" else "🏳️", fontSize = 64.sp)
             }
         }
     }
@@ -199,6 +226,7 @@ private fun NumericStatRow(
     isDead  : Boolean,
     onAdjust: (Int) -> Unit,
 ) {
+    val labelColor = LocalContentColor.current.copy(alpha = 0.75f)
     Row(
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -207,8 +235,7 @@ private fun NumericStatRow(
         Text(
             text     = label,
             style    = MaterialTheme.typography.labelMedium,
-            color    = if (isDead) MaterialTheme.colorScheme.error
-                       else MaterialTheme.colorScheme.onSurfaceVariant,
+            color    = if (isDead) MaterialTheme.colorScheme.error else labelColor,
             modifier = Modifier.widthIn(min = 72.dp),
         )
         Row(
@@ -253,7 +280,8 @@ private fun ToggleStatRow(
     isMe    : Boolean,
     onToggle: () -> Unit,
 ) {
-    val active = value > 0u
+    val active     = value > 0u
+    val labelColor = LocalContentColor.current.copy(alpha = 0.75f)
     Row(
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -262,7 +290,7 @@ private fun ToggleStatRow(
         Text(
             text     = label,
             style    = MaterialTheme.typography.labelMedium,
-            color    = MaterialTheme.colorScheme.onSurfaceVariant,
+            color    = labelColor,
             modifier = Modifier.widthIn(min = 72.dp),
         )
         if (isMe) {
@@ -292,6 +320,7 @@ private fun RingStageRow(
     isMe    : Boolean,
     onAdjust: (Int) -> Unit,
 ) {
+    val labelColor = LocalContentColor.current.copy(alpha = 0.75f)
     Row(
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -300,7 +329,7 @@ private fun RingStageRow(
         Text(
             text     = label,
             style    = MaterialTheme.typography.labelMedium,
-            color    = MaterialTheme.colorScheme.onSurfaceVariant,
+            color    = labelColor,
             modifier = Modifier.widthIn(min = 72.dp),
         )
         Row(

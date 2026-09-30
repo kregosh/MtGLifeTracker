@@ -64,6 +64,17 @@ class UserPreferences(context: Context) : UserPrefs {
         get() = prefs.getInt(KEY_TIMER_LIMIT_MINUTES, 60).toUInt()
         set(value) { prefs.edit().putInt(KEY_TIMER_LIMIT_MINUTES, value.toInt()).apply() }
 
+    override var knownPlayers: Map<String, String>
+        get() = prefs.getStringSet(KEY_KNOWN_PLAYERS, emptySet())
+                    ?.mapNotNull { entry ->
+                        val idx = entry.indexOf('\u001F')
+                        if (idx < 0) null else entry.substring(0, idx) to entry.substring(idx + 1)
+                    }?.toMap() ?: emptyMap()
+        set(value) {
+            val encoded = value.entries.map { (id, name) -> "$id\u001F$name" }.toSet()
+            prefs.edit().putStringSet(KEY_KNOWN_PLAYERS, encoded).apply()
+        }
+
     companion object {
         private const val KEY_USER_ID               = "user_id"
         private const val KEY_DISPLAY_NAME          = "display_name"
@@ -77,5 +88,6 @@ class UserPreferences(context: Context) : UserPrefs {
         private const val KEY_TIMER_VISIBLE         = "timer_visible"
         private const val KEY_TIMER_COUNTDOWN       = "timer_countdown"
         private const val KEY_TIMER_LIMIT_MINUTES   = "timer_limit_minutes"
+        private const val KEY_KNOWN_PLAYERS         = "known_players"
     }
 }

@@ -5,4 +5,5 @@ data class UserState(
     val displayName : String,
     val life        : UInt              = 20u,
     val customStats : Map<String, UInt> = emptyMap(),
+    val conceded    : Boolean           = false,
 )
