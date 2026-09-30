@@ -288,6 +288,9 @@ class SessionViewModel(
     }
 
     private fun joinSession(sessionId: String, sessionCode: String) {
+        val current = _screen.value
+        if (current is Screen.Session && current.sessionId == sessionId) return
+
         tearDownWebSocket()
 
         val myId = prefs.userId
