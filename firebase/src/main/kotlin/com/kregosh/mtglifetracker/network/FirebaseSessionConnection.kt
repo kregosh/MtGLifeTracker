@@ -21,7 +21,9 @@ class FirebaseSessionConnection(
     private val startLife   : UInt,
 ) : SessionConnection {
 
-    private val db         = FirebaseDatabase.getInstance()
+    private val db         = FirebaseDatabase.getInstance(
+        "https://mtg-lifetracker-7866f-default-rtdb.europe-west1.firebasedatabase.app"
+    )
     private val sessionRef = db.getReference("sessions/$sessionId")
     private val myUserRef  = sessionRef.child("users/$userId")
 
