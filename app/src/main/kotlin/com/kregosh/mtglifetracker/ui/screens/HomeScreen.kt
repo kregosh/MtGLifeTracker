@@ -100,14 +100,32 @@ fun HomeScreen(vm: SessionViewModel) {
                 Text("Join session")
             }
 
-            error?.let { msg ->
-                Spacer(Modifier.height(16.dp))
-                Text(msg, color = MaterialTheme.colorScheme.error)
-            }
-
             if (loading) {
                 Spacer(Modifier.height(16.dp))
-                CircularProgressIndicator()
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                    Text("Connecting to Firebase…", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+
+            error?.let { msg ->
+                Spacer(Modifier.height(16.dp))
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        text = msg,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(12.dp),
+                    )
+                }
             }
         }
     }
