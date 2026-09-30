@@ -10,8 +10,14 @@ import com.kregosh.mtglifetracker.shared.ServerMessage
 import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.shared.UserState
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Navigation state
@@ -78,6 +84,72 @@ class SessionViewModel(
     private var webSocket: SessionConnection? = null
     private var wsCollectorJob: Job? = null
     private var settingsReturnTo: Screen = Screen.Home
+
+    // ── timer settings ────────────────────────────────────────────────
+
+    private val _timerVisible    = MutableStateFlow(prefs.timerVisible)
+    val timerVisible: StateFlow<Boolean> = _timerVisible.asStateFlow()
+
+    private val _timerCountDown  = MutableStateFlow(prefs.timerCountDown)
+    val timerCountDown: StateFlow<Boolean> = _timerCountDown.asStateFlow()
+
+    private val _timerLimitMinutes = MutableStateFlow(prefs.timerLimitMinutes)
+    val timerLimitMinutes: StateFlow<UInt> = _timerLimitMinutes.asStateFlow()
+
+    fun setTimerVisible(v: Boolean)       { prefs.timerVisible = v;      _timerVisible.value = v }
+    fun setTimerCountDown(v: Boolean)     { prefs.timerCountDown = v;    _timerCountDown.value = v; resetTimer() }
+    fun setTimerLimitMinutes(v: UInt)     { prefs.timerLimitMinutes = v; _timerLimitMinutes.value = v; resetTimer() }
+
+    // ── game timer ────────────────────────────────────────────────────
+
+    private val _timerRunning = MutableStateFlow(false)
+    val timerRunning: StateFlow<Boolean> = _timerRunning.asStateFlow()
+
+    private val _timerElapsed = MutableStateFlow(Duration.ZERO)
+    val timerElapsed: StateFlow<Duration> = _timerElapsed.asStateFlow()
+
+    private var timerJob: Job? = null
+    private var timerMark: TimeMark? = null
+    private var timerAccumulated: Duration = Duration.ZERO
+
+    fun startPauseTimer() {
+        if (_timerRunning.value) pauseTimer() else startTimer()
+    }
+
+    private fun startTimer() {
+        timerMark = TimeSource.Monotonic.markNow()
+        _timerRunning.value = true
+        timerJob = viewModelScope.launch {
+            val limit = if (prefs.timerCountDown) prefs.timerLimitMinutes.toLong().minutes else null
+            while (isActive) {
+                delay(500)
+                val now = timerAccumulated + (timerMark?.elapsedNow() ?: Duration.ZERO)
+                if (limit != null && now >= limit) {
+                    _timerElapsed.value = limit
+                    pauseTimer()
+                    break
+                }
+                _timerElapsed.value = now
+            }
+        }
+    }
+
+    private fun pauseTimer() {
+        timerAccumulated += timerMark?.elapsedNow() ?: Duration.ZERO
+        timerMark = null
+        _timerRunning.value = false
+        timerJob?.cancel()
+        timerJob = null
+    }
+
+    fun resetTimer() {
+        timerJob?.cancel()
+        timerJob = null
+        timerMark = null
+        timerAccumulated = Duration.ZERO
+        _timerRunning.value = false
+        _timerElapsed.value = Duration.ZERO
+    }
 
     // Debounce state: last server-confirmed snapshot + per-stat pending deltas
     private var serverUsers   = emptyList<UserState>()
@@ -166,7 +238,7 @@ class SessionViewModel(
         _sessionUi.update { it.copy(users = applyPendingDeltas(serverUsers)) }
         debounceJobs[stat]?.cancel()
         debounceJobs[stat] = viewModelScope.launch {
-            kotlinx.coroutines.delay(400)
+            delay(400)
             val accumulated = pendingDeltas.remove(stat) ?: return@launch
             debounceJobs.remove(stat)
             webSocket?.adjust(stat, accumulated)
@@ -273,6 +345,7 @@ class SessionViewModel(
         wsCollectorJob = null
         webSocket?.close()
         webSocket = null
+        resetTimer()
     }
 
     override fun onCleared() {

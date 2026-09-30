@@ -47,6 +47,9 @@ class SessionViewModelTest {
         every { prefs.infectDeathThreshold }    returns 10u
         every { prefs.colorScheme }             returns "dark"
         every { prefs.commanderDefaultEnabled } returns false
+        every { prefs.timerVisible }            returns true
+        every { prefs.timerCountDown }          returns false
+        every { prefs.timerLimitMinutes }       returns 60u
         every { wsFactory(any(), any(), any(), any()) } returns ws
     }
 
@@ -441,5 +444,65 @@ class SessionViewModelTest {
 
         val uiState = vm.sessionUi.value
         assertTrue(deadUser.isDead(uiState))
+    }
+
+    // ── timer tests ──────────────────────────────────────────────────────────
+
+    @Test
+    fun `timer starts not running with zero elapsed`() {
+        val vm = makeVm()
+        assertFalse(vm.timerRunning.value)
+        assertEquals(kotlin.time.Duration.ZERO, vm.timerElapsed.value)
+    }
+
+    @Test
+    fun `startPauseTimer toggles running state`() = runTest {
+        val vm = makeVm()
+        vm.startPauseTimer()
+        assertTrue(vm.timerRunning.value)
+        vm.startPauseTimer()
+        assertFalse(vm.timerRunning.value)
+    }
+
+    @Test
+    fun `elapsed increases while timer is running`() = runTest {
+        val vm = makeVm()
+        vm.startPauseTimer()
+        advanceTimeBy(2_000)
+        assertTrue(vm.timerElapsed.value.inWholeSeconds >= 1)
+    }
+
+    @Test
+    fun `pausing preserves accumulated elapsed`() = runTest {
+        val vm = makeVm()
+        vm.startPauseTimer()
+        advanceTimeBy(3_000)
+        vm.startPauseTimer()          // pause
+        val snapshot = vm.timerElapsed.value
+        advanceTimeBy(2_000)          // time passes while paused
+        assertEquals(snapshot, vm.timerElapsed.value)
+    }
+
+    @Test
+    fun `resetTimer zeroes elapsed and stops running`() = runTest {
+        val vm = makeVm()
+        vm.startPauseTimer()
+        advanceTimeBy(2_000)
+        vm.resetTimer()
+        assertFalse(vm.timerRunning.value)
+        assertEquals(kotlin.time.Duration.ZERO, vm.timerElapsed.value)
+    }
+
+    @Test
+    fun `leaveSession resets the timer`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+        vm.startPauseTimer()
+        advanceTimeBy(1_500)
+        vm.leaveSession()
+        assertFalse(vm.timerRunning.value)
+        assertEquals(kotlin.time.Duration.ZERO, vm.timerElapsed.value)
     }
 }
