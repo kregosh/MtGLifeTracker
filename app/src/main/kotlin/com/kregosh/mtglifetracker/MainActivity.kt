@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import com.kregosh.mtglifetracker.ui.components.LightningOverlay
 import com.kregosh.mtglifetracker.ui.screens.HomeScreen
 import com.kregosh.mtglifetracker.ui.screens.SessionScreen
 import com.kregosh.mtglifetracker.ui.screens.SettingsScreen
@@ -61,6 +62,7 @@ class MainActivity : ComponentActivity() {
             val screen          by vm.screen.collectAsState()
             val bgUriString     by vm.backgroundImageUri.collectAsState()
             val cardBgUriString by vm.cardBackgroundImageUri.collectAsState()
+            val isStormPreset   by vm.isStormPreset.collectAsState()
             val colorSchemePref by vm.colorScheme.collectAsState()
             val context         = LocalContext.current
 
@@ -108,6 +110,10 @@ class MainActivity : ComponentActivity() {
                                 contentScale       = ContentScale.Crop,
                                 modifier           = Modifier.fillMaxSize(),
                             )
+                        }
+
+                        if (isStormPreset) {
+                            LightningOverlay()
                         }
 
                         when (screen) {
