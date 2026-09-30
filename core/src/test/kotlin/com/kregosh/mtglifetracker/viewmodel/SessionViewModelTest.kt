@@ -505,4 +505,36 @@ class SessionViewModelTest {
         assertFalse(vm.timerRunning.value)
         assertEquals(kotlin.time.Duration.ZERO, vm.timerElapsed.value)
     }
+
+    @Test
+    fun `setTimerVisible persists and updates flow`() {
+        val vm = makeVm()
+        vm.setTimerVisible(false)
+        verify { prefs.timerVisible = false }
+        assertFalse(vm.timerVisible.value)
+    }
+
+    @Test
+    fun `setTimerCountDown persists, updates flow, and resets timer`() = runTest {
+        val vm = makeVm()
+        vm.startPauseTimer()
+        advanceTimeBy(1_000)
+        vm.setTimerCountDown(true)
+        verify { prefs.timerCountDown = true }
+        assertTrue(vm.timerCountDown.value)
+        assertFalse(vm.timerRunning.value)
+        assertEquals(kotlin.time.Duration.ZERO, vm.timerElapsed.value)
+    }
+
+    @Test
+    fun `setTimerLimitMinutes persists, updates flow, and resets timer`() = runTest {
+        val vm = makeVm()
+        vm.startPauseTimer()
+        advanceTimeBy(1_000)
+        vm.setTimerLimitMinutes(45u)
+        verify { prefs.timerLimitMinutes = 45u }
+        assertEquals(45u, vm.timerLimitMinutes.value)
+        assertFalse(vm.timerRunning.value)
+        assertEquals(kotlin.time.Duration.ZERO, vm.timerElapsed.value)
+    }
 }

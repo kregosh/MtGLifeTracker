@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.kregosh.mtglifetracker.R
 import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
 import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
 
@@ -137,6 +138,20 @@ fun SettingsScreen(vm: SessionViewModel) {
                             colors  = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                         ) { Text("Remove") }
                     }
+                }
+
+                Spacer(Modifier.height(8.dp))
+                Text("Presets", style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(4.dp))
+                val pkg = context.packageName
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = {
+                        vm.setBackgroundImage("android.resource://$pkg/${R.drawable.bg_arcane_storm}")
+                    }) { Text("⚡ Storm") }
+                    OutlinedButton(onClick = {
+                        vm.setBackgroundImage("android.resource://$pkg/${R.drawable.bg_mana_orbs}")
+                    }) { Text("🔮 Mana Orbs") }
                 }
 
                 Spacer(Modifier.height(12.dp))

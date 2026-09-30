@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="#1A1A2E"/>
+<!-- Deep purple-to-indigo radial gradient for the adaptive icon background -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:type="radial"
+        android:gradientRadius="80%p"
+        android:startColor="#3D0D6B"
+        android:centerColor="#1A0A45"
+        android:endColor="#090618"/>
 </shape>
