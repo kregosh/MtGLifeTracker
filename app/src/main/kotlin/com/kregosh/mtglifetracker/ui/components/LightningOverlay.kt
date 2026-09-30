@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
@@ -128,11 +129,14 @@ fun LightningOverlay(modifier: Modifier = Modifier) {
         }
     }
 
-    Canvas(modifier = modifier.fillMaxSize()) {
-        if (canvasW != size.width || canvasH != size.height) {
-            canvasW = size.width
-            canvasH = size.height
-        }
+    Canvas(
+        modifier = modifier
+            .fillMaxSize()
+            .onSizeChanged { size ->
+                canvasW = size.width.toFloat()
+                canvasH = size.height.toFloat()
+            }
+    ) {
         val b = bolt ?: return@Canvas
         val a = alpha.value
         drawBolt(b.points, a, Color(0xFFD0C0FF), Color(0xFF7744FF), 2.dp, 18.dp)

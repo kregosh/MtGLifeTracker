@@ -1,5 +1,6 @@
 package com.kregosh.mtglifetracker
 
+import android.content.res.Configuration
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
@@ -75,11 +76,23 @@ class MainActivity : ComponentActivity() {
             var bgBitmap     by remember { mutableStateOf<ImageBitmap?>(null) }
             var cardBgBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 
-            LaunchedEffect(bgUriString) {
+            LaunchedEffect(bgUriString, colorSchemePref) {
                 bgBitmap = withContext(Dispatchers.IO) {
                     bgUriString?.let { uriStr ->
                         runCatching {
-                            context.contentResolver.openInputStream(Uri.parse(uriStr))
+                            val resolveCtx = if (uriStr.startsWith("android.resource://")) {
+                                val nightMode = when (colorSchemePref) {
+                                    "dark"  -> Configuration.UI_MODE_NIGHT_YES
+                                    "light" -> Configuration.UI_MODE_NIGHT_NO
+                                    else    -> null
+                                }
+                                if (nightMode != null) {
+                                    val cfg = Configuration(context.resources.configuration)
+                                    cfg.uiMode = (cfg.uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or nightMode
+                                    context.createConfigurationContext(cfg)
+                                } else context
+                            } else context
+                            resolveCtx.contentResolver.openInputStream(Uri.parse(uriStr))
                                 ?.use { BitmapFactory.decodeStream(it)?.asImageBitmap() }
                         }.getOrNull()
                     }
