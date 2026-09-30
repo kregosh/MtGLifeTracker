@@ -179,14 +179,20 @@ class SessionViewModel(
 
     // ── game settings ─────────────────────────────────────────────────
 
-    val startLife: UInt get() = prefs.startLife
-    val commanderThreshold: UInt get() = prefs.commanderDeathThreshold
-    val infectThreshold: UInt get() = prefs.infectDeathThreshold
+    private val _startLife           = MutableStateFlow(prefs.startLife)
+    val startLife: StateFlow<UInt>   = _startLife.asStateFlow()
+
+    private val _commanderThreshold          = MutableStateFlow(prefs.commanderDeathThreshold)
+    val commanderThreshold: StateFlow<UInt>  = _commanderThreshold.asStateFlow()
+
+    private val _infectThreshold             = MutableStateFlow(prefs.infectDeathThreshold)
+    val infectThreshold: StateFlow<UInt>     = _infectThreshold.asStateFlow()
+
     val commanderDefaultEnabled: Boolean get() = prefs.commanderDefaultEnabled
 
-    fun setStartLife(v: UInt) { prefs.startLife = v }
-    fun setCommanderThreshold(v: UInt) { prefs.commanderDeathThreshold = v }
-    fun setInfectThreshold(v: UInt) { prefs.infectDeathThreshold = v }
+    fun setStartLife(v: UInt)          { prefs.startLife = v;                _startLife.value = v }
+    fun setCommanderThreshold(v: UInt) { prefs.commanderDeathThreshold = v;  _commanderThreshold.value = v }
+    fun setInfectThreshold(v: UInt)    { prefs.infectDeathThreshold = v;     _infectThreshold.value = v }
     fun setCommanderDefaultEnabled(v: Boolean) { prefs.commanderDefaultEnabled = v }
 
     fun setColorScheme(scheme: String) {

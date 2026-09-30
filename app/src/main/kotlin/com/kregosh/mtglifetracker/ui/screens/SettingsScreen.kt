@@ -224,23 +224,27 @@ fun SettingsScreen(vm: SessionViewModel) {
 
             // ── Game rules ────────────────────────────────────────────────────
             SettingsSection(title = "Game Rules") {
+                val startLife          by vm.startLife.collectAsState()
+                val commanderThreshold by vm.commanderThreshold.collectAsState()
+                val infectThreshold    by vm.infectThreshold.collectAsState()
+
                 PresetRow(
                     label    = "Starting life total",
-                    current  = vm.startLife,
+                    current  = startLife,
                     presets  = listOf(20u, 30u, 40u),
                     onSelect = vm::setStartLife,
                 )
                 Spacer(Modifier.height(12.dp))
                 PresetRow(
                     label    = "Commander damage limit",
-                    current  = vm.commanderThreshold,
+                    current  = commanderThreshold,
                     presets  = listOf(21u, 15u, 10u),
                     onSelect = vm::setCommanderThreshold,
                 )
                 Spacer(Modifier.height(12.dp))
                 PresetRow(
                     label    = "Infect damage limit",
-                    current  = vm.infectThreshold,
+                    current  = infectThreshold,
                     presets  = listOf(10u, 7u, 5u),
                     onSelect = vm::setInfectThreshold,
                 )
