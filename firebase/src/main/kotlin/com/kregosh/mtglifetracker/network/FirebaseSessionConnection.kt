@@ -43,28 +43,13 @@ class FirebaseSessionConnection(
                 "customStats" to emptyMap<String, Any>(),
             )
         )
-        myUserRef.onDisconnect().removeValue()
 
         val connListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                val connected = snapshot.getValue(Boolean::class.java) == true
-                _state.value = if (connected) WsState.Connected else WsState.Reconnecting
-                if (connected) {
-                    // Re-register presence: onDisconnect may have fired and removed our entry.
-                    // Also re-register the onDisconnect handler itself (consumed after firing).
-                    myUserRef.get().addOnSuccessListener { snap ->
-                        if (!snap.exists()) {
-                            myUserRef.setValue(
-                                mapOf(
-                                    "displayName" to displayName,
-                                    "life"        to startLife.toLong(),
-                                    "customStats" to emptyMap<String, Any>(),
-                                )
-                            )
-                        }
-                        myUserRef.onDisconnect().removeValue()
-                    }
-                }
+                _state.value = if (snapshot.getValue(Boolean::class.java) == true)
+                    WsState.Connected
+                else
+                    WsState.Reconnecting
             }
             override fun onCancelled(error: DatabaseError) {
                 _state.value = WsState.Failed(error.message)
