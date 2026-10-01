@@ -71,51 +71,22 @@ fun HomeScreen(vm: SessionViewModel) {
 
             Spacer(Modifier.height(8.dp))
 
-            Button(
-                onClick  = vm::createSession,
-                enabled  = !loading,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Create new session")
-            }
-
-            OutlinedTextField(
-                value          = codeInput,
-                onValueChange  = { codeInput = it.uppercase() },
-                label          = { Text("Invite code") },
-                placeholder    = { Text("ABC123") },
-                singleLine     = true,
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Characters,
-                    imeAction      = ImeAction.Go,
-                ),
-                keyboardActions = KeyboardActions(onGo = {
-                    if (codeInput.isNotBlank()) vm.joinByCode(codeInput)
-                }),
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            OutlinedButton(
-                onClick  = { if (codeInput.isNotBlank()) vm.joinByCode(codeInput) },
-                enabled  = codeInput.isNotBlank() && !loading,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(Icons.Default.Link, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Join session")
-            }
-
             // ── Friends online ────────────────────────────────────────────────
-            if (friendList.isNotEmpty()) {
-                HorizontalDivider()
+            HorizontalDivider()
+            Text(
+                text  = "FRIENDS",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.align(Alignment.Start),
+            )
+            if (friendList.isEmpty()) {
                 Text(
-                    text  = "FRIENDS",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
+                    text  = "Add friends during a session to see them here",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.align(Alignment.Start),
                 )
+            } else {
                 Column(
                     modifier            = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -172,6 +143,44 @@ fun HomeScreen(vm: SessionViewModel) {
                         }
                     }
                 }
+            }
+
+            HorizontalDivider()
+
+            Button(
+                onClick  = vm::createSession,
+                enabled  = !loading,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Create new session")
+            }
+
+            OutlinedTextField(
+                value          = codeInput,
+                onValueChange  = { codeInput = it.uppercase() },
+                label          = { Text("Invite code") },
+                placeholder    = { Text("ABC123") },
+                singleLine     = true,
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Characters,
+                    imeAction      = ImeAction.Go,
+                ),
+                keyboardActions = KeyboardActions(onGo = {
+                    if (codeInput.isNotBlank()) vm.joinByCode(codeInput)
+                }),
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            OutlinedButton(
+                onClick  = { if (codeInput.isNotBlank()) vm.joinByCode(codeInput) },
+                enabled  = codeInput.isNotBlank() && !loading,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(Icons.Default.Link, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Join session")
             }
 
             if (loading) {
