@@ -32,7 +32,7 @@ sealed interface Screen {
 }
 
 // Stat names that would shadow Firebase data-model fields or built-in stats.
-internal val RESERVED_STAT_NAMES = setOf(
+val RESERVED_STAT_NAMES = setOf(
     "life", "displayname", "conceded", "customstats",
     "commander", "poison",
 )
