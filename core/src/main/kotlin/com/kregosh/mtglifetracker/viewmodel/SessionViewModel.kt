@@ -2,6 +2,8 @@ package com.kregosh.mtglifetracker.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kregosh.mtglifetracker.data.Friend
+import com.kregosh.mtglifetracker.data.KnownPlayer
 import com.kregosh.mtglifetracker.data.UserPrefs
 import com.kregosh.mtglifetracker.network.SessionApi
 import com.kregosh.mtglifetracker.network.SessionConnection
@@ -28,6 +30,12 @@ sealed interface Screen {
     data class Session(val sessionId: String) : Screen
     object Settings : Screen
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Friend-request pending entry (local to ViewModel, not shared over network)
+// ─────────────────────────────────────────────────────────────────────────────
+
+data class FriendRequestInfo(val fromUserId: String, val fromDisplayName: String)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // UI state for a live session
@@ -190,6 +198,44 @@ class SessionViewModel(
 
     val commanderDefaultEnabled: Boolean get() = prefs.commanderDefaultEnabled
 
+    private val _knownPlayers = MutableStateFlow(prefs.knownPlayers)
+    val knownPlayers: StateFlow<List<KnownPlayer>> = _knownPlayers.asStateFlow()
+
+    private val _friendList = MutableStateFlow(prefs.friendList)
+    val friendList: StateFlow<List<Friend>> = _friendList.asStateFlow()
+
+    private val _pendingFriendRequests = MutableStateFlow<List<FriendRequestInfo>>(emptyList())
+    val pendingFriendRequests: StateFlow<List<FriendRequestInfo>> = _pendingFriendRequests.asStateFlow()
+
+    fun forgetPlayer(userId: String) {
+        prefs.forgetKnownPlayer(userId)
+        _knownPlayers.value = prefs.knownPlayers
+    }
+
+    fun addFriend(userId: String, displayName: String) {
+        prefs.addFriend(userId, displayName)
+        _friendList.value = prefs.friendList
+    }
+
+    fun removeFriend(userId: String) {
+        prefs.removeFriend(userId)
+        _friendList.value = prefs.friendList
+    }
+
+    fun sendFriendRequest(toUserId: String) = webSocket?.sendFriendRequest(toUserId)
+
+    fun acceptFriendRequest(fromUserId: String, fromDisplayName: String) {
+        prefs.addFriend(fromUserId, fromDisplayName)
+        _friendList.value = prefs.friendList
+        _pendingFriendRequests.update { it.filterNot { req -> req.fromUserId == fromUserId } }
+        webSocket?.acceptFriendRequest(fromUserId)
+    }
+
+    fun declineFriendRequest(fromUserId: String) {
+        _pendingFriendRequests.update { it.filterNot { req -> req.fromUserId == fromUserId } }
+        webSocket?.declineFriendRequest(fromUserId)
+    }
+
     fun setStartLife(v: UInt)          { prefs.startLife = v;                _startLife.value = v }
     fun setCommanderThreshold(v: UInt) { prefs.commanderDeathThreshold = v;  _commanderThreshold.value = v }
     fun setInfectThreshold(v: UInt)    { prefs.infectDeathThreshold = v;     _infectThreshold.value = v }
@@ -261,6 +307,20 @@ class SessionViewModel(
 
     fun setGlobal(stat: String, value: UInt) = webSocket?.setGlobal(stat, value)
 
+    fun concede() {
+        val myId = _sessionUi.value.myUserId
+        serverUsers = serverUsers.map { if (it.id == myId) it.copy(conceded = true) else it }
+        _sessionUi.update { it.copy(users = applyPendingDeltas(serverUsers)) }
+        webSocket?.setConceded(true)
+    }
+
+    fun unconcede() {
+        val myId = _sessionUi.value.myUserId
+        serverUsers = serverUsers.map { if (it.id == myId) it.copy(conceded = false) else it }
+        _sessionUi.update { it.copy(users = applyPendingDeltas(serverUsers)) }
+        webSocket?.setConceded(false)
+    }
+
     fun toggleGlobal(stat: String) {
         val current = _sessionUi.value.globalStats[stat] ?: 0u
         setGlobal(stat, if (current == 0u) 1u else 0u)
@@ -331,11 +391,38 @@ class SessionViewModel(
                                     globalStats = msg.globalStats,
                                 )
                             }
+                            val myId = _sessionUi.value.myUserId
+                            var knownDirty  = false
+                            var friendDirty = false
+                            val friendIds   = prefs.friendList.map { it.userId }.toSet()
+                            msg.users
+                                .filter { it.id != myId && it.displayName.isNotBlank() }
+                                .forEach { user ->
+                                    prefs.touchKnownPlayer(user.id, user.displayName)
+                                    knownDirty = true
+                                    if (user.id in friendIds) {
+                                        prefs.addFriend(user.id, user.displayName)
+                                        friendDirty = true
+                                    }
+                                }
+                            if (knownDirty)  _knownPlayers.value = prefs.knownPlayers
+                            if (friendDirty) _friendList.value   = prefs.friendList
                         }
                         is ServerMessage.Joined -> _sessionUi.update {
                             it.copy(sessionCode = msg.sessionCode)
                         }
                         is ServerMessage.Error  -> _sessionUi.update { it.copy(error = msg.message) }
+                        is ServerMessage.FriendRequest -> {
+                            _pendingFriendRequests.update {
+                                if (it.any { r -> r.fromUserId == msg.fromUserId }) it
+                                else it + FriendRequestInfo(msg.fromUserId, msg.fromDisplayName)
+                            }
+                        }
+                        is ServerMessage.FriendAccepted -> {
+                            prefs.addFriend(msg.fromUserId, msg.fromDisplayName)
+                            _friendList.value = prefs.friendList
+                            webSocket?.acknowledgeAccepted(msg.fromUserId)
+                        }
                     }
                 }
             }
@@ -353,6 +440,7 @@ class SessionViewModel(
         debounceJobs.clear()
         pendingDeltas.clear()
         serverUsers = emptyList()
+        _pendingFriendRequests.value = emptyList()
         wsCollectorJob?.cancel()
         wsCollectorJob = null
         webSocket?.close()

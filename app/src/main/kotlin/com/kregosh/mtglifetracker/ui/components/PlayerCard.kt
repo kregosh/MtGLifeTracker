@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,21 +29,27 @@ import com.kregosh.mtglifetracker.viewmodel.isDead
 
 @Composable
 fun PlayerCard(
-    user      : UserState,
-    isMe      : Boolean,
-    sessionUi : SessionUiState,
-    onAdjust  : (stat: String, delta: Int) -> Unit = { _, _ -> },
-    modifier  : Modifier = Modifier,
+    user        : UserState,
+    isMe        : Boolean,
+    sessionUi   : SessionUiState,
+    onAdjust    : (stat: String, delta: Int) -> Unit = { _, _ -> },
+    onConcede   : (() -> Unit)?  = null,
+    onUnconcede : (() -> Unit)?  = null,
+    isFriend    : Boolean        = false,
+    onAddFriend : (() -> Unit)?  = null,
+    modifier    : Modifier = Modifier,
 ) {
     val dead      = user.isDead(sessionUi)
+    val conceded  = user.conceded
     val hasBg     = LocalHasBackground.current
     val cardBg    = LocalCardBackground.current
     val hasCardBg = isMe && cardBg != null
 
     val containerColor = when {
-        dead  -> MaterialTheme.colorScheme.errorContainer.copy(alpha = if (hasBg || hasCardBg) 0.45f else 0.6f)
-        isMe  -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (hasCardBg) 0.65f else if (hasBg) 0.72f else 1f)
-        else  -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (hasBg) 0.60f else 1f)
+        conceded -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (hasBg) 0.35f else 0.5f)
+        dead     -> MaterialTheme.colorScheme.errorContainer.copy(alpha = if (hasBg || hasCardBg) 0.45f else 0.6f)
+        isMe     -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (hasCardBg) 0.65f else if (hasBg) 0.72f else 1f)
+        else     -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (hasBg) 0.60f else 1f)
     }
 
     val contentColor = if (hasBg || hasCardBg) Color.White else Color.Unspecified
@@ -79,7 +86,36 @@ fun PlayerCard(
                             fontWeight = if (isMe) FontWeight.Bold else FontWeight.Normal,
                             modifier   = Modifier.weight(1f),
                         )
-                        if (isMe) {
+                        if (!isMe && !isFriend && onAddFriend != null) {
+                            IconButton(
+                                onClick  = onAddFriend,
+                                modifier = Modifier.size(28.dp),
+                            ) {
+                                Icon(
+                                    imageVector        = Icons.Default.PersonAdd,
+                                    contentDescription = "Send friend request",
+                                    modifier           = Modifier.size(18.dp),
+                                    tint               = LocalContentColor.current.copy(alpha = 0.7f),
+                                )
+                            }
+                        } else if (isMe && conceded) {
+                            TextButton(
+                                onClick      = { onUnconcede?.invoke() },
+                                modifier     = Modifier.height(28.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                            ) {
+                                Text("Undo", style = MaterialTheme.typography.labelSmall)
+                            }
+                        } else if (isMe && !dead) {
+                            TextButton(
+                                onClick      = { onConcede?.invoke() },
+                                modifier     = Modifier.height(28.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                            ) {
+                                Text("Concede", style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.error)
+                            }
+                        } else if (isMe) {
                             SuggestionChip(
                                 onClick  = {},
                                 label    = { Text("You", style = MaterialTheme.typography.labelSmall) },
@@ -159,16 +195,17 @@ fun PlayerCard(
             }
         }
 
-        // ── Skull overlay for eliminated opponents ────────────────────────
-        if (dead && !isMe) {
+        // ── Overlays for eliminated / conceded opponents ──────────────────
+        if (!isMe && (dead || conceded)) {
+            val overlayAlpha = if (dead) 0.65f else 0.50f
             Box(
                 modifier = Modifier
                     .matchParentSize()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color.Black.copy(alpha = 0.65f)),
+                    .background(Color.Black.copy(alpha = overlayAlpha)),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(text = "💀", fontSize = 64.sp)
+                Text(text = if (dead) "💀" else "🏳️", fontSize = 64.sp)
             }
         }
     }

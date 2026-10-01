@@ -25,6 +25,10 @@ class FirebaseSessionConnection(
     private val sessionRef = db.getReference("sessions/$sessionId")
     private val myUserRef  = sessionRef.child("users/$userId")
 
+    // Friend-request subtrees scoped to me
+    private val inboundRequestRef  = sessionRef.child("friendRequests/$userId")
+    private val inboundAcceptedRef = sessionRef.child("friendAccepted/$userId")
+
     private val _messages = MutableSharedFlow<ServerMessage>(extraBufferCapacity = 64)
     private val _state    = MutableStateFlow<WsState>(WsState.Connecting)
     private val scope     = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -32,8 +36,10 @@ class FirebaseSessionConnection(
     override val messages        : SharedFlow<ServerMessage> = _messages
     override val connectionState : StateFlow<WsState>        = _state
 
-    private var connectedListener : ValueEventListener? = null
-    private var sessionListener   : ValueEventListener? = null
+    private var connectedListener     : ValueEventListener?  = null
+    private var sessionListener       : ValueEventListener?  = null
+    private var requestChildListener  : ChildEventListener?  = null
+    private var acceptedChildListener : ChildEventListener?  = null
 
     override fun connect() {
         myUserRef.setValue(
@@ -44,6 +50,7 @@ class FirebaseSessionConnection(
             )
         )
 
+        // ── Connection state ──────────────────────────────────────────────
         val connListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 _state.value = if (snapshot.getValue(Boolean::class.java) == true)
@@ -58,6 +65,7 @@ class FirebaseSessionConnection(
         connectedListener = connListener
         db.getReference(".info/connected").addValueEventListener(connListener)
 
+        // ── Session state (users, stats, globals) ─────────────────────────
         val sessListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val users = snapshot.child("users").children.map { userSnap ->
@@ -68,6 +76,7 @@ class FirebaseSessionConnection(
                         customStats = userSnap.child("customStats").children.associate { stat ->
                             (stat.key ?: "") to (stat.getValue(Long::class.java) ?: 0L).toUInt()
                         },
+                        conceded    = userSnap.child("conceded").getValue(Boolean::class.java) ?: false,
                     )
                 }
                 val statDefs = snapshot.child("customStatNames").children.associate { child ->
@@ -86,6 +95,42 @@ class FirebaseSessionConnection(
         }
         sessionListener = sessListener
         sessionRef.addValueEventListener(sessListener)
+
+        // ── Incoming friend requests ──────────────────────────────────────
+        // Use ChildEventListener so this only fires when a request arrives,
+        // not on every life-total change.
+        val reqListener = object : ChildEventListener {
+            override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
+                val fromUserId = snapshot.key ?: return
+                val fromName   = snapshot.child("displayName").getValue(String::class.java) ?: return
+                scope.launch {
+                    _messages.emit(ServerMessage.FriendRequest(fromUserId, fromName))
+                }
+            }
+            override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) {}
+            override fun onChildRemoved(snapshot: DataSnapshot) {}
+            override fun onChildMoved(snapshot: DataSnapshot, previousChildName: String?) {}
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        requestChildListener = reqListener
+        inboundRequestRef.addChildEventListener(reqListener)
+
+        // ── Incoming friend acceptances ───────────────────────────────────
+        val accListener = object : ChildEventListener {
+            override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
+                val fromUserId = snapshot.key ?: return
+                val fromName   = snapshot.child("displayName").getValue(String::class.java) ?: return
+                scope.launch {
+                    _messages.emit(ServerMessage.FriendAccepted(fromUserId, fromName))
+                }
+            }
+            override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) {}
+            override fun onChildRemoved(snapshot: DataSnapshot) {}
+            override fun onChildMoved(snapshot: DataSnapshot, previousChildName: String?) {}
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        acceptedChildListener = accListener
+        inboundAcceptedRef.addChildEventListener(accListener)
     }
 
     override fun adjust(stat: String, delta: Int) {
@@ -121,11 +166,42 @@ class FirebaseSessionConnection(
         sessionRef.child("globalStats/$stat").setValue(value.toLong())
     }
 
+    override fun setConceded(conceded: Boolean) {
+        myUserRef.child("conceded").setValue(conceded)
+    }
+
+    // ── Friend requests ───────────────────────────────────────────────────
+
+    override fun sendFriendRequest(toUserId: String) {
+        sessionRef.child("friendRequests/$toUserId/$userId").setValue(
+            mapOf("displayName" to displayName)
+        )
+    }
+
+    override fun acceptFriendRequest(fromUserId: String) {
+        // Remove the inbound request
+        inboundRequestRef.child(fromUserId).removeValue()
+        // Notify the sender that we accepted, carrying our own display name
+        sessionRef.child("friendAccepted/$fromUserId/$userId").setValue(
+            mapOf("displayName" to displayName)
+        )
+    }
+
+    override fun declineFriendRequest(fromUserId: String) {
+        inboundRequestRef.child(fromUserId).removeValue()
+    }
+
+    override fun acknowledgeAccepted(fromUserId: String) {
+        // Clean up the acceptance notification once the app has processed it
+        inboundAcceptedRef.child(fromUserId).removeValue()
+    }
+
     override fun close() {
         _state.value = WsState.Closed
-        connectedListener?.let { db.getReference(".info/connected").removeEventListener(it) }
-        sessionListener?.let { sessionRef.removeEventListener(it) }
-        myUserRef.onDisconnect().cancel()
+        connectedListener?.let     { db.getReference(".info/connected").removeEventListener(it) }
+        sessionListener?.let       { sessionRef.removeEventListener(it) }
+        requestChildListener?.let  { inboundRequestRef.removeEventListener(it) }
+        acceptedChildListener?.let { inboundAcceptedRef.removeEventListener(it) }
         myUserRef.removeValue()
         scope.cancel()
     }

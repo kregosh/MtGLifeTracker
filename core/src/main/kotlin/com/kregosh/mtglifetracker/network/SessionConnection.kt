@@ -13,5 +13,13 @@ interface SessionConnection {
     fun addCustomStat(name: String, type: StatType = StatType.NUMERIC)
     fun removeCustomStat(name: String)
     fun setGlobal(stat: String, value: UInt)
+    fun setConceded(conceded: Boolean)
+
+    // ── Friend requests ───────────────────────────────────────────────────
+    fun sendFriendRequest(toUserId: String)
+    fun acceptFriendRequest(fromUserId: String)
+    fun declineFriendRequest(fromUserId: String)
+    fun acknowledgeAccepted(fromUserId: String)
+
     fun close()
 }

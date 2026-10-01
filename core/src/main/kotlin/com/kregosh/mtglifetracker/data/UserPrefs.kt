@@ -13,4 +13,19 @@ interface UserPrefs {
     var timerVisible            : Boolean
     var timerCountDown          : Boolean
     var timerLimitMinutes       : UInt
+
+    // ── Known players (auto-populated, LRU, max 10) ───────────────────────
+    // Ordered newest-first by last-seen time.
+    val knownPlayers: List<KnownPlayer>
+    fun touchKnownPlayer(userId: String, displayName: String)
+    fun forgetKnownPlayer(userId: String)
+
+    // ── Friends (explicit, device-local, no size limit) ───────────────────
+    val friendList: List<Friend>
+    fun addFriend(userId: String, displayName: String)
+    fun removeFriend(userId: String)
 }
+
+data class KnownPlayer(val userId: String, val displayName: String, val lastSeen: Long)
+
+data class Friend(val userId: String, val displayName: String)
