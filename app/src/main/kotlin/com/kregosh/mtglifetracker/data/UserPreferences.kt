@@ -6,7 +6,10 @@ import java.util.UUID
 private const val SEP = "\u001F"
 private const val MAX_KNOWN = 10
 
-class UserPreferences(context: Context) : UserPrefs {
+class UserPreferences(
+    context: Context,
+    private val clock: () -> Long = System::currentTimeMillis,
+) : UserPrefs {
 
     private val prefs = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
 
@@ -74,7 +77,7 @@ class UserPreferences(context: Context) : UserPrefs {
         get() = parseKnownSet(prefs.getStringSet(KEY_KNOWN_PLAYERS, emptySet()))
 
     override fun touchKnownPlayer(userId: String, displayName: String) {
-        val now     = System.currentTimeMillis()
+        val now     = clock()
         val current = parseKnownSet(prefs.getStringSet(KEY_KNOWN_PLAYERS, emptySet()))
             .filter { it.userId != userId }         // remove stale entry for this user
         val updated = (current + KnownPlayer(userId, displayName, now))

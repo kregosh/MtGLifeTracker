@@ -6,6 +6,7 @@ import org.junit.Before
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -17,6 +18,7 @@ import kotlin.test.assertTrue
 class UserPreferencesTest {
 
     private lateinit var prefs: UserPreferences
+    private val fakeTime = AtomicLong(0)
 
     @Before
     fun setUp() {
@@ -24,7 +26,8 @@ class UserPreferencesTest {
         // Fresh SharedPreferences for each test
         app.getSharedPreferences("user_prefs", android.content.Context.MODE_PRIVATE)
             .edit().clear().commit()
-        prefs = UserPreferences(app)
+        fakeTime.set(0)
+        prefs = UserPreferences(app, clock = { fakeTime.incrementAndGet() })
     }
 
     // ── userId ───────────────────────────────────────────────────────────────
@@ -143,7 +146,6 @@ class UserPreferencesTest {
     @Test
     fun `knownPlayers is ordered newest-first`() {
         prefs.touchKnownPlayer("uid-1", "First")
-        Thread.sleep(200)
         prefs.touchKnownPlayer("uid-2", "Second")
         val ids = prefs.knownPlayers.map { it.userId }
         assertEquals(listOf("uid-2", "uid-1"), ids)
@@ -152,7 +154,6 @@ class UserPreferencesTest {
     @Test
     fun `touchKnownPlayer is capped at 10 entries evicting the oldest`() {
         repeat(11) { i ->
-            Thread.sleep(100)
             prefs.touchKnownPlayer("uid-$i", "Player $i")
         }
         val known = prefs.knownPlayers
@@ -166,9 +167,7 @@ class UserPreferencesTest {
     @Test
     fun `touchKnownPlayer re-touching an existing entry moves it to the front`() {
         prefs.touchKnownPlayer("uid-1", "Alice")
-        Thread.sleep(200)
         prefs.touchKnownPlayer("uid-2", "Bob")
-        Thread.sleep(200)
         prefs.touchKnownPlayer("uid-1", "Alice") // re-touch uid-1
         assertEquals("uid-1", prefs.knownPlayers.first().userId)
     }
