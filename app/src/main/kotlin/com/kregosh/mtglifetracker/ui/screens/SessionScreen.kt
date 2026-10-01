@@ -1,6 +1,5 @@
 package com.kregosh.mtglifetracker.ui.screens
 
-import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -20,7 +19,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
@@ -34,6 +32,8 @@ import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.shared.UserState
 import com.kregosh.mtglifetracker.viewmodel.LifeChange
 import com.kregosh.mtglifetracker.ui.components.FriendsSheet
+import com.kregosh.mtglifetracker.ui.components.InviteDialog
+import com.kregosh.mtglifetracker.viewmodel.Screen
 import com.kregosh.mtglifetracker.ui.components.PlayerCard
 import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
 import com.kregosh.mtglifetracker.viewmodel.FriendRequestInfo
@@ -81,7 +81,6 @@ fun SessionScreen(vm: SessionViewModel) {
     val pendingFriendRequests by vm.pendingFriendRequests.collectAsState()
     val friendList            by vm.friendList.collectAsState()
     val knownPlayers          by vm.knownPlayers.collectAsState()
-    val context = LocalContext.current
     val hasBg   = LocalHasBackground.current
     val view    = LocalView.current
 
@@ -103,7 +102,7 @@ fun SessionScreen(vm: SessionViewModel) {
     SessionContent(
         vm, ui, friendIds, friendList, knownPlayers,
         timerElapsed, timerRunning, timerVisible, timerCountDown, timerLimitMinutes,
-        context, hasBg,
+        hasBg,
     )
 }
 
@@ -120,7 +119,6 @@ private fun SessionContent(
     timerVisible      : Boolean,
     timerCountDown    : Boolean,
     timerLimitMinutes : UInt,
-    context           : android.content.Context,
     hasBg             : Boolean,
 ) {
 
@@ -219,11 +217,22 @@ private fun SessionContent(
     var showCustomDialog by remember { mutableStateOf(false) }
     var showFriendsSheet by remember { mutableStateOf(false) }
 
+    val friendPresence by vm.friendPresence.collectAsState()
+    val screen         by vm.screen.collectAsState()
+    var showInvite     by remember { mutableStateOf(false) }
+
+    if (showInvite) {
+        InviteDialog(code = ui.sessionCode, onDismiss = { showInvite = false })
+    }
+
     if (showFriendsSheet) {
         FriendsSheet(
             friendList   = friendList,
             knownPlayers = knownPlayers,
             friendIds    = friendIds,
+            friendPresence   = friendPresence,
+            currentSessionId = (screen as? Screen.Session)?.sessionId,
+            onJoinSession    = vm::joinFriendSession,
             onRemoveFriend    = vm::removeFriend,
             onAddFriend       = { uid, name -> vm.addFriend(uid, name) },
             onForgetPlayer    = vm::forgetPlayer,
@@ -284,19 +293,8 @@ private fun SessionContent(
                         Icon(Icons.Default.People, contentDescription = "Friends")
                     }
                     if (ui.sessionCode.isNotEmpty()) {
-                        IconButton(
-                            onClick = {
-                                val shareText = "Join my MtG Life Tracker session!\n" +
-                                        "Code: ${ui.sessionCode}\n" +
-                                        "Or tap: mtgtracker://join/${ui.sessionCode}"
-                                val intent = Intent(Intent.ACTION_SEND).apply {
-                                    type = "text/plain"
-                                    putExtra(Intent.EXTRA_TEXT, shareText)
-                                }
-                                context.startActivity(Intent.createChooser(intent, "Share invite"))
-                            }
-                        ) {
-                            Icon(Icons.Default.Share, contentDescription = "Share invite")
+                        IconButton(onClick = { showInvite = true }) {
+                            Icon(Icons.Default.QrCode2, contentDescription = "Invite players")
                         }
                     }
                     IconButton(onClick = { showHistory = true }) {

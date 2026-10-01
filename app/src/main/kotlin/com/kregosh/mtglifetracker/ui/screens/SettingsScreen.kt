@@ -9,13 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Login
-import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.PersonRemove
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,7 +19,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.kregosh.mtglifetracker.R
-import com.kregosh.mtglifetracker.data.Friend
+import com.kregosh.mtglifetracker.ui.components.FriendsList
+import com.kregosh.mtglifetracker.ui.components.RecentPlayersList
 import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
 import com.kregosh.mtglifetracker.viewmodel.MAX_DISPLAY_NAME_LENGTH
 import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
@@ -238,29 +233,7 @@ fun SettingsScreen(vm: SessionViewModel) {
             val friendList     by vm.friendList.collectAsState()
             val knownPlayers   by vm.knownPlayers.collectAsState()
             val friendPresence by vm.friendPresence.collectAsState()
-            val friendIds      = friendList.map { it.userId }.toSet()
-
-            var unfriendTarget by remember { mutableStateOf<Friend?>(null) }
-
-            unfriendTarget?.let { target ->
-                AlertDialog(
-                    onDismissRequest = { unfriendTarget = null },
-                    title = { Text("Remove friend") },
-                    text  = { Text("Remove ${target.displayName} from your friends list?") },
-                    confirmButton = {
-                        TextButton(
-                            onClick = {
-                                vm.removeFriend(target.userId)
-                                unfriendTarget = null
-                            },
-                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                        ) { Text("Remove") }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { unfriendTarget = null }) { Text("Cancel") }
-                    },
-                )
-            }
+            val friendIds      = remember(friendList) { friendList.map { it.userId }.toSet() }
 
             if (friendList.isNotEmpty()) {
                 SettingsSection(title = "Friends") {
@@ -270,56 +243,13 @@ fun SettingsScreen(vm: SessionViewModel) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(8.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        friendList.forEach { friend ->
-                            Row(
-                                modifier              = Modifier.fillMaxWidth(),
-                                verticalAlignment     = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                Row(
-                                    verticalAlignment     = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier              = Modifier.weight(1f),
-                                ) {
-                                    Icon(
-                                        imageVector        = Icons.Default.Star,
-                                        contentDescription = null,
-                                        modifier           = Modifier.size(16.dp),
-                                        tint               = MaterialTheme.colorScheme.primary,
-                                    )
-                                    Text(friend.displayName, style = MaterialTheme.typography.bodyMedium)
-                                }
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    val sessionId = friendPresence[friend.userId]
-                                    if (sessionId != null) {
-                                        IconButton(
-                                            onClick  = { vm.joinFriendSession(sessionId) },
-                                            modifier = Modifier.size(36.dp),
-                                        ) {
-                                            Icon(
-                                                imageVector        = Icons.Default.Login,
-                                                contentDescription = "Join ${friend.displayName}'s session",
-                                                modifier           = Modifier.size(18.dp),
-                                                tint               = MaterialTheme.colorScheme.primary,
-                                            )
-                                        }
-                                    }
-                                    IconButton(
-                                        onClick  = { unfriendTarget = friend },
-                                        modifier = Modifier.size(36.dp),
-                                    ) {
-                                        Icon(
-                                            imageVector        = Icons.Default.PersonRemove,
-                                            contentDescription = "Remove ${friend.displayName}",
-                                            modifier           = Modifier.size(18.dp),
-                                            tint               = MaterialTheme.colorScheme.error,
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    FriendsList(
+                        friends          = friendList,
+                        friendPresence   = friendPresence,
+                        currentSessionId = null,
+                        onJoinSession    = vm::joinFriendSession,
+                        onRemoveFriend   = vm::removeFriend,
+                    )
                 }
             }
 
@@ -332,55 +262,12 @@ fun SettingsScreen(vm: SessionViewModel) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(8.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        knownPlayers.forEach { player ->
-                            Row(
-                                modifier              = Modifier.fillMaxWidth(),
-                                verticalAlignment     = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                Row(
-                                    verticalAlignment     = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier              = Modifier.weight(1f),
-                                ) {
-                                    Icon(
-                                        imageVector        = Icons.Default.People,
-                                        contentDescription = null,
-                                        modifier           = Modifier.size(16.dp),
-                                        tint               = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                    Text(player.displayName, style = MaterialTheme.typography.bodyMedium)
-                                }
-                                Row {
-                                    if (player.userId !in friendIds) {
-                                        IconButton(
-                                            onClick  = { vm.addFriend(player.userId, player.displayName) },
-                                            modifier = Modifier.size(36.dp),
-                                        ) {
-                                            Icon(
-                                                imageVector        = Icons.Default.PersonAdd,
-                                                contentDescription = "Add ${player.displayName} as friend",
-                                                modifier           = Modifier.size(18.dp),
-                                                tint               = MaterialTheme.colorScheme.primary,
-                                            )
-                                        }
-                                    }
-                                    IconButton(
-                                        onClick  = { vm.forgetPlayer(player.userId) },
-                                        modifier = Modifier.size(36.dp),
-                                    ) {
-                                        Icon(
-                                            imageVector        = Icons.Default.Close,
-                                            contentDescription = "Forget ${player.displayName}",
-                                            modifier           = Modifier.size(18.dp),
-                                            tint               = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    RecentPlayersList(
+                        players        = knownPlayers,
+                        friendIds      = friendIds,
+                        onAddFriend    = vm::addFriend,
+                        onForgetPlayer = vm::forgetPlayer,
+                    )
                 }
             }
 

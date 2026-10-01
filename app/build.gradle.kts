@@ -66,6 +66,8 @@ dependencies {
     implementation(libs.compose.icons.extended)
     debugImplementation(libs.compose.ui.tooling)
 
+    implementation(libs.zxing.core)
+
     // ── Test ─────────────────────────────────────────────────────────────
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)

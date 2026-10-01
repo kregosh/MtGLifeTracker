@@ -31,6 +31,7 @@ import androidx.lifecycle.ViewModelProvider
 import com.kregosh.mtglifetracker.data.UserPreferences
 import com.kregosh.mtglifetracker.network.FirebaseSessionApi
 import com.kregosh.mtglifetracker.network.FirebaseSessionConnection
+import com.kregosh.mtglifetracker.shared.parseInviteCode
 import com.kregosh.mtglifetracker.viewmodel.Screen
 import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
 import kotlinx.coroutines.Dispatchers
@@ -158,9 +159,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleInvite(intent: Intent?): Boolean {
-        val uri = intent?.data ?: return false
-        if (uri.scheme != "mtgtracker" || uri.host != "join") return false
-        val code = uri.lastPathSegment?.takeIf { it.isNotBlank() } ?: return false
+        val code = intent?.data?.let { parseInviteCode(it.toString()) } ?: return false
         vm.handleInviteLink(code)
         return true
     }
