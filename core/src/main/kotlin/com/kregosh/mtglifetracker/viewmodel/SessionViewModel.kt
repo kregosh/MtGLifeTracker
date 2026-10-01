@@ -211,6 +211,18 @@ class SessionViewModel(
     private val _pendingFriendRequests = MutableStateFlow<List<FriendRequestInfo>>(emptyList())
     val pendingFriendRequests: StateFlow<List<FriendRequestInfo>> = _pendingFriendRequests.asStateFlow()
 
+    private val _friendPresence = MutableStateFlow<Map<String, String?>>(emptyMap())
+    val friendPresence: StateFlow<Map<String, String?>> = _friendPresence.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            _friendList.flatMapLatest { friends ->
+                if (friends.isEmpty()) flowOf(emptyMap())
+                else api.observeFriendPresence(friends.map { it.userId })
+            }.collect { _friendPresence.value = it }
+        }
+    }
+
     fun forgetPlayer(userId: String) {
         prefs.forgetKnownPlayer(userId)
         _knownPlayers.value = prefs.knownPlayers
@@ -281,6 +293,17 @@ class SessionViewModel(
             runCatching { api.getSessionByCode(code.trim().uppercase()) }
                 .onSuccess { info -> joinSession(info.sessionId, info.sessionCode) }
                 .onFailure { _homeError.value = "Session not found" }
+            _homeLoading.value = false
+        }
+    }
+
+    fun joinFriendSession(sessionId: String) {
+        viewModelScope.launch {
+            _homeLoading.value = true
+            _homeError.value   = null
+            runCatching { api.getSessionById(sessionId) }
+                .onSuccess { info -> joinSession(info.sessionId, info.sessionCode) }
+                .onFailure { _homeError.value = it.message ?: "Failed to join session" }
             _homeLoading.value = false
         }
     }

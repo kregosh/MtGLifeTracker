@@ -1,10 +1,17 @@
 package com.kregosh.mtglifetracker.network
 
 import android.util.Log
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ServerValue
+import com.google.firebase.database.ValueEventListener
 import com.kregosh.mtglifetracker.shared.CreateSessionResponse
 import com.kregosh.mtglifetracker.shared.SessionInfoResponse
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
 import java.util.UUID
@@ -59,6 +66,30 @@ class FirebaseSessionApi : SessionApi {
             val code           = snapshot.child("code").getValue(String::class.java) ?: ""
             val connectedUsers = snapshot.child("users").childrenCount.toInt()
             SessionInfoResponse(sessionId = sessionId, sessionCode = code, connectedUsers = connectedUsers)
+        }
+    }
+
+    override fun observeFriendPresence(friendUserIds: List<String>): Flow<Map<String, String?>> {
+        if (friendUserIds.isEmpty()) return flowOf(emptyMap())
+        return callbackFlow {
+            val presence  = friendUserIds.associateWithTo(mutableMapOf()) { null as String? }
+            val listeners = mutableMapOf<String, ValueEventListener>()
+            friendUserIds.forEach { uid ->
+                val listener = object : ValueEventListener {
+                    override fun onDataChange(snapshot: DataSnapshot) {
+                        presence[uid] = snapshot.getValue(String::class.java)
+                        trySend(presence.toMap())
+                    }
+                    override fun onCancelled(error: DatabaseError) {}
+                }
+                listeners[uid] = listener
+                db.getReference("presence/$uid").addValueEventListener(listener)
+            }
+            awaitClose {
+                friendUserIds.forEach { uid ->
+                    listeners[uid]?.let { db.getReference("presence/$uid").removeEventListener(it) }
+                }
+            }
         }
     }
 
