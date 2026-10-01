@@ -191,7 +191,7 @@ fun PlayerCard(
     // Alternate between two parchment textures so adjacent cards feel distinct
     val parchmentRes = if (playerIndex % 2 == 0) R.drawable.card_parchment_a else R.drawable.card_parchment_b
 
-    Box(modifier = modifier.fillMaxWidth()) {
+    Box(modifier = modifier.fillMaxWidth().graphicsLayer { alpha = if (user.online) 1f else 0.6f }) {
         Card(
             shape     = RoundedCornerShape(14.dp),
             colors    = CardDefaults.cardColors(containerColor = Color.Transparent),
@@ -238,13 +238,21 @@ fun PlayerCard(
                         modifier              = Modifier.fillMaxWidth(),
                     ) {
                         Spacer(Modifier.width(BANDEROLE_CLEARANCE))
-                        Text(
-                            text       = user.displayName,
-                            style      = MaterialTheme.typography.titleMedium,
-                            fontWeight = if (isMe) FontWeight.Bold else FontWeight.Normal,
-                            color      = PARCHMENT_INK,
-                            modifier   = Modifier.weight(1f),
-                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text       = user.displayName,
+                                style      = MaterialTheme.typography.titleMedium,
+                                fontWeight = if (isMe) FontWeight.Bold else FontWeight.Normal,
+                                color      = PARCHMENT_INK,
+                            )
+                            if (!user.online) {
+                                Text(
+                                    text  = "offline",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = PARCHMENT_SEPIA,
+                                )
+                            }
+                        }
                         if (!isMe && !isFriend && onAddFriend != null) {
                             IconButton(
                                 onClick  = onAddFriend,

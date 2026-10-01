@@ -47,6 +47,17 @@ class UserPreferencesTest {
         assertEquals(prefs.userId, other.userId)
     }
 
+    // ── lastSessionId ────────────────────────────────────────────────────────
+
+    @Test
+    fun `lastSessionId defaults to null and round-trips`() {
+        assertNull(prefs.lastSessionId)
+        prefs.lastSessionId = "sid-1"
+        assertEquals("sid-1", prefs.lastSessionId)
+        prefs.lastSessionId = null
+        assertNull(prefs.lastSessionId)
+    }
+
     // ── displayName ──────────────────────────────────────────────────────────
 
     @Test

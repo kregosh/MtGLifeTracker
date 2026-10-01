@@ -6,4 +6,5 @@ data class UserState(
     val life        : UInt              = 20u,
     val customStats : Map<String, UInt> = emptyMap(),
     val conceded    : Boolean           = false,
+    val online      : Boolean           = true,
 )

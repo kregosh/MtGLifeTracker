@@ -70,6 +70,14 @@ class UserPreferences(
         get() = prefs.getInt(KEY_TIMER_LIMIT_MINUTES, 60).toUInt()
         set(value) { prefs.edit().putInt(KEY_TIMER_LIMIT_MINUTES, value.toInt()).apply() }
 
+    override var lastSessionId: String?
+        get() = prefs.getString(KEY_LAST_SESSION_ID, null)
+        set(value) {
+            prefs.edit().apply {
+                if (value != null) putString(KEY_LAST_SESSION_ID, value) else remove(KEY_LAST_SESSION_ID)
+            }.apply()
+        }
+
     // ── Known players ─────────────────────────────────────────────────────
     // Stored as StringSet; each entry: "$userId$SEP$displayName$SEP$lastSeenMillis"
 
@@ -149,6 +157,7 @@ class UserPreferences(
         private const val KEY_TIMER_VISIBLE         = "timer_visible"
         private const val KEY_TIMER_COUNTDOWN       = "timer_countdown"
         private const val KEY_TIMER_LIMIT_MINUTES   = "timer_limit_minutes"
+        private const val KEY_LAST_SESSION_ID       = "last_session_id"
         private const val KEY_KNOWN_PLAYERS         = "known_players"
         private const val KEY_FRIEND_LIST           = "friend_list"
     }

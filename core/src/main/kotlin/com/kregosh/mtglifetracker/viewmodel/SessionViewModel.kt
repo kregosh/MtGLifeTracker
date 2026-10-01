@@ -325,6 +325,19 @@ class SessionViewModel(
         if (code.isNotBlank()) joinByCode(code)
     }
 
+    /** Rejoins the session the app was in when it was last closed or killed. */
+    fun resumeLastSession() {
+        val sessionId = prefs.lastSessionId ?: return
+        if (_screen.value !is Screen.Home) return
+        viewModelScope.launch {
+            _homeLoading.value = true
+            runCatching { api.getSessionById(sessionId) }
+                .onSuccess { info -> joinSession(info.sessionId, info.sessionCode) }
+                .onFailure { prefs.lastSessionId = null }
+            _homeLoading.value = false
+        }
+    }
+
     // ── session screen actions ───────────────────────────────────────
 
     fun adjust(stat: String, delta: Int) {
@@ -369,7 +382,8 @@ class SessionViewModel(
     }
 
     fun leaveSession() {
-        tearDownWebSocket()
+        prefs.lastSessionId = null
+        tearDownWebSocket(removePlayer = true)
         _screen.value = Screen.Home
     }
 
@@ -434,6 +448,7 @@ class SessionViewModel(
             infectDeathThreshold    = prefs.infectDeathThreshold,
         )
         _screen.value = Screen.Session(sessionId)
+        prefs.lastSessionId = sessionId
 
         val ws = wsFactory(sessionId, myId, name, prefs.startLife)
         webSocket = ws
@@ -485,7 +500,7 @@ class SessionViewModel(
         }
     }
 
-    private fun tearDownWebSocket() {
+    private fun tearDownWebSocket(removePlayer: Boolean = true) {
         debounceJobs.values.forEach { it.cancel() }
         debounceJobs.clear()
         pendingDeltas.clear()
@@ -494,14 +509,15 @@ class SessionViewModel(
         _pendingFriendRequests.value = emptyList()
         wsCollectorJob?.cancel()
         wsCollectorJob = null
-        webSocket?.close()
+        webSocket?.close(removePlayer)
         webSocket = null
         resetTimer()
     }
 
     override fun onCleared() {
         super.onCleared()
-        tearDownWebSocket()
+        // The activity is going away, not necessarily the player: keep their seat for resume.
+        tearDownWebSocket(removePlayer = false)
         api.close()
     }
 }
