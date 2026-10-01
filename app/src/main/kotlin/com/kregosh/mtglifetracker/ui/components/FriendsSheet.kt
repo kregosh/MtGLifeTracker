@@ -7,7 +7,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.kregosh.mtglifetracker.R
 import com.kregosh.mtglifetracker.data.Friend
 import com.kregosh.mtglifetracker.data.KnownPlayer
 
@@ -26,7 +28,7 @@ fun FriendsSheet(
     onDismiss       : () -> Unit,
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Friends", "Recently Played")
+    val tabs = listOf(stringResource(R.string.friends_tab), stringResource(R.string.recent_tab))
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -51,7 +53,7 @@ fun FriendsSheet(
 
             when (selectedTab) {
                 0 -> if (friendList.isEmpty()) {
-                    EmptyHint("No friends yet — send a friend request during a session")
+                    EmptyHint(stringResource(R.string.friends_empty))
                 } else {
                     FriendsList(
                         friends          = friendList,
@@ -63,7 +65,7 @@ fun FriendsSheet(
                     )
                 }
                 1 -> if (knownPlayers.isEmpty()) {
-                    EmptyHint("No recent players — join a session to see who you've played with")
+                    EmptyHint(stringResource(R.string.recent_empty))
                 } else {
                     RecentPlayersList(
                         players        = knownPlayers,

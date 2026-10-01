@@ -1,10 +1,5 @@
 package com.kregosh.mtglifetracker
 
-import android.content.Intent
-import android.content.res.Configuration
-import android.graphics.BitmapFactory
-import android.net.Uri
-import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -18,20 +13,25 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import com.kregosh.mtglifetracker.ui.components.LightningOverlay
-import com.kregosh.mtglifetracker.ui.screens.HomeScreen
-import com.kregosh.mtglifetracker.ui.screens.SessionScreen
-import com.kregosh.mtglifetracker.ui.screens.SettingsScreen
-import com.kregosh.mtglifetracker.ui.theme.AppColorScheme
-import com.kregosh.mtglifetracker.ui.theme.LocalCardBackground
-import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
-import com.kregosh.mtglifetracker.ui.theme.MtGLifeTrackerTheme
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import android.content.Intent
+import android.content.res.Configuration
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.os.Bundle
+import com.kregosh.mtglifetracker.data.AppColorScheme
 import com.kregosh.mtglifetracker.data.UserPreferences
 import com.kregosh.mtglifetracker.network.FirebaseSessionApi
 import com.kregosh.mtglifetracker.network.FirebaseSessionConnection
 import com.kregosh.mtglifetracker.shared.parseInviteCode
+import com.kregosh.mtglifetracker.ui.components.LightningOverlay
+import com.kregosh.mtglifetracker.ui.screens.HomeScreen
+import com.kregosh.mtglifetracker.ui.screens.SessionScreen
+import com.kregosh.mtglifetracker.ui.screens.SettingsScreen
+import com.kregosh.mtglifetracker.ui.theme.LocalCardBackground
+import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
+import com.kregosh.mtglifetracker.ui.theme.MtGLifeTrackerTheme
 import com.kregosh.mtglifetracker.viewmodel.Screen
 import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
 import kotlinx.coroutines.Dispatchers
@@ -46,7 +46,7 @@ class MainActivity : ComponentActivity() {
                 SessionViewModel(
                     prefs     = UserPreferences(application),
                     api       = FirebaseSessionApi(),
-                    wsFactory = { id, uid, name, startLife -> FirebaseSessionConnection(id, uid, name, startLife) },
+                    connectionFactory = { id, uid, name, startLife -> FirebaseSessionConnection(id, uid, name, startLife) },
                 ) as T
         }
     }
@@ -67,12 +67,6 @@ class MainActivity : ComponentActivity() {
             val colorSchemePref by vm.colorScheme.collectAsState()
             val context         = LocalContext.current
 
-            val appColorScheme = when (colorSchemePref) {
-                "light"  -> AppColorScheme.LIGHT
-                "system" -> AppColorScheme.SYSTEM
-                else     -> AppColorScheme.DARK
-            }
-
             var bgBitmap     by remember { mutableStateOf<ImageBitmap?>(null) }
             var cardBgBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 
@@ -82,9 +76,9 @@ class MainActivity : ComponentActivity() {
                         runCatching {
                             val resolveCtx = if (uriStr.startsWith("android.resource://")) {
                                 val nightMode = when (colorSchemePref) {
-                                    "dark"  -> Configuration.UI_MODE_NIGHT_YES
-                                    "light" -> Configuration.UI_MODE_NIGHT_NO
-                                    else    -> null
+                                    AppColorScheme.DARK   -> Configuration.UI_MODE_NIGHT_YES
+                                    AppColorScheme.LIGHT  -> Configuration.UI_MODE_NIGHT_NO
+                                    AppColorScheme.SYSTEM -> null
                                 }
                                 if (nightMode != null) {
                                     val cfg = Configuration(context.resources.configuration)
@@ -110,7 +104,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            MtGLifeTrackerTheme(colorScheme = appColorScheme) {
+            MtGLifeTrackerTheme(colorScheme = colorSchemePref) {
                 CompositionLocalProvider(
                     LocalHasBackground  provides (bgBitmap != null),
                     LocalCardBackground provides cardBgBitmap,

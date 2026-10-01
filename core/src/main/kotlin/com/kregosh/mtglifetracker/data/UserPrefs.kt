@@ -8,7 +8,7 @@ interface UserPrefs {
     var startLife               : UInt
     var commanderDeathThreshold : UInt
     var infectDeathThreshold    : UInt
-    var colorScheme             : String
+    var colorScheme             : AppColorScheme
     var commanderDefaultEnabled : Boolean
     var timerVisible            : Boolean
     var timerCountDown          : Boolean

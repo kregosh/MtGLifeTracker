@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -36,16 +37,17 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlin.random.Random
 import com.kregosh.mtglifetracker.R
 import com.kregosh.mtglifetracker.shared.COMMANDER_STAT
+import com.kregosh.mtglifetracker.shared.LIFE_STAT
 import com.kregosh.mtglifetracker.shared.POISON_STAT
 import com.kregosh.mtglifetracker.shared.StatType
-import com.kregosh.mtglifetracker.shared.commanderDamageStat
 import com.kregosh.mtglifetracker.shared.UserState
+import com.kregosh.mtglifetracker.shared.commanderDamageStat
 import com.kregosh.mtglifetracker.ui.theme.LocalCardBackground
 import com.kregosh.mtglifetracker.viewmodel.SessionUiState
 import com.kregosh.mtglifetracker.viewmodel.isDead
+import kotlin.random.Random
 
 // MTG mana color accent bands — assigned to players by index (mod 5)
 private val MANA_COLORS = listOf(
@@ -252,7 +254,7 @@ fun PlayerCard(
                             )
                             if (!user.online) {
                                 Text(
-                                    text  = "offline",
+                                    text  = stringResource(R.string.player_offline),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = PARCHMENT_SEPIA,
                                 )
@@ -265,7 +267,7 @@ fun PlayerCard(
                             ) {
                                 Icon(
                                     imageVector        = Icons.Default.PersonRemove,
-                                    contentDescription = "Remove ${user.displayName} from the session",
+                                    contentDescription = stringResource(R.string.player_remove, user.displayName),
                                     modifier           = Modifier.size(18.dp),
                                     tint               = PARCHMENT_SEPIA.copy(alpha = 0.75f),
                                 )
@@ -278,7 +280,7 @@ fun PlayerCard(
                             ) {
                                 Icon(
                                     imageVector        = Icons.Default.PersonAdd,
-                                    contentDescription = "Send friend request",
+                                    contentDescription = stringResource(R.string.player_send_friend_request),
                                     modifier           = Modifier.size(18.dp),
                                     tint               = PARCHMENT_SEPIA.copy(alpha = 0.75f),
                                 )
@@ -289,7 +291,7 @@ fun PlayerCard(
                                 modifier       = Modifier.height(28.dp),
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                             ) {
-                                Text("Undo", style = MaterialTheme.typography.labelSmall, color = PARCHMENT_SEPIA)
+                                Text(stringResource(R.string.player_undo_concede), style = MaterialTheme.typography.labelSmall, color = PARCHMENT_SEPIA)
                             }
                         } else if (isMe && !dead) {
                             TextButton(
@@ -298,7 +300,7 @@ fun PlayerCard(
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                             ) {
                                 Text(
-                                    "Concede",
+                                    stringResource(R.string.player_concede),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = PARCHMENT_ERROR,
                                 )
@@ -306,7 +308,7 @@ fun PlayerCard(
                         } else if (isMe) {
                             SuggestionChip(
                                 onClick  = {},
-                                label    = { Text("You", style = MaterialTheme.typography.labelSmall) },
+                                label    = { Text(stringResource(R.string.player_you), style = MaterialTheme.typography.labelSmall) },
                                 modifier = Modifier.height(24.dp),
                             )
                         }
@@ -322,9 +324,9 @@ fun PlayerCard(
                         if (isMe) {
                             SmallAdjustButton(
                                 icon        = Icons.Default.Remove,
-                                description = "Decrease life",
+                                description = stringResource(R.string.life_decrease),
                                 enabled     = user.life > 0u,
-                                onClick     = { onAdjust("life", -1) },
+                                onClick     = { onAdjust(LIFE_STAT, -1) },
                             )
                         }
                         InkedNumber(
@@ -336,8 +338,8 @@ fun PlayerCard(
                         if (isMe) {
                             SmallAdjustButton(
                                 icon        = Icons.Default.Add,
-                                description = "Increase life",
-                                onClick     = { onAdjust("life", 1) },
+                                description = stringResource(R.string.life_increase),
+                                onClick     = { onAdjust(LIFE_STAT, 1) },
                             )
                         }
                     }
@@ -356,7 +358,7 @@ fun PlayerCard(
                                         .forEach { opponent ->
                                             val damage = user.commanderDamage[opponent.id] ?: 0u
                                             NumericStatRow(
-                                                label    = "CMD ${opponent.displayName}",
+                                                label    = stringResource(R.string.commander_damage_from, opponent.displayName),
                                                 value    = damage,
                                                 isMe     = isMe,
                                                 isDead   = damage >= sessionUi.settings.commanderDeathThreshold,
@@ -364,20 +366,20 @@ fun PlayerCard(
                                             )
                                         }
                                     type == StatType.NUMERIC -> NumericStatRow(
-                                        label    = statLabel(name),
+                                        label    = statShortLabel(name),
                                         value    = value,
                                         isMe     = isMe,
                                         isDead   = name == POISON_STAT && value >= sessionUi.settings.infectDeathThreshold,
                                         onAdjust = { d -> onAdjust(name, d) },
                                     )
                                     type == StatType.TOGGLE -> ToggleStatRow(
-                                        label    = statLabel(name),
+                                        label    = statShortLabel(name),
                                         value    = value,
                                         isMe     = isMe,
                                         onToggle = { onAdjust(name, if (value > 0u) -1 else 1) },
                                     )
                                     else -> RingStageRow(
-                                        label    = statLabel(name),
+                                        label    = statShortLabel(name),
                                         value    = value,
                                         isMe     = isMe,
                                         onAdjust = { d -> onAdjust(name, d) },
@@ -404,24 +406,6 @@ fun PlayerCard(
             }
         }
     }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Stat label helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-private fun statLabel(name: String): String = when (name) {
-    "commander"  -> "CMD Dmg"
-    "poison"     -> "Poison"
-    "energy"     -> "Energy"
-    "experience" -> "Exp"
-    "storm"      -> "Storm"
-    "tax"        -> "CMD Tax"
-    "ring"       -> "The Ring"
-    "monarch"    -> "Monarch"
-    "initiative" -> "Initiative"
-    "blessing"   -> "City's Blessing"
-    else         -> name
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -454,7 +438,7 @@ private fun NumericStatRow(
             if (isMe) {
                 SmallAdjustButton(
                     icon        = Icons.Default.Remove,
-                    description = "Decrease $label",
+                    description = stringResource(R.string.stat_decrease, label),
                     enabled     = value > 0u,
                     onClick     = { onAdjust(-1) },
                 )
@@ -470,7 +454,7 @@ private fun NumericStatRow(
             if (isMe) {
                 SmallAdjustButton(
                     icon        = Icons.Default.Add,
-                    description = "Increase $label",
+                    description = stringResource(R.string.stat_increase, label),
                     onClick     = { onAdjust(1) },
                 )
             }
@@ -505,13 +489,13 @@ private fun ToggleStatRow(
             FilterChip(
                 selected = active,
                 onClick  = onToggle,
-                label    = { Text(if (active) "Active" else "Inactive", style = MaterialTheme.typography.labelSmall) },
+                label    = { Text(stringResource(if (active) R.string.stat_active else R.string.stat_inactive), style = MaterialTheme.typography.labelSmall) },
             )
         } else {
             AssistChip(
                 onClick  = {},
                 enabled  = active,
-                label    = { Text(if (active) "Active" else "—", style = MaterialTheme.typography.labelSmall) },
+                label    = { Text(stringResource(if (active) R.string.stat_active else R.string.stat_inactive_other), style = MaterialTheme.typography.labelSmall) },
             )
         }
     }
@@ -546,7 +530,7 @@ private fun RingStageRow(
             if (isMe) {
                 SmallAdjustButton(
                     icon        = Icons.Default.Remove,
-                    description = "Previous ring stage",
+                    description = stringResource(R.string.ring_previous),
                     enabled     = value > 0u,
                     onClick     = { onAdjust(-1) },
                 )
@@ -567,7 +551,7 @@ private fun RingStageRow(
             if (isMe) {
                 SmallAdjustButton(
                     icon        = Icons.Default.Add,
-                    description = "Next ring stage",
+                    description = stringResource(R.string.ring_next),
                     enabled     = value < 4u,
                     onClick     = { onAdjust(1) },
                 )

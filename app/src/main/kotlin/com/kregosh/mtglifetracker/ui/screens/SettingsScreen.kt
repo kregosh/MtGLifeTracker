@@ -1,6 +1,5 @@
 package com.kregosh.mtglifetracker.ui.screens
 
-import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -16,9 +15,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
+import android.net.Uri
 import com.kregosh.mtglifetracker.R
+import com.kregosh.mtglifetracker.data.AppColorScheme
 import com.kregosh.mtglifetracker.ui.components.FriendsList
 import com.kregosh.mtglifetracker.ui.components.RecentPlayersList
 import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
@@ -76,10 +78,10 @@ fun SettingsScreen(vm: SessionViewModel) {
         topBar = {
             TopAppBar(
                 colors = topBarColors,
-                title  = { Text("Settings") },
+                title  = { Text(stringResource(R.string.settings)) },
                 navigationIcon = {
                     IconButton(onClick = vm::closeSettings) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
             )
@@ -95,101 +97,107 @@ fun SettingsScreen(vm: SessionViewModel) {
         ) {
 
             // ── Identity ──────────────────────────────────────────────────────
-            SettingsSection(title = "Identity") {
+            SettingsSection(title = stringResource(R.string.settings_identity)) {
                 Row(
                     modifier             = Modifier.fillMaxWidth(),
                     verticalAlignment    = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
-                        text  = displayName.ifBlank { "Player" },
+                        text  = displayName.ifBlank { stringResource(R.string.default_player_name) },
                         style = MaterialTheme.typography.bodyLarge,
                     )
                     OutlinedButton(onClick = { showNameDialog = true }) {
-                        Text("Change")
+                        Text(stringResource(R.string.action_change))
                     }
                 }
             }
 
             // ── Appearance ────────────────────────────────────────────────────
-            SettingsSection(title = "Appearance") {
+            SettingsSection(title = stringResource(R.string.settings_appearance)) {
                 val colorScheme by vm.colorScheme.collectAsState()
 
-                Text("Color scheme", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.settings_color_scheme), style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.height(4.dp))
                 @OptIn(ExperimentalMaterial3Api::class)
                 SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    listOf("dark" to "Dark", "light" to "Light", "system" to "System").forEachIndexed { idx, (key, label) ->
+                    AppColorScheme.entries.forEachIndexed { idx, scheme ->
                         SegmentedButton(
-                            selected = colorScheme == key,
-                            onClick  = { vm.setColorScheme(key) },
-                            shape    = SegmentedButtonDefaults.itemShape(index = idx, count = 3),
-                        ) { Text(label) }
+                            selected = colorScheme == scheme,
+                            onClick  = { vm.setColorScheme(scheme) },
+                            shape    = SegmentedButtonDefaults.itemShape(index = idx, count = AppColorScheme.entries.size),
+                        ) {
+                            Text(when (scheme) {
+                                AppColorScheme.DARK   -> stringResource(R.string.color_scheme_dark)
+                                AppColorScheme.LIGHT  -> stringResource(R.string.color_scheme_light)
+                                AppColorScheme.SYSTEM -> stringResource(R.string.color_scheme_system)
+                            })
+                        }
                     }
                 }
 
                 Spacer(Modifier.height(12.dp))
 
                 val appBgUri by vm.backgroundImageUri.collectAsState()
-                Text("App background image", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.settings_app_background), style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { appBgPicker.launch("image/*") }) {
                         Icon(Icons.Default.Image, contentDescription = null)
                         Spacer(Modifier.width(4.dp))
-                        Text(if (appBgUri != null) "Change" else "Choose")
+                        Text(stringResource(if (appBgUri != null) R.string.action_change else R.string.action_choose))
                     }
                     if (appBgUri != null) {
                         OutlinedButton(
                             onClick = { vm.setBackgroundImage(null) },
                             colors  = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                        ) { Text("Remove") }
+                        ) { Text(stringResource(R.string.action_remove)) }
                     }
                 }
 
                 Spacer(Modifier.height(8.dp))
-                Text("Presets", style = MaterialTheme.typography.labelSmall,
+                Text(stringResource(R.string.settings_presets), style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(4.dp))
                 val pkg = context.packageName
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = {
                         vm.setBackgroundImage("android.resource://$pkg/drawable/bg_arcane_storm")
-                    }) { Text("⚡ Storm") }
+                    }) { Text(stringResource(R.string.settings_preset_storm)) }
                     OutlinedButton(onClick = {
                         vm.setBackgroundImage("android.resource://$pkg/drawable/bg_mana_orbs")
-                    }) { Text("🔮 Mana Orbs") }
+                    }) { Text(stringResource(R.string.settings_preset_mana_orbs)) }
                 }
 
                 Spacer(Modifier.height(12.dp))
 
                 val cardBgUri by vm.cardBackgroundImageUri.collectAsState()
-                Text("Your card background image", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.settings_card_background), style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { cardBgPicker.launch("image/*") }) {
                         Icon(Icons.Default.Image, contentDescription = null)
                         Spacer(Modifier.width(4.dp))
-                        Text(if (cardBgUri != null) "Change" else "Choose")
+                        Text(stringResource(if (cardBgUri != null) R.string.action_change else R.string.action_choose))
                     }
                     if (cardBgUri != null) {
                         OutlinedButton(
                             onClick = { vm.setCardBackgroundImage(null) },
                             colors  = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                        ) { Text("Remove") }
+                        ) { Text(stringResource(R.string.action_remove)) }
                     }
                 }
             }
 
             // ── Timer ─────────────────────────────────────────────────────────
-            SettingsSection(title = "Timer") {
+            SettingsSection(title = stringResource(R.string.settings_timer)) {
                 var timerVisible by remember { mutableStateOf(vm.timerVisible.value) }
                 Row(
                     modifier              = Modifier.fillMaxWidth(),
                     verticalAlignment     = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text("Show game timer", style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.settings_show_timer), style = MaterialTheme.typography.bodyMedium)
                     Switch(
                         checked         = timerVisible,
                         onCheckedChange = { v -> timerVisible = v; vm.setTimerVisible(v) },
@@ -200,7 +208,7 @@ fun SettingsScreen(vm: SessionViewModel) {
                     Spacer(Modifier.height(12.dp))
 
                     var countDown by remember { mutableStateOf(vm.timerCountDown.value) }
-                    Text("Mode", style = MaterialTheme.typography.labelMedium)
+                    Text(stringResource(R.string.settings_timer_mode), style = MaterialTheme.typography.labelMedium)
                     Spacer(Modifier.height(4.dp))
                     @OptIn(ExperimentalMaterial3Api::class)
                     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
@@ -208,19 +216,19 @@ fun SettingsScreen(vm: SessionViewModel) {
                             selected = !countDown,
                             onClick  = { countDown = false; vm.setTimerCountDown(false) },
                             shape    = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                        ) { Text("Stopwatch") }
+                        ) { Text(stringResource(R.string.settings_timer_stopwatch)) }
                         SegmentedButton(
                             selected = countDown,
                             onClick  = { countDown = true; vm.setTimerCountDown(true) },
                             shape    = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                        ) { Text("Countdown") }
+                        ) { Text(stringResource(R.string.settings_timer_countdown)) }
                     }
 
                     if (countDown) {
                         Spacer(Modifier.height(12.dp))
                         val timerLimitMinutes by vm.timerLimitMinutes.collectAsState()
                         PresetRow(
-                            label    = "Time limit (minutes)",
+                            label    = stringResource(R.string.settings_timer_limit),
                             current  = timerLimitMinutes,
                             presets  = listOf(30u, 45u, 60u, 90u),
                             onSelect = vm::setTimerLimitMinutes,
@@ -236,9 +244,9 @@ fun SettingsScreen(vm: SessionViewModel) {
             val friendIds      = remember(friendList) { friendList.map { it.userId }.toSet() }
 
             if (friendList.isNotEmpty()) {
-                SettingsSection(title = "Friends") {
+                SettingsSection(title = stringResource(R.string.friends)) {
                     Text(
-                        "Saved to this device",
+                        stringResource(R.string.settings_friends_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -255,9 +263,9 @@ fun SettingsScreen(vm: SessionViewModel) {
 
             // ── Known players ─────────────────────────────────────────────────
             if (knownPlayers.isNotEmpty()) {
-                SettingsSection(title = "Recently Played With") {
+                SettingsSection(title = stringResource(R.string.settings_recent_players)) {
                     Text(
-                        "Up to 10 most recent — oldest dropped automatically",
+                        stringResource(R.string.settings_recent_players_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -272,9 +280,9 @@ fun SettingsScreen(vm: SessionViewModel) {
             }
 
             // ── Game rules ────────────────────────────────────────────────────
-            SettingsSection(title = "Game Rules") {
+            SettingsSection(title = stringResource(R.string.settings_game_rules)) {
                 Text(
-                    "Used for sessions you create. Players who join follow the host's rules.",
+                    stringResource(R.string.settings_game_rules_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -284,21 +292,21 @@ fun SettingsScreen(vm: SessionViewModel) {
                 val infectThreshold    by vm.infectThreshold.collectAsState()
 
                 PresetRow(
-                    label    = "Starting life total",
+                    label    = stringResource(R.string.rules_starting_life),
                     current  = startLife,
                     presets  = listOf(20u, 30u, 40u),
                     onSelect = vm::setStartLife,
                 )
                 Spacer(Modifier.height(12.dp))
                 PresetRow(
-                    label    = "Commander damage limit",
+                    label    = stringResource(R.string.rules_commander_limit),
                     current  = commanderThreshold,
                     presets  = listOf(21u, 15u, 10u),
                     onSelect = vm::setCommanderThreshold,
                 )
                 Spacer(Modifier.height(12.dp))
                 PresetRow(
-                    label    = "Infect damage limit",
+                    label    = stringResource(R.string.rules_infect_limit),
                     current  = infectThreshold,
                     presets  = listOf(10u, 7u, 5u),
                     onSelect = vm::setInfectThreshold,
@@ -311,9 +319,9 @@ fun SettingsScreen(vm: SessionViewModel) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Commander damage by default", style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.settings_commander_default), style = MaterialTheme.typography.bodyMedium)
                         Text(
-                            "Auto-add commander damage when joining a session",
+                            stringResource(R.string.settings_commander_default_hint),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -340,7 +348,7 @@ internal fun DisplayNameDialog(
     initial    : String,
     onConfirm  : (String) -> Unit,
     onDismiss  : () -> Unit,
-    title      : String  = "Your display name",
+    title      : String? = null,
     dismissible: Boolean = true,
 ) {
     var name by remember { mutableStateOf(initial) }
@@ -351,24 +359,24 @@ internal fun DisplayNameDialog(
             dismissOnBackPress    = dismissible,
             dismissOnClickOutside = dismissible,
         ),
-        title    = { Text(title) },
+        title    = { Text(title ?: stringResource(R.string.name_dialog_title)) },
         text     = {
             OutlinedTextField(
                 value          = name,
                 onValueChange  = { if (it.length <= MAX_DISPLAY_NAME_LENGTH) name = it },
                 singleLine     = true,
-                placeholder    = { Text("e.g. Alice") },
-                supportingText = { Text("${name.length} / $MAX_DISPLAY_NAME_LENGTH") },
+                placeholder    = { Text(stringResource(R.string.name_dialog_placeholder)) },
+                supportingText = { Text(stringResource(R.string.name_dialog_counter, name.length, MAX_DISPLAY_NAME_LENGTH)) },
             )
         },
         confirmButton = {
             TextButton(
                 onClick  = { if (name.isNotBlank()) onConfirm(name) },
                 enabled  = name.isNotBlank(),
-            ) { Text("OK") }
+            ) { Text(stringResource(R.string.action_ok)) }
         },
         dismissButton = if (dismissible) {
-            { TextButton(onClick = onDismiss) { Text("Cancel") } }
+            { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } }
         } else null,
     )
 }

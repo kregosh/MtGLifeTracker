@@ -1,11 +1,13 @@
 package com.kregosh.mtglifetracker.viewmodel
 
+import com.kregosh.mtglifetracker.data.AppColorScheme
 import com.kregosh.mtglifetracker.data.Friend
 import com.kregosh.mtglifetracker.data.KnownPlayer
 import com.kregosh.mtglifetracker.data.UserPrefs
 import com.kregosh.mtglifetracker.network.SessionApi
 import com.kregosh.mtglifetracker.network.SessionConnection
-import com.kregosh.mtglifetracker.network.WsState
+import com.kregosh.mtglifetracker.network.SessionNotFoundException
+import com.kregosh.mtglifetracker.network.ConnectionState
 import io.mockk.coVerify
 import com.kregosh.mtglifetracker.shared.CreateSessionResponse
 import com.kregosh.mtglifetracker.shared.ServerMessage
@@ -31,15 +33,15 @@ class SessionViewModelTest {
 
     private val prefs      = mockk<UserPrefs>(relaxed = true)
     private val api        = mockk<SessionApi>(relaxed = true)
-    private val wsMessages = MutableSharedFlow<ServerMessage>(extraBufferCapacity = 16)
-    private val wsState    = MutableStateFlow<WsState>(WsState.Connecting)
+    private val serverMessages = MutableSharedFlow<ServerMessage>(extraBufferCapacity = 16)
+    private val connectionStateFlow    = MutableStateFlow<ConnectionState>(ConnectionState.Connecting)
     private val ws         = mockk<SessionConnection>(relaxed = true) {
-        every { messages }        returns wsMessages
-        every { connectionState } returns wsState
+        every { messages }        returns serverMessages
+        every { connectionState } returns connectionStateFlow
     }
-    private val wsFactory  = mockk<(String, String, String, UInt) -> SessionConnection>()
+    private val connectionFactory  = mockk<(String, String, String, UInt) -> SessionConnection>()
 
-    private fun makeVm() = SessionViewModel(prefs, api, wsFactory, testDispatcher.scheduler.timeSource)
+    private fun makeVm() = SessionViewModel(prefs, api, connectionFactory, testDispatcher.scheduler.timeSource)
 
     @BeforeTest
     fun setUp() {
@@ -51,7 +53,7 @@ class SessionViewModelTest {
         every { prefs.startLife }               returns 20u
         every { prefs.commanderDeathThreshold } returns 21u
         every { prefs.infectDeathThreshold }    returns 10u
-        every { prefs.colorScheme }             returns "dark"
+        every { prefs.colorScheme }             returns AppColorScheme.DARK
         every { prefs.commanderDefaultEnabled } returns false
         every { prefs.timerVisible }            returns true
         every { prefs.timerCountDown }          returns false
@@ -59,7 +61,7 @@ class SessionViewModelTest {
         every { prefs.knownPlayers }            returns emptyList()
         every { prefs.friendList }              returns emptyList()
         every { prefs.lastSessionId }           returns null
-        every { wsFactory(any(), any(), any(), any()) } returns ws
+        every { connectionFactory(any(), any(), any(), any()) } returns ws
     }
 
     @AfterTest
@@ -94,7 +96,7 @@ class SessionViewModelTest {
         advanceUntilIdle()
 
         assertEquals(Screen.Home, vm.screen.value)
-        assertEquals("network error", vm.homeError.value)
+        assertEquals(HomeError.CreateFailed("network error"), vm.homeError.value)
     }
 
     @Test
@@ -109,14 +111,25 @@ class SessionViewModelTest {
     }
 
     @Test
+    fun `joinByCode reports network failures as such, not as a missing session`() = runTest {
+        coEvery { api.getSessionByCode(any()) } throws RuntimeException("timeout")
+
+        val vm = makeVm()
+        vm.joinByCode("ABCDEFGH")
+        advanceUntilIdle()
+
+        assertEquals(HomeError.JoinFailed("timeout"), vm.homeError.value)
+    }
+
+    @Test
     fun `joinByCode on failure sets homeError`() = runTest {
-        coEvery { api.getSessionByCode(any()) } throws RuntimeException("not found")
+        coEvery { api.getSessionByCode(any()) } throws SessionNotFoundException("not found")
 
         val vm = makeVm()
         vm.joinByCode("BADCOD")
         advanceUntilIdle()
 
-        assertEquals("Session not found", vm.homeError.value)
+        assertEquals(HomeError.SessionNotFound, vm.homeError.value)
     }
 
     @Test
@@ -128,7 +141,7 @@ class SessionViewModelTest {
         advanceUntilIdle()
 
         val users = listOf(UserState("test-user-id", "Test Player", life = 20u))
-        wsMessages.emit(ServerMessage.State(users, statDefs = mapOf("energy" to StatType.NUMERIC)))
+        serverMessages.emit(ServerMessage.State(users, statDefs = mapOf("energy" to StatType.NUMERIC)))
         advanceUntilIdle()
 
         assertEquals(users, vm.sessionUi.value.users)
@@ -188,7 +201,7 @@ class SessionViewModelTest {
         advanceUntilIdle()
 
         val base = listOf(UserState("test-user-id", "Test Player", life = 20u))
-        wsMessages.emit(ServerMessage.State(base))
+        serverMessages.emit(ServerMessage.State(base))
         advanceUntilIdle()
 
         vm.adjust("life", -3)
@@ -204,12 +217,12 @@ class SessionViewModelTest {
         advanceUntilIdle()
 
         val base = listOf(UserState("test-user-id", "Test Player", life = 20u))
-        wsMessages.emit(ServerMessage.State(base))
+        serverMessages.emit(ServerMessage.State(base))
         advanceUntilIdle()
 
         vm.adjust("life", -3)
 
-        wsMessages.emit(ServerMessage.State(base))
+        serverMessages.emit(ServerMessage.State(base))
         advanceUntilIdle()
 
         assertEquals(17u, vm.sessionUi.value.users.first().life)
@@ -256,7 +269,7 @@ class SessionViewModelTest {
         advanceUntilIdle()
 
         val staleUsers = listOf(UserState("test-user-id", "Test Player", life = 99u))
-        wsMessages.emit(ServerMessage.State(staleUsers))
+        serverMessages.emit(ServerMessage.State(staleUsers))
         advanceUntilIdle()
 
         assertNotEquals(staleUsers, vm.sessionUi.value.users)
@@ -272,42 +285,29 @@ class SessionViewModelTest {
     }
 
     @Test
-    fun `Joined message updates sessionCode in sessionUi`() = runTest {
-        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
-        val vm = makeVm()
-        vm.createSession()
-        advanceUntilIdle()
-
-        wsMessages.emit(ServerMessage.Joined("test-user-id", "NEWCOD"))
-        advanceUntilIdle()
-
-        assertEquals("NEWCOD", vm.sessionUi.value.sessionCode)
-    }
-
-    @Test
     fun `Error message updates error field in sessionUi`() = runTest {
         coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
 
-        wsMessages.emit(ServerMessage.Error("Join first"))
+        serverMessages.emit(ServerMessage.Error("Join first"))
         advanceUntilIdle()
 
         assertEquals("Join first", vm.sessionUi.value.error)
     }
 
     @Test
-    fun `wsState change propagates to sessionUi`() = runTest {
+    fun `connection state change propagates to sessionUi`() = runTest {
         coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
 
-        wsState.value = WsState.Connected
+        connectionStateFlow.value = ConnectionState.Connected
         advanceUntilIdle()
 
-        assertEquals(WsState.Connected, vm.sessionUi.value.wsState)
+        assertEquals(ConnectionState.Connected, vm.sessionUi.value.connectionState)
     }
 
     @Test
@@ -366,7 +366,7 @@ class SessionViewModelTest {
     @Test
     fun `rejoin cancels collectors from previous session`() = runTest {
         val ws2Messages = MutableSharedFlow<ServerMessage>(extraBufferCapacity = 16)
-        val ws2State    = MutableStateFlow<WsState>(WsState.Connecting)
+        val ws2State    = MutableStateFlow<ConnectionState>(ConnectionState.Connecting)
         val ws2         = mockk<SessionConnection>(relaxed = true) {
             every { messages }        returns ws2Messages
             every { connectionState } returns ws2State
@@ -377,7 +377,7 @@ class SessionViewModelTest {
             CreateSessionResponse("sid-2", "CODE02"),
         )
         var callCount = 0
-        every { wsFactory(any(), any(), any(), any()) } answers {
+        every { connectionFactory(any(), any(), any(), any()) } answers {
             if (callCount++ == 0) ws else ws2
         }
 
@@ -388,7 +388,7 @@ class SessionViewModelTest {
         advanceUntilIdle()
 
         val staleUsers = listOf(UserState("test-user-id", "Old Session", life = 5u))
-        wsMessages.emit(ServerMessage.State(staleUsers))
+        serverMessages.emit(ServerMessage.State(staleUsers))
         advanceUntilIdle()
 
         assertNotEquals(staleUsers, vm.sessionUi.value.users)
@@ -414,7 +414,7 @@ class SessionViewModelTest {
         vm.createSession()
         advanceUntilIdle()
 
-        wsMessages.emit(ServerMessage.State(emptyList(), globalStats = mapOf("daynight" to 1u)))
+        serverMessages.emit(ServerMessage.State(emptyList(), globalStats = mapOf("daynight" to 1u)))
         advanceUntilIdle()
 
         assertEquals(1u, vm.sessionUi.value.globalStats["daynight"])
@@ -428,7 +428,7 @@ class SessionViewModelTest {
         advanceUntilIdle()
 
         // seed daynight = 0 (day)
-        wsMessages.emit(ServerMessage.State(emptyList(), globalStats = mapOf("daynight" to 0u)))
+        serverMessages.emit(ServerMessage.State(emptyList(), globalStats = mapOf("daynight" to 0u)))
         advanceUntilIdle()
 
         vm.toggleGlobal("daynight")
@@ -448,7 +448,7 @@ class SessionViewModelTest {
             life        = 20u,
             commanderDamage = mapOf("opponent" to 21u),
         )
-        wsMessages.emit(ServerMessage.State(listOf(deadUser)))
+        serverMessages.emit(ServerMessage.State(listOf(deadUser)))
         advanceUntilIdle()
 
         val uiState = vm.sessionUi.value
@@ -693,7 +693,7 @@ class SessionViewModelTest {
         advanceUntilIdle()
 
         val users = listOf(UserState("test-user-id", "Test Player", life = 20u, conceded = false))
-        wsMessages.emit(ServerMessage.State(users))
+        serverMessages.emit(ServerMessage.State(users))
         advanceUntilIdle()
 
         vm.concede()
@@ -708,7 +708,7 @@ class SessionViewModelTest {
         advanceUntilIdle()
 
         val users = listOf(UserState("test-user-id", "Test Player", life = 20u, conceded = true))
-        wsMessages.emit(ServerMessage.State(users))
+        serverMessages.emit(ServerMessage.State(users))
         advanceUntilIdle()
 
         vm.unconcede()
@@ -735,7 +735,7 @@ class SessionViewModelTest {
         vm.createSession()
         advanceUntilIdle()
 
-        wsMessages.emit(ServerMessage.FriendRequest("user-2", "Alice"))
+        serverMessages.emit(ServerMessage.FriendRequest("user-2", "Alice"))
         advanceUntilIdle()
 
         val pending = vm.pendingFriendRequests.value
@@ -751,8 +751,8 @@ class SessionViewModelTest {
         vm.createSession()
         advanceUntilIdle()
 
-        wsMessages.emit(ServerMessage.FriendRequest("user-2", "Alice"))
-        wsMessages.emit(ServerMessage.FriendRequest("user-2", "Alice"))
+        serverMessages.emit(ServerMessage.FriendRequest("user-2", "Alice"))
+        serverMessages.emit(ServerMessage.FriendRequest("user-2", "Alice"))
         advanceUntilIdle()
 
         assertEquals(1, vm.pendingFriendRequests.value.size)
@@ -766,7 +766,7 @@ class SessionViewModelTest {
         vm.createSession()
         advanceUntilIdle()
 
-        wsMessages.emit(ServerMessage.FriendRequest("user-2", "Alice"))
+        serverMessages.emit(ServerMessage.FriendRequest("user-2", "Alice"))
         advanceUntilIdle()
 
         vm.acceptFriendRequest("user-2", "Alice")
@@ -783,7 +783,7 @@ class SessionViewModelTest {
         vm.createSession()
         advanceUntilIdle()
 
-        wsMessages.emit(ServerMessage.FriendRequest("user-2", "Alice"))
+        serverMessages.emit(ServerMessage.FriendRequest("user-2", "Alice"))
         advanceUntilIdle()
 
         vm.declineFriendRequest("user-2")
@@ -801,7 +801,7 @@ class SessionViewModelTest {
         advanceUntilIdle()
 
         vm.sendFriendRequest("user-3")
-        wsMessages.emit(ServerMessage.FriendAccepted("user-3", "Bob"))
+        serverMessages.emit(ServerMessage.FriendAccepted("user-3", "Bob"))
         advanceUntilIdle()
 
         verify { prefs.addFriend("user-3", "Bob") }
@@ -816,7 +816,7 @@ class SessionViewModelTest {
         vm.createSession()
         advanceUntilIdle()
 
-        wsMessages.emit(ServerMessage.FriendAccepted("stalker", "Mallory"))
+        serverMessages.emit(ServerMessage.FriendAccepted("stalker", "Mallory"))
         advanceUntilIdle()
 
         verify(exactly = 0) { prefs.addFriend("stalker", any()) }
@@ -830,7 +830,7 @@ class SessionViewModelTest {
         vm.createSession()
         advanceUntilIdle()
 
-        wsMessages.emit(ServerMessage.FriendRequest("user-2", "Alice"))
+        serverMessages.emit(ServerMessage.FriendRequest("user-2", "Alice"))
         advanceUntilIdle()
         assertEquals(1, vm.pendingFriendRequests.value.size)
 
@@ -852,7 +852,7 @@ class SessionViewModelTest {
             UserState("test-user-id", "Test Player", life = 20u),
             UserState("other-id", "Alice", life = 20u),
         )
-        wsMessages.emit(ServerMessage.State(users))
+        serverMessages.emit(ServerMessage.State(users))
         advanceUntilIdle()
 
         verify { prefs.touchKnownPlayer("other-id", "Alice") }
@@ -866,7 +866,7 @@ class SessionViewModelTest {
         vm.createSession()
         advanceUntilIdle()
 
-        wsMessages.emit(ServerMessage.State(listOf(UserState("test-user-id", "Test Player", life = 20u))))
+        serverMessages.emit(ServerMessage.State(listOf(UserState("test-user-id", "Test Player", life = 20u))))
         advanceUntilIdle()
 
         verify(exactly = 0) { prefs.touchKnownPlayer("test-user-id", any()) }
@@ -884,7 +884,7 @@ class SessionViewModelTest {
             UserState("test-user-id", "Test Player", life = 20u),
             UserState("friend-id", "NewName", life = 20u),
         )
-        wsMessages.emit(ServerMessage.State(users))
+        serverMessages.emit(ServerMessage.State(users))
         advanceUntilIdle()
 
         verify { prefs.addFriend("friend-id", "NewName") }
@@ -899,9 +899,9 @@ class SessionViewModelTest {
 
         val me    = UserState("test-user-id", "Test Player", life = 20u)
         val alice = UserState("other-id", "Alice", life = 20u)
-        wsMessages.emit(ServerMessage.State(listOf(me, alice)))
-        wsMessages.emit(ServerMessage.State(listOf(me, alice.copy(life = 19u))))
-        wsMessages.emit(ServerMessage.State(listOf(me.copy(life = 18u), alice.copy(life = 17u))))
+        serverMessages.emit(ServerMessage.State(listOf(me, alice)))
+        serverMessages.emit(ServerMessage.State(listOf(me, alice.copy(life = 19u))))
+        serverMessages.emit(ServerMessage.State(listOf(me.copy(life = 18u), alice.copy(life = 17u))))
         advanceUntilIdle()
 
         verify(exactly = 1) { prefs.touchKnownPlayer("other-id", "Alice") }
@@ -915,8 +915,8 @@ class SessionViewModelTest {
         advanceUntilIdle()
 
         val me = UserState("test-user-id", "Test Player", life = 20u)
-        wsMessages.emit(ServerMessage.State(listOf(me, UserState("other-id", "Alice"))))
-        wsMessages.emit(ServerMessage.State(listOf(me, UserState("other-id", "Alicia"))))
+        serverMessages.emit(ServerMessage.State(listOf(me, UserState("other-id", "Alice"))))
+        serverMessages.emit(ServerMessage.State(listOf(me, UserState("other-id", "Alicia"))))
         advanceUntilIdle()
 
         verify(exactly = 1) { prefs.touchKnownPlayer("other-id", "Alice") }
@@ -1127,7 +1127,7 @@ class SessionViewModelTest {
         advanceUntilIdle()
 
         assertEquals(Screen.Home, vm.screen.value)
-        assertEquals("session gone", vm.homeError.value)
+        assertEquals(HomeError.JoinFailed("session gone"), vm.homeError.value)
     }
 
     @Test
@@ -1215,7 +1215,7 @@ class SessionViewModelTest {
         vm.joinFriendSession("stale-id")
         advanceUntilIdle()
 
-        assertEquals("session expired", vm.homeError.value)
+        assertEquals(HomeError.JoinFailed("session expired"), vm.homeError.value)
         assertEquals(Screen.Home, vm.screen.value)
     }
 
@@ -1239,7 +1239,7 @@ class SessionViewModelTest {
     @Test
     fun `addCustomStat silently ignores reserved names`() = runTest {
         coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid", "CODE01")
-        every { wsFactory("sid", any(), any(), any()) } returns ws
+        every { connectionFactory("sid", any(), any(), any()) } returns ws
 
         val vm = makeVm()
         vm.createSession()
@@ -1314,7 +1314,7 @@ class SessionViewModelTest {
     @Test
     fun `addCustomStat forwards non-reserved names`() = runTest {
         coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid", "CODE01")
-        every { wsFactory("sid", any(), any(), any()) } returns ws
+        every { connectionFactory("sid", any(), any(), any()) } returns ws
 
         val vm = makeVm()
         vm.createSession()
@@ -1360,7 +1360,7 @@ class SessionViewModelTest {
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
-        wsMessages.emit(ServerMessage.State(users, hostUserId = hostUserId))
+        serverMessages.emit(ServerMessage.State(users, hostUserId = hostUserId))
         advanceUntilIdle()
         return vm
     }
@@ -1388,7 +1388,7 @@ class SessionViewModelTest {
         advanceUntilIdle()
 
         coVerify { api.createSession("test-user-id", SessionSettings(startLife = 40u)) }
-        verify { wsFactory("sid-1", "test-user-id", any(), 40u) }
+        verify { connectionFactory("sid-1", "test-user-id", any(), 40u) }
     }
 
     @Test
@@ -1400,7 +1400,7 @@ class SessionViewModelTest {
         vm.joinByCode("ABCDEFGH")
         advanceUntilIdle()
 
-        verify { wsFactory("sid-2", any(), any(), 30u) }
+        verify { connectionFactory("sid-2", any(), any(), 30u) }
         assertEquals(rules, vm.sessionUi.value.settings)
     }
 
@@ -1413,7 +1413,7 @@ class SessionViewModelTest {
         advanceUntilIdle()
 
         assertEquals(Screen.Home, vm.screen.value)
-        assertEquals("This session is full (2 players)", vm.homeError.value)
+        assertEquals(HomeError.SessionFull(2), vm.homeError.value)
     }
 
     @Test
@@ -1431,7 +1431,7 @@ class SessionViewModelTest {
     fun `settings and host come from the session state`() = runTest {
         val vm = inSession()
         val rules = SessionSettings(startLife = 40u, infectDeathThreshold = 7u)
-        wsMessages.emit(ServerMessage.State(
+        serverMessages.emit(ServerMessage.State(
             listOf(UserState("test-user-id", "Test Player")), hostUserId = "test-user-id", settings = rules,
         ))
         advanceUntilIdle()
@@ -1470,11 +1470,11 @@ class SessionViewModelTest {
     @Test
     fun `losing our seat returns to Home with a message`() = runTest {
         val vm = inSession()
-        wsMessages.emit(ServerMessage.State(listOf(UserState("other", "Bob"))))
+        serverMessages.emit(ServerMessage.State(listOf(UserState("other", "Bob"))))
         advanceUntilIdle()
 
         assertEquals(Screen.Home, vm.screen.value)
-        assertEquals("You are no longer in that session", vm.homeError.value)
+        assertEquals(HomeError.RemovedFromSession, vm.homeError.value)
         verify { prefs.lastSessionId = null }
     }
 
@@ -1484,7 +1484,7 @@ class SessionViewModelTest {
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
-        wsMessages.emit(ServerMessage.State(listOf(UserState("other", "Bob"))))
+        serverMessages.emit(ServerMessage.State(listOf(UserState("other", "Bob"))))
         advanceUntilIdle()
 
         assertIs<Screen.Session>(vm.screen.value)
@@ -1517,7 +1517,7 @@ class SessionViewModelTest {
         val vm = inSession()
         vm.adjust("life", -5)
         advanceUntilIdle()
-        wsMessages.emit(ServerMessage.State(listOf(UserState("test-user-id", "Test Player", life = 15u))))
+        serverMessages.emit(ServerMessage.State(listOf(UserState("test-user-id", "Test Player", life = 15u))))
         advanceUntilIdle()
 
         vm.undoLastLifeChange()
@@ -1550,7 +1550,7 @@ class SessionViewModelTest {
         advanceUntilIdle()
         assertEquals(1, vm.lifeHistory.value.size)
 
-        wsMessages.emit(ServerMessage.State(listOf(UserState("test-user-id", "Test Player")), game = 1))
+        serverMessages.emit(ServerMessage.State(listOf(UserState("test-user-id", "Test Player")), game = 1))
         advanceUntilIdle()
 
         assertTrue(vm.lifeHistory.value.isEmpty())

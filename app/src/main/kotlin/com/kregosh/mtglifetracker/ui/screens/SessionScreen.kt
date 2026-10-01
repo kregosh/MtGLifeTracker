@@ -19,51 +19,36 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.minutes
+import com.kregosh.mtglifetracker.R
 import com.kregosh.mtglifetracker.data.Friend
 import com.kregosh.mtglifetracker.data.KnownPlayer
-import com.kregosh.mtglifetracker.network.WsState
+import com.kregosh.mtglifetracker.network.ConnectionState
+import com.kregosh.mtglifetracker.shared.DAY_NIGHT_GLOBAL
+import com.kregosh.mtglifetracker.shared.PredefinedStat
 import com.kregosh.mtglifetracker.shared.SessionSettings
 import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.shared.UserState
-import com.kregosh.mtglifetracker.viewmodel.LifeChange
 import com.kregosh.mtglifetracker.ui.components.FriendsSheet
 import com.kregosh.mtglifetracker.ui.components.InviteDialog
-import com.kregosh.mtglifetracker.viewmodel.Screen
 import com.kregosh.mtglifetracker.ui.components.PlayerCard
+import com.kregosh.mtglifetracker.ui.components.statLabel
+import com.kregosh.mtglifetracker.ui.components.statTypeLabel
 import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
 import com.kregosh.mtglifetracker.viewmodel.FriendRequestInfo
+import com.kregosh.mtglifetracker.viewmodel.LifeChange
 import com.kregosh.mtglifetracker.viewmodel.MAX_STAT_NAME_LENGTH
 import com.kregosh.mtglifetracker.viewmodel.RESERVED_STAT_NAMES
-import com.kregosh.mtglifetracker.viewmodel.isValidStatName
+import com.kregosh.mtglifetracker.viewmodel.Screen
 import com.kregosh.mtglifetracker.viewmodel.SessionUiState
 import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Predefined per-player stat catalogue
-// ─────────────────────────────────────────────────────────────────────────────
-
-private data class StatPreset(val id: String, val label: String, val type: StatType)
-
-private val PREDEFINED_STATS = listOf(
-    StatPreset("commander",  "Commander Damage",  StatType.NUMERIC),
-    StatPreset("poison",     "Poison / Infect",   StatType.NUMERIC),
-    StatPreset("energy",     "Energy",            StatType.NUMERIC),
-    StatPreset("experience", "Experience",        StatType.NUMERIC),
-    StatPreset("storm",      "Storm Count",       StatType.NUMERIC),
-    StatPreset("tax",        "Commander Tax",     StatType.NUMERIC),
-    StatPreset("ring",       "The Ring",          StatType.RING_STAGE),
-    StatPreset("monarch",    "Monarch",           StatType.TOGGLE),
-    StatPreset("initiative", "Initiative",        StatType.TOGGLE),
-    StatPreset("blessing",   "City's Blessing",   StatType.TOGGLE),
-)
-
-// Day/Night is a session-global toggle, stored in globalStats, NOT in customStatNames/statDefs.
-private const val GLOBAL_DAY_NIGHT = "daynight"
+import com.kregosh.mtglifetracker.viewmodel.isValidStatName
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Session screen
@@ -131,6 +116,7 @@ private fun SessionContent(
     var removeTarget     by remember { mutableStateOf<UserState?>(null) }
 
     val lifeHistory  by vm.lifeHistory.collectAsState()
+    val resources    = LocalContext.current.resources
     val snackbarHost = remember { SnackbarHostState() }
     var announcedUpTo by remember { mutableLongStateOf(-1L) }
     val latestChange = lifeHistory.firstOrNull()
@@ -141,8 +127,8 @@ private fun SessionContent(
         if (change.id <= announcedUpTo) return@LaunchedEffect
         announcedUpTo = change.id
         val result = snackbarHost.showSnackbar(
-            message     = "Life ${change.delta.signed()} → ${change.lifeAfter}",
-            actionLabel = "Undo",
+            message     = resources.getString(R.string.life_change_snackbar, change.delta.signed(), change.lifeAfter.toInt()),
+            actionLabel = resources.getString(R.string.action_undo),
             duration    = SnackbarDuration.Short,
         )
         if (result == SnackbarResult.ActionPerformed) vm.undoLastLifeChange()
@@ -168,13 +154,13 @@ private fun SessionContent(
     if (showNewGame) {
         AlertDialog(
             onDismissRequest = { showNewGame = false },
-            title = { Text("Start a new game?") },
-            text  = { Text("Everyone goes back to ${ui.settings.startLife} life and all stats are cleared. Players stay in the session.") },
+            title = { Text(stringResource(R.string.new_game_title)) },
+            text  = { Text(stringResource(R.string.new_game_text, ui.settings.startLife.toInt())) },
             confirmButton = {
-                TextButton(onClick = { showNewGame = false; vm.startNewGame() }) { Text("New game") }
+                TextButton(onClick = { showNewGame = false; vm.startNewGame() }) { Text(stringResource(R.string.session_new_game)) }
             },
             dismissButton = {
-                TextButton(onClick = { showNewGame = false }) { Text("Cancel") }
+                TextButton(onClick = { showNewGame = false }) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }
@@ -182,16 +168,16 @@ private fun SessionContent(
     removeTarget?.let { target ->
         AlertDialog(
             onDismissRequest = { removeTarget = null },
-            title = { Text("Remove ${target.displayName}?") },
-            text  = { Text("Their card and stats are removed from this session.") },
+            title = { Text(stringResource(R.string.remove_player_title, target.displayName)) },
+            text  = { Text(stringResource(R.string.remove_player_text)) },
             confirmButton = {
                 TextButton(
                     onClick = { removeTarget = null; vm.removePlayer(target.id) },
                     colors  = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                ) { Text("Remove") }
+                ) { Text(stringResource(R.string.action_remove)) }
             },
             dismissButton = {
-                TextButton(onClick = { removeTarget = null }) { Text("Cancel") }
+                TextButton(onClick = { removeTarget = null }) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }
@@ -201,16 +187,16 @@ private fun SessionContent(
     if (showLeaveDialog) {
         AlertDialog(
             onDismissRequest = { showLeaveDialog = false },
-            title = { Text("Leave session?") },
-            text  = { Text("Your life total and stats will be removed from this game.") },
+            title = { Text(stringResource(R.string.leave_title)) },
+            text  = { Text(stringResource(R.string.leave_text)) },
             confirmButton = {
                 TextButton(
                     onClick = { showLeaveDialog = false; vm.leaveSession() },
                     colors  = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                ) { Text("Leave") }
+                ) { Text(stringResource(R.string.leave_confirm)) }
             },
             dismissButton = {
-                TextButton(onClick = { showLeaveDialog = false }) { Text("Stay") }
+                TextButton(onClick = { showLeaveDialog = false }) { Text(stringResource(R.string.leave_stay)) }
             },
         )
     }
@@ -246,7 +232,7 @@ private fun SessionContent(
             onAdd       = { name, type -> vm.addCustomStat(name, type); showStatPicker = false },
             onAddCustom = { showStatPicker = false; showCustomDialog = true },
             onRemove    = { name -> vm.removeCustomStat(name) },
-            onEnableDayNight = { vm.setGlobal(GLOBAL_DAY_NIGHT, 0u) ; showStatPicker = false },
+            onEnableDayNight = { vm.setGlobal(DAY_NIGHT_GLOBAL, 0u) ; showStatPicker = false },
             onDismiss   = { showStatPicker = false },
         )
     }
@@ -272,10 +258,10 @@ private fun SessionContent(
                 colors = topBarColors,
                 title  = {
                     Column {
-                        Text("Session")
+                        Text(stringResource(R.string.session_title))
                         if (ui.sessionCode.isNotEmpty()) {
                             Text(
-                                text  = "Code: ${ui.sessionCode}",
+                                text  = stringResource(R.string.session_code, ui.sessionCode),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = if (hasBg) Color.White.copy(alpha = 0.7f)
                                         else MaterialTheme.colorScheme.primary,
@@ -285,40 +271,40 @@ private fun SessionContent(
                 },
                 navigationIcon = {
                     IconButton(onClick = { showLeaveDialog = true }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Leave session")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.session_leave))
                     }
                 },
                 actions = {
                     IconButton(onClick = { showFriendsSheet = true }) {
-                        Icon(Icons.Default.People, contentDescription = "Friends")
+                        Icon(Icons.Default.People, contentDescription = stringResource(R.string.friends))
                     }
                     if (ui.sessionCode.isNotEmpty()) {
                         IconButton(onClick = { showInvite = true }) {
-                            Icon(Icons.Default.QrCode2, contentDescription = "Invite players")
+                            Icon(Icons.Default.QrCode2, contentDescription = stringResource(R.string.session_invite))
                         }
                     }
                     IconButton(onClick = { showHistory = true }) {
-                        Icon(Icons.Default.History, contentDescription = "Life history")
+                        Icon(Icons.Default.History, contentDescription = stringResource(R.string.session_life_history))
                     }
                     Box {
                         IconButton(onClick = { showMenu = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "More")
+                            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.session_more))
                         }
                         DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                             DropdownMenuItem(
-                                text        = { Text("Game rules") },
+                                text        = { Text(stringResource(R.string.session_game_rules)) },
                                 leadingIcon = { Icon(Icons.Default.Tune, contentDescription = null) },
                                 onClick     = { showMenu = false; showGameRules = true },
                             )
                             if (ui.isHost) {
                                 DropdownMenuItem(
-                                    text        = { Text("New game") },
+                                    text        = { Text(stringResource(R.string.session_new_game)) },
                                     leadingIcon = { Icon(Icons.Default.RestartAlt, contentDescription = null) },
                                     onClick     = { showMenu = false; showNewGame = true },
                                 )
                             }
                             DropdownMenuItem(
-                                text        = { Text("Settings") },
+                                text        = { Text(stringResource(R.string.settings)) },
                                 leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) },
                                 onClick     = { showMenu = false; vm.openSettings() },
                             )
@@ -332,7 +318,7 @@ private fun SessionContent(
             ExtendedFloatingActionButton(
                 onClick = { showStatPicker = true },
                 icon    = { Icon(Icons.Default.Add, contentDescription = null) },
-                text    = { Text("Stats") },
+                text    = { Text(stringResource(R.string.session_stats)) },
             )
         },
     ) { padding ->
@@ -340,11 +326,11 @@ private fun SessionContent(
         // The icon sits at approximately (left-padding + icon-half, topbar-height + banner-half).
         // Using fixed dp values avoids layout measurement while staying close enough.
         val density = LocalDensity.current
-        val dayNightBrush: Brush? = if (GLOBAL_DAY_NIGHT !in ui.globalStats) null else {
+        val dayNightBrush: Brush? = if (DAY_NIGHT_GLOBAL !in ui.globalStats) null else {
             val iconX = with(density) { (padding.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr) + 24.dp).toPx() }
             val iconY = with(density) { (padding.calculateTopPadding() + 27.dp).toPx() }
             val radius = with(density) { 420.dp.toPx() }
-            val isDaytime = (ui.globalStats[GLOBAL_DAY_NIGHT] ?: 0u) == 0u
+            val isDaytime = (ui.globalStats[DAY_NIGHT_GLOBAL] ?: 0u) == 0u
             val centerColor = if (isDaytime) Color.White.copy(alpha = 0.10f)
                               else           Color.Black.copy(alpha = 0.14f)
             Brush.radialGradient(
@@ -361,13 +347,13 @@ private fun SessionContent(
                 .padding(padding)
                 .padding(horizontal = 12.dp),
         ) {
-            ConnectionBanner(ui.wsState)
+            ConnectionBanner(ui.connectionState)
 
             // Day/Night banner — only shown once the global has been initialised
-            if (GLOBAL_DAY_NIGHT in ui.globalStats) {
+            if (DAY_NIGHT_GLOBAL in ui.globalStats) {
                 DayNightBanner(
-                    isDaytime = (ui.globalStats[GLOBAL_DAY_NIGHT] ?: 0u) == 0u,
-                    onToggle  = { vm.toggleGlobal(GLOBAL_DAY_NIGHT) },
+                    isDaytime = (ui.globalStats[DAY_NIGHT_GLOBAL] ?: 0u) == 0u,
+                    onToggle  = { vm.toggleGlobal(DAY_NIGHT_GLOBAL) },
                 )
             }
 
@@ -386,7 +372,7 @@ private fun SessionContent(
 
             if (ui.users.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Waiting for players to join…")
+                    Text(stringResource(R.string.session_waiting))
                 }
             } else {
                 LazyColumn(
@@ -413,7 +399,7 @@ private fun SessionContent(
 
             ui.error?.let { msg ->
                 Spacer(Modifier.height(8.dp))
-                Text(msg, color = MaterialTheme.colorScheme.error)
+                Text(stringResource(R.string.connection_error, msg), color = MaterialTheme.colorScheme.error)
             }
         }
         if (dayNightBrush != null) {
@@ -430,7 +416,7 @@ private fun SessionContent(
 @Composable
 private fun DayNightBanner(isDaytime: Boolean, onToggle: () -> Unit) {
     val icon  = if (isDaytime) Icons.Default.WbSunny else Icons.Default.Bedtime
-    val label = if (isDaytime) "Day" else "Night"
+    val label = stringResource(if (isDaytime) R.string.day else R.string.night)
     val color = if (isDaytime) MaterialTheme.colorScheme.tertiary
                 else           MaterialTheme.colorScheme.primary
     Surface(
@@ -461,7 +447,7 @@ private fun DayNightBanner(isDaytime: Boolean, onToggle: () -> Unit) {
                 modifier     = Modifier.height(32.dp),
             ) {
                 val nextIcon  = if (isDaytime) Icons.Default.Bedtime else Icons.Default.WbSunny
-                val nextLabel = if (isDaytime) "Night" else "Day"
+                val nextLabel = stringResource(if (isDaytime) R.string.night else R.string.day)
                 Icon(nextIcon, contentDescription = null, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(4.dp))
                 Text(nextLabel, style = MaterialTheme.typography.labelSmall)
@@ -512,11 +498,11 @@ private fun GameTimerRow(
         )
         IconButton(onClick = onToggle, modifier = Modifier.size(36.dp)) {
             val icon = if (running) Icons.Default.Pause else Icons.Default.PlayArrow
-            Icon(icon, contentDescription = if (running) "Pause" else "Start", tint = tint)
+            Icon(icon, contentDescription = stringResource(if (running) R.string.timer_pause else R.string.timer_start), tint = tint)
         }
         if (hasStarted) {
             IconButton(onClick = onReset, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.Default.Replay, contentDescription = "Reset timer",
+                Icon(Icons.Default.Replay, contentDescription = stringResource(R.string.timer_reset),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -536,13 +522,13 @@ private fun Duration.toTimerString(): String {
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun ConnectionBanner(state: WsState) {
+private fun ConnectionBanner(state: ConnectionState) {
     val (text, color) = when (state) {
-        WsState.Connected    -> return
-        WsState.Closed       -> return
-        WsState.Connecting   -> "Connecting…"                   to MaterialTheme.colorScheme.tertiary
-        WsState.Reconnecting -> "Reconnecting…"                 to MaterialTheme.colorScheme.secondary
-        is WsState.Failed    -> "Disconnected: ${state.reason}" to MaterialTheme.colorScheme.error
+        ConnectionState.Connected    -> return
+        ConnectionState.Closed       -> return
+        ConnectionState.Connecting   -> stringResource(R.string.connection_connecting)               to MaterialTheme.colorScheme.tertiary
+        ConnectionState.Reconnecting -> stringResource(R.string.connection_reconnecting)             to MaterialTheme.colorScheme.secondary
+        is ConnectionState.Failed    -> stringResource(R.string.connection_failed, state.reason) to MaterialTheme.colorScheme.error
     }
     Surface(
         color    = color.copy(alpha = 0.15f),
@@ -572,7 +558,7 @@ private fun StatPickerSheet(
     onDismiss        : () -> Unit,
 ) {
     val statDefs        = ui.statDefs
-    val dayNightEnabled = GLOBAL_DAY_NIGHT in ui.globalStats
+    val dayNightEnabled = DAY_NIGHT_GLOBAL in ui.globalStats
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -587,14 +573,14 @@ private fun StatPickerSheet(
             // ── Active per-player stats ───────────────────────────────────
             if (statDefs.isNotEmpty()) {
                 Text(
-                    text  = "ACTIVE STATS",
+                    text  = stringResource(R.string.stats_active).uppercase(),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                 )
                 statDefs.forEach { (name, type) ->
                     ActiveStatRow(
-                        label     = presetLabel(name),
-                        typeLabel = typeLabel(type),
+                        label     = statLabel(name),
+                        typeLabel = statTypeLabel(type),
                         onRemove  = { onRemove(name) },
                     )
                 }
@@ -605,13 +591,13 @@ private fun StatPickerSheet(
 
             // ── Global options ────────────────────────────────────────────
             Text(
-                text  = "GLOBAL",
+                text  = stringResource(R.string.stats_global).uppercase(),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
             )
             PickerRow(
-                label     = "Day / Night",
-                typeLabel = "Session-wide toggle",
+                label     = stringResource(R.string.stats_day_night),
+                typeLabel = stringResource(R.string.stats_day_night_hint),
                 active    = dayNightEnabled,
                 onClick   = { if (!dayNightEnabled) onEnableDayNight() },
             )
@@ -622,15 +608,15 @@ private fun StatPickerSheet(
 
             // ── Add a per-player stat ─────────────────────────────────────
             Text(
-                text  = "ADD STAT",
+                text  = stringResource(R.string.stats_add).uppercase(),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
             )
-            PREDEFINED_STATS.forEach { preset ->
+            PredefinedStat.entries.forEach { preset ->
                 val active = preset.id in statDefs
                 PickerRow(
-                    label     = preset.label,
-                    typeLabel = typeLabel(preset.type),
+                    label     = statLabel(preset.id),
+                    typeLabel = statTypeLabel(preset.type),
                     active    = active,
                     onClick   = { if (!active) onAdd(preset.id, preset.type) },
                 )
@@ -642,7 +628,7 @@ private fun StatPickerSheet(
             ) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("Custom stat…")
+                Text(stringResource(R.string.stats_custom))
             }
         }
     }
@@ -661,7 +647,7 @@ private fun ActiveStatRow(label: String, typeLabel: String, onRemove: () -> Unit
                  color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         IconButton(onClick = onRemove) {
-            Icon(Icons.Default.Close, contentDescription = "Remove $label",
+            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.stats_remove, label),
                  tint = MaterialTheme.colorScheme.error)
         }
     }
@@ -684,25 +670,14 @@ private fun PickerRow(label: String, typeLabel: String, active: Boolean, onClick
                 Text(typeLabel, style = MaterialTheme.typography.labelSmall)
             }
             if (active) {
-                Icon(Icons.Default.Check, contentDescription = "Already added",
+                Icon(Icons.Default.Check, contentDescription = stringResource(R.string.stats_already_added),
                      tint = MaterialTheme.colorScheme.primary)
             } else {
-                Icon(Icons.Default.Add, contentDescription = "Add $label")
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.stats_add_named, label))
             }
         }
     }
 }
-
-private fun presetLabel(id: String): String =
-    PREDEFINED_STATS.find { it.id == id }?.label ?: id
-
-private fun typeLabel(type: StatType): String = when (type) {
-    StatType.NUMERIC    -> "Counter"
-    StatType.TOGGLE     -> "Toggle"
-    StatType.RING_STAGE -> "Stage tracker (1–4)"
-}
-
-// FriendsSheet is defined in ui/components/FriendsSheet.kt and shared with HomeScreen.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Friend request confirmation dialog
@@ -716,13 +691,13 @@ private fun FriendRequestDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDecline,
-        title = { Text("Friend Request") },
-        text  = { Text("${request.fromDisplayName} wants to be your friend.") },
+        title = { Text(stringResource(R.string.friend_request_title)) },
+        text  = { Text(stringResource(R.string.friend_request_text, request.fromDisplayName)) },
         confirmButton = {
-            TextButton(onClick = onAccept) { Text("Accept") }
+            TextButton(onClick = onAccept) { Text(stringResource(R.string.friend_request_accept)) }
         },
         dismissButton = {
-            TextButton(onClick = onDecline) { Text("Decline") }
+            TextButton(onClick = onDecline) { Text(stringResource(R.string.friend_request_decline)) }
         },
     )
 }
@@ -744,20 +719,20 @@ private fun AddCustomStatDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add custom stat") },
+        title = { Text(stringResource(R.string.custom_stat_title)) },
         text  = {
             OutlinedTextField(
                 value         = name,
                 onValueChange = { if (it.length <= MAX_STAT_NAME_LENGTH) name = it },
-                label         = { Text("Stat name") },
-                placeholder   = { Text("e.g. Gold, Lore…") },
+                label         = { Text(stringResource(R.string.custom_stat_name)) },
+                placeholder   = { Text(stringResource(R.string.custom_stat_placeholder)) },
                 singleLine    = true,
                 isError       = showError,
                 supportingText = if (showError) {
                     {
                         Text(
-                            if (isReserved) "\"$trimmed\" is a reserved name"
-                            else "Use letters, digits, spaces, - _ or '"
+                            if (isReserved) stringResource(R.string.custom_stat_reserved, trimmed)
+                            else stringResource(R.string.custom_stat_invalid)
                         )
                     }
                 } else null,
@@ -767,10 +742,10 @@ private fun AddCustomStatDialog(
             TextButton(
                 onClick  = { if (isValid) onConfirm(trimmed) },
                 enabled  = isValid,
-            ) { Text("Add") }
+            ) { Text(stringResource(R.string.action_add)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         },
     )
 }
@@ -801,16 +776,16 @@ private fun LifeHistorySheet(
                 verticalAlignment     = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text("Your life changes", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.history_title), style = MaterialTheme.typography.titleMedium)
                 TextButton(onClick = onUndo, enabled = history.isNotEmpty()) {
                     Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null)
                     Spacer(Modifier.width(4.dp))
-                    Text("Undo last")
+                    Text(stringResource(R.string.history_undo_last))
                 }
             }
             if (history.isEmpty()) {
                 Text(
-                    "No changes yet this game",
+                    stringResource(R.string.history_empty),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -827,7 +802,7 @@ private fun LifeHistorySheet(
                             color = if (change.delta < 0) MaterialTheme.colorScheme.error
                                     else MaterialTheme.colorScheme.primary,
                         )
-                        Text("→ ${change.lifeAfter}", style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(R.string.history_life_after, change.lifeAfter.toInt()), style = MaterialTheme.typography.bodyLarge)
                     }
                 }
             }
@@ -847,37 +822,38 @@ private fun GameRulesDialog(
     onDismiss: () -> Unit,
 ) {
     var draft by remember(settings) { mutableStateOf(settings) }
-    fun players(n: UInt) = if (n == 0u) "Any" else n.toString()
+    val anyPlayers = stringResource(R.string.rules_any_players)
+    fun players(n: UInt) = if (n == 0u) anyPlayers else n.toString()
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Game rules") },
+        title = { Text(stringResource(R.string.session_game_rules)) },
         text  = {
             Column(
                 modifier            = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (editable) {
-                    PresetRow("Starting life", draft.startLife, listOf(20u, 30u, 40u),
+                    PresetRow(stringResource(R.string.rules_starting_life_short), draft.startLife, listOf(20u, 30u, 40u),
                         { draft = draft.copy(startLife = it) })
-                    PresetRow("Commander damage limit", draft.commanderDeathThreshold, listOf(21u, 15u, 10u),
+                    PresetRow(stringResource(R.string.rules_commander_limit), draft.commanderDeathThreshold, listOf(21u, 15u, 10u),
                         { draft = draft.copy(commanderDeathThreshold = it) })
-                    PresetRow("Infect damage limit", draft.infectDeathThreshold, listOf(10u, 7u, 5u),
+                    PresetRow(stringResource(R.string.rules_infect_limit), draft.infectDeathThreshold, listOf(10u, 7u, 5u),
                         { draft = draft.copy(infectDeathThreshold = it) })
-                    PresetRow("Max players", draft.maxPlayers.toUInt(), listOf(0u, 2u, 4u, 6u),
+                    PresetRow(stringResource(R.string.rules_max_players), draft.maxPlayers.toUInt(), listOf(0u, 2u, 4u, 6u),
                         { draft = draft.copy(maxPlayers = it.toInt()) }, valueText = ::players)
                     Text(
-                        "A new starting life applies from the next game.",
+                        stringResource(R.string.rules_next_game_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
-                    Text("Starting life: ${settings.startLife}")
-                    Text("Commander damage limit: ${settings.commanderDeathThreshold}")
-                    Text("Infect damage limit: ${settings.infectDeathThreshold}")
-                    Text("Max players: ${players(settings.maxPlayers.toUInt())}")
+                    Text(stringResource(R.string.rules_summary_starting_life, settings.startLife.toInt()))
+                    Text(stringResource(R.string.rules_summary_commander, settings.commanderDeathThreshold.toInt()))
+                    Text(stringResource(R.string.rules_summary_infect, settings.infectDeathThreshold.toInt()))
+                    Text(stringResource(R.string.rules_summary_players, players(settings.maxPlayers.toUInt())))
                     Text(
-                        "Only the host can change these.",
+                        stringResource(R.string.rules_host_only),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -885,11 +861,11 @@ private fun GameRulesDialog(
             }
         },
         confirmButton = {
-            if (editable) TextButton(onClick = { onSave(draft) }) { Text("Save") }
-            else TextButton(onClick = onDismiss) { Text("Close") }
+            if (editable) TextButton(onClick = { onSave(draft) }) { Text(stringResource(R.string.action_save)) }
+            else TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
         },
         dismissButton = if (editable) {
-            { TextButton(onClick = onDismiss) { Text("Cancel") } }
+            { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } }
         } else null,
     )
 }
