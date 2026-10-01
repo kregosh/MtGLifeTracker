@@ -36,6 +36,37 @@ android {
     kotlinOptions { jvmTarget = "11" }
 }
 
+// ── Debug APK rotation: keep last 3 builds ───────────────────────────────────
+val buildTimestamp = System.currentTimeMillis()
+
+android.applicationVariants.configureEach {
+    if (buildType.name == "debug") {
+        outputs.configureEach {
+            (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl)
+                .outputFileName = "app-debug-$buildTimestamp.apk"
+        }
+    }
+}
+
+tasks.register("trimOldDebugApks") {
+    mustRunAfter("packageDebug")
+    doLast {
+        val dir = layout.buildDirectory.dir("outputs/apk/debug").get().asFile
+        if (!dir.exists()) return@doLast
+        dir.listFiles { f -> f.extension == "apk" }
+            ?.sortedByDescending { it.lastModified() }
+            ?.drop(3)
+            ?.forEach {
+                logger.lifecycle("Removing old debug APK: ${it.name}")
+                it.delete()
+            }
+    }
+}
+
+tasks.matching { it.name == "assembleDebug" }.configureEach {
+    finalizedBy("trimOldDebugApks")
+}
+
 dependencies {
     // ── Modules ──────────────────────────────────────────────────────
     implementation(project(":core"))
