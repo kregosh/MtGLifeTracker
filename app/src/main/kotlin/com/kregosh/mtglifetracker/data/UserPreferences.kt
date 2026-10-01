@@ -132,8 +132,8 @@ class UserPreferences(
 
     private fun parseFriendSet(set: Set<String>?): List<Friend> =
         set.orEmpty().mapNotNull { entry ->
-            val idx = entry.indexOf(SEP)
-            if (idx < 0) null else Friend(entry.substring(0, idx), entry.substring(idx + 1))
+            val parts = entry.split(SEP, limit = 2)
+            if (parts.size < 2) null else Friend(parts[0], parts[1])
         }
 
     companion object {

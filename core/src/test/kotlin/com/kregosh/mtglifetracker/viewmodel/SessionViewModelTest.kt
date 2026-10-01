@@ -542,6 +542,87 @@ class SessionViewModelTest {
         assertEquals(kotlin.time.Duration.ZERO, vm.timerElapsed.value)
     }
 
+    @Test
+    fun `countdown timer stops at exactly the limit without overshoot`() = runTest {
+        every { prefs.timerCountDown }     returns true
+        every { prefs.timerLimitMinutes }  returns 1u   // 1-minute limit
+
+        val vm = makeVm()
+        vm.startPauseTimer()
+        advanceTimeBy(90_000)   // advance well past the 1-minute limit
+        advanceUntilIdle()
+
+        assertEquals(1.minutes, vm.timerElapsed.value)
+    }
+
+    @Test
+    fun `countdown timer is not running after hitting the limit`() = runTest {
+        every { prefs.timerCountDown }     returns true
+        every { prefs.timerLimitMinutes }  returns 1u
+
+        val vm = makeVm()
+        vm.startPauseTimer()
+        advanceTimeBy(90_000)
+        advanceUntilIdle()
+
+        assertFalse(vm.timerRunning.value)
+    }
+
+    @Test
+    fun `elapsed is preserved correctly across multiple pause-resume cycles`() = runTest {
+        val vm = makeVm()
+
+        vm.startPauseTimer()
+        advanceTimeBy(3_000)
+        vm.startPauseTimer()   // pause — ~3 s accumulated
+        val after1 = vm.timerElapsed.value
+
+        advanceTimeBy(2_000)   // time passes while paused — should not add
+        assertEquals(after1, vm.timerElapsed.value)
+
+        vm.startPauseTimer()   // resume
+        advanceTimeBy(2_000)
+        vm.startPauseTimer()   // pause — ~5 s accumulated
+
+        assertTrue(vm.timerElapsed.value.inWholeSeconds >= 4)
+        assertFalse(vm.timerRunning.value)
+    }
+
+    @Test
+    fun `countdown timer does not advance after hitting limit`() = runTest {
+        every { prefs.timerCountDown }     returns true
+        every { prefs.timerLimitMinutes }  returns 1u
+
+        val vm = makeVm()
+        vm.startPauseTimer()
+        advanceTimeBy(90_000)
+        advanceUntilIdle()
+
+        val snapshot = vm.timerElapsed.value
+        advanceTimeBy(5_000)
+        assertEquals(snapshot, vm.timerElapsed.value)   // frozen at limit
+    }
+
+    @Test
+    fun `rapid start-pause toggles preserve accumulated time correctly`() = runTest {
+        val vm = makeVm()
+
+        vm.startPauseTimer()
+        advanceTimeBy(1_000)
+        vm.startPauseTimer()   // pause
+
+        vm.startPauseTimer()   // resume
+        advanceTimeBy(1_000)
+        vm.startPauseTimer()   // pause
+
+        vm.startPauseTimer()   // resume
+        advanceTimeBy(1_000)
+        vm.startPauseTimer()   // pause
+
+        assertTrue(vm.timerElapsed.value.inWholeSeconds >= 2)
+        assertFalse(vm.timerRunning.value)
+    }
+
     // ── display name live propagation ────────────────────────────────────────
 
     @Test
