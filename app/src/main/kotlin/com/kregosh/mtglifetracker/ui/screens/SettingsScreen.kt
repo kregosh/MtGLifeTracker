@@ -386,6 +386,12 @@ fun SettingsScreen(vm: SessionViewModel) {
 
             // ── Game rules ────────────────────────────────────────────────────
             SettingsSection(title = "Game Rules") {
+                Text(
+                    "Used for sessions you create. Players who join follow the host's rules.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
                 val startLife          by vm.startLife.collectAsState()
                 val commanderThreshold by vm.commanderThreshold.collectAsState()
                 val infectThreshold    by vm.infectThreshold.collectAsState()
@@ -508,11 +514,12 @@ private fun SettingsSection(title: String, content: @Composable ColumnScope.() -
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PresetRow(
-    label   : String,
-    current : UInt,
-    presets : List<UInt>,
-    onSelect: (UInt) -> Unit,
+internal fun PresetRow(
+    label    : String,
+    current  : UInt,
+    presets  : List<UInt>,
+    onSelect : (UInt) -> Unit,
+    valueText: (UInt) -> String = { it.toString() },
 ) {
     Text(label, style = MaterialTheme.typography.labelMedium)
     Spacer(Modifier.height(4.dp))
@@ -522,7 +529,7 @@ private fun PresetRow(
                 selected = current == value,
                 onClick  = { onSelect(value) },
                 shape    = SegmentedButtonDefaults.itemShape(index = idx, count = presets.size),
-            ) { Text(value.toString()) }
+            ) { Text(valueText(value)) }
         }
     }
 }

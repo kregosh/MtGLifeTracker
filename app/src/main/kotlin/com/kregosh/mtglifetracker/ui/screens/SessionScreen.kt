@@ -11,6 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,7 +29,10 @@ import kotlin.time.Duration.Companion.minutes
 import com.kregosh.mtglifetracker.data.Friend
 import com.kregosh.mtglifetracker.data.KnownPlayer
 import com.kregosh.mtglifetracker.network.WsState
+import com.kregosh.mtglifetracker.shared.SessionSettings
 import com.kregosh.mtglifetracker.shared.StatType
+import com.kregosh.mtglifetracker.shared.UserState
+import com.kregosh.mtglifetracker.viewmodel.LifeChange
 import com.kregosh.mtglifetracker.ui.components.FriendsSheet
 import com.kregosh.mtglifetracker.ui.components.PlayerCard
 import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
@@ -122,6 +126,77 @@ private fun SessionContent(
 
     var showStatPicker   by remember { mutableStateOf(false) }
     var showLeaveDialog  by remember { mutableStateOf(false) }
+    var showHistory      by remember { mutableStateOf(false) }
+    var showGameRules    by remember { mutableStateOf(false) }
+    var showNewGame      by remember { mutableStateOf(false) }
+    var showMenu         by remember { mutableStateOf(false) }
+    var removeTarget     by remember { mutableStateOf<UserState?>(null) }
+
+    val lifeHistory  by vm.lifeHistory.collectAsState()
+    val snackbarHost = remember { SnackbarHostState() }
+    var announcedUpTo by remember { mutableLongStateOf(-1L) }
+    val latestChange = lifeHistory.firstOrNull()
+
+    // Offer undo once per new change; undoing exposes older entries, which were already offered.
+    LaunchedEffect(latestChange?.id) {
+        val change = latestChange ?: return@LaunchedEffect
+        if (change.id <= announcedUpTo) return@LaunchedEffect
+        announcedUpTo = change.id
+        val result = snackbarHost.showSnackbar(
+            message     = "Life ${change.delta.signed()} → ${change.lifeAfter}",
+            actionLabel = "Undo",
+            duration    = SnackbarDuration.Short,
+        )
+        if (result == SnackbarResult.ActionPerformed) vm.undoLastLifeChange()
+    }
+
+    if (showHistory) {
+        LifeHistorySheet(
+            history   = lifeHistory,
+            onUndo    = vm::undoLastLifeChange,
+            onDismiss = { showHistory = false },
+        )
+    }
+
+    if (showGameRules) {
+        GameRulesDialog(
+            settings  = ui.settings,
+            editable  = ui.isHost,
+            onSave    = { vm.updateSessionSettings(it); showGameRules = false },
+            onDismiss = { showGameRules = false },
+        )
+    }
+
+    if (showNewGame) {
+        AlertDialog(
+            onDismissRequest = { showNewGame = false },
+            title = { Text("Start a new game?") },
+            text  = { Text("Everyone goes back to ${ui.settings.startLife} life and all stats are cleared. Players stay in the session.") },
+            confirmButton = {
+                TextButton(onClick = { showNewGame = false; vm.startNewGame() }) { Text("New game") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNewGame = false }) { Text("Cancel") }
+            },
+        )
+    }
+
+    removeTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { removeTarget = null },
+            title = { Text("Remove ${target.displayName}?") },
+            text  = { Text("Their card and stats are removed from this session.") },
+            confirmButton = {
+                TextButton(
+                    onClick = { removeTarget = null; vm.removePlayer(target.id) },
+                    colors  = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) { Text("Remove") }
+            },
+            dismissButton = {
+                TextButton(onClick = { removeTarget = null }) { Text("Cancel") }
+            },
+        )
+    }
 
     BackHandler { showLeaveDialog = true }
 
@@ -224,12 +299,37 @@ private fun SessionContent(
                             Icon(Icons.Default.Share, contentDescription = "Share invite")
                         }
                     }
-                    IconButton(onClick = vm::openSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                    IconButton(onClick = { showHistory = true }) {
+                        Icon(Icons.Default.History, contentDescription = "Life history")
+                    }
+                    Box {
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "More")
+                        }
+                        DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                            DropdownMenuItem(
+                                text        = { Text("Game rules") },
+                                leadingIcon = { Icon(Icons.Default.Tune, contentDescription = null) },
+                                onClick     = { showMenu = false; showGameRules = true },
+                            )
+                            if (ui.isHost) {
+                                DropdownMenuItem(
+                                    text        = { Text("New game") },
+                                    leadingIcon = { Icon(Icons.Default.RestartAlt, contentDescription = null) },
+                                    onClick     = { showMenu = false; showNewGame = true },
+                                )
+                            }
+                            DropdownMenuItem(
+                                text        = { Text("Settings") },
+                                leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                                onClick     = { showMenu = false; vm.openSettings() },
+                            )
+                        }
                     }
                 },
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHost) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { showStatPicker = true },
@@ -306,6 +406,7 @@ private fun SessionContent(
                             onUnconcede = if (isMe) vm::unconcede else null,
                             isFriend    = user.id in friendIds,
                             onAddFriend = if (!isMe) { { vm.sendFriendRequest(user.id) } } else null,
+                            onRemove    = if (ui.isHost && !isMe) { { removeTarget = user } } else null,
                             playerIndex = index,
                         )
                     }
@@ -673,5 +774,124 @@ private fun AddCustomStatDialog(
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
         },
+    )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Life history
+// ─────────────────────────────────────────────────────────────────────────────
+
+private fun Int.signed(): String = if (this > 0) "+$this" else "−${-this}"
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LifeHistorySheet(
+    history  : List<LifeChange>,
+    onUndo   : () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                modifier              = Modifier.fillMaxWidth(),
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text("Your life changes", style = MaterialTheme.typography.titleMedium)
+                TextButton(onClick = onUndo, enabled = history.isNotEmpty()) {
+                    Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null)
+                    Spacer(Modifier.width(4.dp))
+                    Text("Undo last")
+                }
+            }
+            if (history.isEmpty()) {
+                Text(
+                    "No changes yet this game",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                items(history, key = { it.id }) { change ->
+                    Row(
+                        modifier              = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            change.delta.signed(),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = if (change.delta < 0) MaterialTheme.colorScheme.error
+                                    else MaterialTheme.colorScheme.primary,
+                        )
+                        Text("→ ${change.lifeAfter}", style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared game rules (host edits, everyone else can look)
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun GameRulesDialog(
+    settings : SessionSettings,
+    editable : Boolean,
+    onSave   : (SessionSettings) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var draft by remember(settings) { mutableStateOf(settings) }
+    fun players(n: UInt) = if (n == 0u) "Any" else n.toString()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Game rules") },
+        text  = {
+            Column(
+                modifier            = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (editable) {
+                    PresetRow("Starting life", draft.startLife, listOf(20u, 30u, 40u),
+                        { draft = draft.copy(startLife = it) })
+                    PresetRow("Commander damage limit", draft.commanderDeathThreshold, listOf(21u, 15u, 10u),
+                        { draft = draft.copy(commanderDeathThreshold = it) })
+                    PresetRow("Infect damage limit", draft.infectDeathThreshold, listOf(10u, 7u, 5u),
+                        { draft = draft.copy(infectDeathThreshold = it) })
+                    PresetRow("Max players", draft.maxPlayers.toUInt(), listOf(0u, 2u, 4u, 6u),
+                        { draft = draft.copy(maxPlayers = it.toInt()) }, valueText = ::players)
+                    Text(
+                        "A new starting life applies from the next game.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    Text("Starting life: ${settings.startLife}")
+                    Text("Commander damage limit: ${settings.commanderDeathThreshold}")
+                    Text("Infect damage limit: ${settings.infectDeathThreshold}")
+                    Text("Max players: ${players(settings.maxPlayers.toUInt())}")
+                    Text(
+                        "Only the host can change these.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            if (editable) TextButton(onClick = { onSave(draft) }) { Text("Save") }
+            else TextButton(onClick = onDismiss) { Text("Close") }
+        },
+        dismissButton = if (editable) {
+            { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        } else null,
     )
 }

@@ -1,5 +1,6 @@
 package com.kregosh.mtglifetracker.viewmodel
 
+import com.kregosh.mtglifetracker.shared.SessionSettings
 import com.kregosh.mtglifetracker.shared.UserState
 import kotlin.test.Test
 import kotlin.test.assertFalse
@@ -8,8 +9,7 @@ import kotlin.test.assertTrue
 class IsDeadTest {
 
     private val defaultUi = SessionUiState(
-        commanderDeathThreshold = 21u,
-        infectDeathThreshold    = 10u,
+        settings = SessionSettings(commanderDeathThreshold = 21u, infectDeathThreshold = 10u),
     )
 
     private fun user(
@@ -20,10 +20,8 @@ class IsDeadTest {
         id          = "u1",
         displayName = "Alice",
         life        = life,
-        customStats = buildMap {
-            if (commanderDamage > 0u) put("commander", commanderDamage)
-            if (poisonDamage    > 0u) put("poison",    poisonDamage)
-        },
+        customStats     = if (poisonDamage > 0u) mapOf("poison" to poisonDamage) else emptyMap(),
+        commanderDamage = if (commanderDamage > 0u) mapOf("opponent" to commanderDamage) else emptyMap(),
     )
 
     @Test
@@ -63,16 +61,23 @@ class IsDeadTest {
 
     @Test
     fun `custom commander threshold of 15 applies correctly`() {
-        val ui = defaultUi.copy(commanderDeathThreshold = 15u)
+        val ui = defaultUi.copy(settings = defaultUi.settings.copy(commanderDeathThreshold = 15u))
         assertFalse(user(commanderDamage = 14u).isDead(ui))
         assertTrue(user(commanderDamage = 15u).isDead(ui))
     }
 
     @Test
     fun `custom poison threshold of 5 applies correctly`() {
-        val ui = defaultUi.copy(infectDeathThreshold = 5u)
+        val ui = defaultUi.copy(settings = defaultUi.settings.copy(infectDeathThreshold = 5u))
         assertFalse(user(poisonDamage = 4u).isDead(ui))
         assertTrue(user(poisonDamage = 5u).isDead(ui))
+    }
+
+    @Test
+    fun `commander damage counts per commander, not in total`() {
+        val user = user().copy(commanderDamage = mapOf("bob" to 15u, "carol" to 15u))
+        assertFalse(user.isDead(defaultUi))
+        assertTrue(user.copy(commanderDamage = mapOf("bob" to 21u, "carol" to 0u)).isDead(defaultUi))
     }
 
     @Test
