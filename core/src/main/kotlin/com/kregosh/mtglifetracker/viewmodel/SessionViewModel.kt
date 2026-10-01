@@ -32,6 +32,12 @@ sealed interface Screen {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Friend-request pending entry (local to ViewModel, not shared over network)
+// ─────────────────────────────────────────────────────────────────────────────
+
+data class FriendRequestInfo(val fromUserId: String, val fromDisplayName: String)
+
+// ─────────────────────────────────────────────────────────────────────────────
 // UI state for a live session
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -198,6 +204,9 @@ class SessionViewModel(
     private val _friendList = MutableStateFlow(prefs.friendList)
     val friendList: StateFlow<List<Friend>> = _friendList.asStateFlow()
 
+    private val _pendingFriendRequests = MutableStateFlow<List<FriendRequestInfo>>(emptyList())
+    val pendingFriendRequests: StateFlow<List<FriendRequestInfo>> = _pendingFriendRequests.asStateFlow()
+
     fun forgetPlayer(userId: String) {
         prefs.forgetKnownPlayer(userId)
         _knownPlayers.value = prefs.knownPlayers
@@ -211,6 +220,20 @@ class SessionViewModel(
     fun removeFriend(userId: String) {
         prefs.removeFriend(userId)
         _friendList.value = prefs.friendList
+    }
+
+    fun sendFriendRequest(toUserId: String) = webSocket?.sendFriendRequest(toUserId)
+
+    fun acceptFriendRequest(fromUserId: String, fromDisplayName: String) {
+        prefs.addFriend(fromUserId, fromDisplayName)
+        _friendList.value = prefs.friendList
+        _pendingFriendRequests.update { it.filterNot { req -> req.fromUserId == fromUserId } }
+        webSocket?.acceptFriendRequest(fromUserId)
+    }
+
+    fun declineFriendRequest(fromUserId: String) {
+        _pendingFriendRequests.update { it.filterNot { req -> req.fromUserId == fromUserId } }
+        webSocket?.declineFriendRequest(fromUserId)
     }
 
     fun setStartLife(v: UInt)          { prefs.startLife = v;                _startLife.value = v }
@@ -389,6 +412,17 @@ class SessionViewModel(
                             it.copy(sessionCode = msg.sessionCode)
                         }
                         is ServerMessage.Error  -> _sessionUi.update { it.copy(error = msg.message) }
+                        is ServerMessage.FriendRequest -> {
+                            _pendingFriendRequests.update {
+                                if (it.any { r -> r.fromUserId == msg.fromUserId }) it
+                                else it + FriendRequestInfo(msg.fromUserId, msg.fromDisplayName)
+                            }
+                        }
+                        is ServerMessage.FriendAccepted -> {
+                            prefs.addFriend(msg.fromUserId, msg.fromDisplayName)
+                            _friendList.value = prefs.friendList
+                            webSocket?.acknowledgeAccepted(msg.fromUserId)
+                        }
                     }
                 }
             }
@@ -406,6 +440,7 @@ class SessionViewModel(
         debounceJobs.clear()
         pendingDeltas.clear()
         serverUsers = emptyList()
+        _pendingFriendRequests.value = emptyList()
         wsCollectorJob?.cancel()
         wsCollectorJob = null
         webSocket?.close()

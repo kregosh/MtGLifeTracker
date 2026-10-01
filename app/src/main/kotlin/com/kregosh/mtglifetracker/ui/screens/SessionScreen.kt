@@ -26,6 +26,7 @@ import com.kregosh.mtglifetracker.network.WsState
 import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.ui.components.PlayerCard
 import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
+import com.kregosh.mtglifetracker.viewmodel.FriendRequestInfo
 import com.kregosh.mtglifetracker.viewmodel.SessionUiState
 import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
 
@@ -58,16 +59,28 @@ private const val GLOBAL_DAY_NIGHT = "daynight"
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SessionScreen(vm: SessionViewModel) {
-    val ui                by vm.sessionUi.collectAsState()
-    val timerElapsed      by vm.timerElapsed.collectAsState()
-    val timerRunning      by vm.timerRunning.collectAsState()
-    val timerVisible      by vm.timerVisible.collectAsState()
-    val timerCountDown    by vm.timerCountDown.collectAsState()
-    val timerLimitMinutes by vm.timerLimitMinutes.collectAsState()
+    val ui                    by vm.sessionUi.collectAsState()
+    val timerElapsed          by vm.timerElapsed.collectAsState()
+    val timerRunning          by vm.timerRunning.collectAsState()
+    val timerVisible          by vm.timerVisible.collectAsState()
+    val timerCountDown        by vm.timerCountDown.collectAsState()
+    val timerLimitMinutes     by vm.timerLimitMinutes.collectAsState()
+    val pendingFriendRequests by vm.pendingFriendRequests.collectAsState()
+    val friendList            by vm.friendList.collectAsState()
     val context = LocalContext.current
     val hasBg   = LocalHasBackground.current
 
-    SessionContent(vm, ui, timerElapsed, timerRunning, timerVisible, timerCountDown, timerLimitMinutes, context, hasBg)
+    val friendIds = remember(friendList) { friendList.map { it.userId }.toSet() }
+
+    pendingFriendRequests.firstOrNull()?.let { req ->
+        FriendRequestDialog(
+            request   = req,
+            onAccept  = { vm.acceptFriendRequest(req.fromUserId, req.fromDisplayName) },
+            onDecline = { vm.declineFriendRequest(req.fromUserId) },
+        )
+    }
+
+    SessionContent(vm, ui, friendIds, timerElapsed, timerRunning, timerVisible, timerCountDown, timerLimitMinutes, context, hasBg)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -75,6 +88,7 @@ fun SessionScreen(vm: SessionViewModel) {
 private fun SessionContent(
     vm                : SessionViewModel,
     ui                : SessionUiState,
+    friendIds         : Set<String>,
     timerElapsed      : Duration,
     timerRunning      : Boolean,
     timerVisible      : Boolean,
@@ -232,6 +246,8 @@ private fun SessionContent(
                             onAdjust    = { stat, delta -> if (isMe) vm.adjust(stat, delta) },
                             onConcede   = if (isMe) vm::concede   else null,
                             onUnconcede = if (isMe) vm::unconcede else null,
+                            isFriend    = user.id in friendIds,
+                            onAddFriend = if (!isMe) { { vm.sendFriendRequest(user.id) } } else null,
                         )
                     }
                 }
@@ -526,6 +542,29 @@ private fun typeLabel(type: StatType): String = when (type) {
     StatType.NUMERIC    -> "Counter"
     StatType.TOGGLE     -> "Toggle"
     StatType.RING_STAGE -> "Stage tracker (1–4)"
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Friend request confirmation dialog
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun FriendRequestDialog(
+    request  : FriendRequestInfo,
+    onAccept : () -> Unit,
+    onDecline: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDecline,
+        title = { Text("Friend Request") },
+        text  = { Text("${request.fromDisplayName} wants to be your friend.") },
+        confirmButton = {
+            TextButton(onClick = onAccept) { Text("Accept") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDecline) { Text("Decline") }
+        },
+    )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

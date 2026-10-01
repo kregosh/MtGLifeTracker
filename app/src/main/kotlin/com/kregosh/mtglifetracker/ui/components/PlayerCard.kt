@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,13 +29,15 @@ import com.kregosh.mtglifetracker.viewmodel.isDead
 
 @Composable
 fun PlayerCard(
-    user       : UserState,
-    isMe       : Boolean,
-    sessionUi  : SessionUiState,
-    onAdjust   : (stat: String, delta: Int) -> Unit = { _, _ -> },
-    onConcede  : (() -> Unit)?  = null,
-    onUnconcede: (() -> Unit)?  = null,
-    modifier   : Modifier = Modifier,
+    user        : UserState,
+    isMe        : Boolean,
+    sessionUi   : SessionUiState,
+    onAdjust    : (stat: String, delta: Int) -> Unit = { _, _ -> },
+    onConcede   : (() -> Unit)?  = null,
+    onUnconcede : (() -> Unit)?  = null,
+    isFriend    : Boolean        = false,
+    onAddFriend : (() -> Unit)?  = null,
+    modifier    : Modifier = Modifier,
 ) {
     val dead      = user.isDead(sessionUi)
     val conceded  = user.conceded
@@ -83,7 +86,19 @@ fun PlayerCard(
                             fontWeight = if (isMe) FontWeight.Bold else FontWeight.Normal,
                             modifier   = Modifier.weight(1f),
                         )
-                        if (isMe && conceded) {
+                        if (!isMe && !isFriend && onAddFriend != null) {
+                            IconButton(
+                                onClick  = onAddFriend,
+                                modifier = Modifier.size(28.dp),
+                            ) {
+                                Icon(
+                                    imageVector        = Icons.Default.PersonAdd,
+                                    contentDescription = "Send friend request",
+                                    modifier           = Modifier.size(18.dp),
+                                    tint               = LocalContentColor.current.copy(alpha = 0.7f),
+                                )
+                            }
+                        } else if (isMe && conceded) {
                             TextButton(
                                 onClick      = { onUnconcede?.invoke() },
                                 modifier     = Modifier.height(28.dp),
