@@ -152,10 +152,10 @@ fun SettingsScreen(vm: SessionViewModel) {
                 val pkg = context.packageName
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = {
-                        vm.setBackgroundImage("android.resource://$pkg/${R.drawable.bg_arcane_storm}")
+                        vm.setBackgroundImage("android.resource://$pkg/drawable/bg_arcane_storm")
                     }) { Text("⚡ Storm") }
                     OutlinedButton(onClick = {
-                        vm.setBackgroundImage("android.resource://$pkg/${R.drawable.bg_mana_orbs}")
+                        vm.setBackgroundImage("android.resource://$pkg/drawable/bg_mana_orbs")
                     }) { Text("🔮 Mana Orbs") }
                 }
 

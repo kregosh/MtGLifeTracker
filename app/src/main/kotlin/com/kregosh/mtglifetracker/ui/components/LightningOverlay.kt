@@ -112,8 +112,7 @@ fun LightningOverlay(modifier: Modifier = Modifier) {
 
     LaunchedEffect(Unit) {
         while (true) {
-            // wait a random 300 ms – 5 s between strikes
-            delay(Random.nextLong(300L, 5_000L))
+            delay(Random.nextLong(500L, 45_001L))
             if (canvasW == 0f || canvasH == 0f) continue
             bolt = makeBolt(canvasW, canvasH, Random)
             // flash in fast, fade out slower — run inline so bolt stays alive for the full flash
