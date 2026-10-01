@@ -52,6 +52,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        migrateLegacyPresetUri()
 
         intent?.data?.let { uri ->
             if (uri.scheme == "mtgtracker" && uri.host == "join") {
@@ -138,6 +139,18 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    // Presets used to be saved by numeric resource ID, which never matched the
+    // name-based storm check and isn't stable across builds.
+    private fun migrateLegacyPresetUri() {
+        val uri = vm.backgroundImageUri.value ?: return
+        val prefix = "android.resource://$packageName/"
+        val byId = mapOf(
+            "$prefix${R.drawable.bg_arcane_storm}" to "${prefix}drawable/bg_arcane_storm",
+            "$prefix${R.drawable.bg_mana_orbs}"    to "${prefix}drawable/bg_mana_orbs",
+        )
+        byId[uri]?.let(vm::setBackgroundImage)
     }
 
     override fun onNewIntent(intent: android.content.Intent) {
