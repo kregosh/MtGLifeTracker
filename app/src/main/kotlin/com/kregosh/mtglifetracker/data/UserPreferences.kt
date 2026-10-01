@@ -6,7 +6,10 @@ import java.util.UUID
 private const val SEP = "\u001F"
 private const val MAX_KNOWN = 10
 
-class UserPreferences(context: Context) : UserPrefs {
+class UserPreferences(
+    context: Context,
+    private val clock: () -> Long = System::currentTimeMillis,
+) : UserPrefs {
 
     private val prefs = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
 
@@ -72,9 +75,10 @@ class UserPreferences(context: Context) : UserPrefs {
 
     override val knownPlayers: List<KnownPlayer>
         get() = parseKnownSet(prefs.getStringSet(KEY_KNOWN_PLAYERS, emptySet()))
+            .sortedByDescending { it.lastSeen }
 
     override fun touchKnownPlayer(userId: String, displayName: String) {
-        val now     = System.currentTimeMillis()
+        val now     = clock()
         val current = parseKnownSet(prefs.getStringSet(KEY_KNOWN_PLAYERS, emptySet()))
             .filter { it.userId != userId }         // remove stale entry for this user
         val updated = (current + KnownPlayer(userId, displayName, now))
@@ -113,9 +117,14 @@ class UserPreferences(context: Context) : UserPrefs {
 
     private fun parseKnownSet(set: Set<String>?): List<KnownPlayer> =
         set.orEmpty().mapNotNull { entry ->
-            val parts = entry.split(SEP)
-            if (parts.size < 3) null
-            else KnownPlayer(parts[0], parts[1], parts[2].toLongOrNull() ?: 0L)
+            val first = entry.indexOf(SEP)
+            val last  = entry.lastIndexOf(SEP)
+            if (first < 0 || last == first) null
+            else KnownPlayer(
+                entry.substring(0, first),
+                entry.substring(first + 1, last),
+                entry.substring(last + 1).toLongOrNull() ?: 0L
+            )
         }
 
     private fun List<KnownPlayer>.toEncodedSet(): Set<String> =

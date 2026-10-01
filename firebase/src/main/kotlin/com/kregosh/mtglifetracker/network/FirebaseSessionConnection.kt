@@ -170,6 +170,10 @@ class FirebaseSessionConnection(
         myUserRef.child("conceded").setValue(conceded)
     }
 
+    override fun setDisplayName(name: String) {
+        myUserRef.child("displayName").setValue(name)
+    }
+
     // ── Friend requests ───────────────────────────────────────────────────
 
     override fun sendFriendRequest(toUserId: String) {

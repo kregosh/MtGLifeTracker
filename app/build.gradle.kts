@@ -28,6 +28,12 @@ android {
         compose = true
     }
 
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -57,4 +63,9 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.compose.icons.extended)
     debugImplementation(libs.compose.ui.tooling)
+
+    // ── Test ─────────────────────────────────────────────────────────────
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(kotlin("test"))
 }

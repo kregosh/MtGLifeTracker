@@ -1,5 +1,7 @@
 package com.kregosh.mtglifetracker.viewmodel
 
+import com.kregosh.mtglifetracker.data.Friend
+import com.kregosh.mtglifetracker.data.KnownPlayer
 import com.kregosh.mtglifetracker.data.UserPrefs
 import com.kregosh.mtglifetracker.network.SessionApi
 import com.kregosh.mtglifetracker.network.SessionConnection
@@ -50,6 +52,8 @@ class SessionViewModelTest {
         every { prefs.timerVisible }            returns true
         every { prefs.timerCountDown }          returns false
         every { prefs.timerLimitMinutes }       returns 60u
+        every { prefs.knownPlayers }            returns emptyList()
+        every { prefs.friendList }              returns emptyList()
         every { wsFactory(any(), any(), any(), any()) } returns ws
     }
 
@@ -536,5 +540,280 @@ class SessionViewModelTest {
         assertEquals(45u, vm.timerLimitMinutes.value)
         assertFalse(vm.timerRunning.value)
         assertEquals(kotlin.time.Duration.ZERO, vm.timerElapsed.value)
+    }
+
+    // ── display name live propagation ────────────────────────────────────────
+
+    @Test
+    fun `setDisplayName propagates to live websocket when session is active`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        vm.setDisplayName("Bob")
+        verify { ws.setDisplayName("Bob") }
+    }
+
+    @Test
+    fun `setDisplayName does not call websocket when no session is active`() {
+        val vm = makeVm()
+        vm.setDisplayName("Bob")
+        verify(exactly = 0) { ws.setDisplayName(any()) }
+    }
+
+    @Test
+    fun `setDisplayName trims before propagating to websocket`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        vm.setDisplayName("  Carol  ")
+        verify { ws.setDisplayName("Carol") }
+        verify { prefs.displayName = "Carol" }
+    }
+
+    // ── concede / unconcede ──────────────────────────────────────────────────
+
+    @Test
+    fun `concede delegates setConceded(true) to websocket`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        vm.concede()
+        verify { ws.setConceded(true) }
+    }
+
+    @Test
+    fun `unconcede delegates setConceded(false) to websocket`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        vm.unconcede()
+        verify { ws.setConceded(false) }
+    }
+
+    @Test
+    fun `concede updates local user state optimistically`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        val users = listOf(UserState("test-user-id", "Test Player", life = 20u, conceded = false))
+        wsMessages.emit(ServerMessage.State(users))
+        advanceUntilIdle()
+
+        vm.concede()
+        assertTrue(vm.sessionUi.value.users.first { it.id == "test-user-id" }.conceded)
+    }
+
+    @Test
+    fun `unconcede updates local user state optimistically`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        val users = listOf(UserState("test-user-id", "Test Player", life = 20u, conceded = true))
+        wsMessages.emit(ServerMessage.State(users))
+        advanceUntilIdle()
+
+        vm.unconcede()
+        assertFalse(vm.sessionUi.value.users.first { it.id == "test-user-id" }.conceded)
+    }
+
+    // ── friend requests ──────────────────────────────────────────────────────
+
+    @Test
+    fun `sendFriendRequest delegates to websocket`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        vm.sendFriendRequest("other-user-id")
+        verify { ws.sendFriendRequest("other-user-id") }
+    }
+
+    @Test
+    fun `FriendRequest message adds entry to pendingFriendRequests`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        wsMessages.emit(ServerMessage.FriendRequest("user-2", "Alice"))
+        advanceUntilIdle()
+
+        val pending = vm.pendingFriendRequests.value
+        assertEquals(1, pending.size)
+        assertEquals("user-2", pending.first().fromUserId)
+        assertEquals("Alice", pending.first().fromDisplayName)
+    }
+
+    @Test
+    fun `duplicate FriendRequest message is not added twice`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        wsMessages.emit(ServerMessage.FriendRequest("user-2", "Alice"))
+        wsMessages.emit(ServerMessage.FriendRequest("user-2", "Alice"))
+        advanceUntilIdle()
+
+        assertEquals(1, vm.pendingFriendRequests.value.size)
+    }
+
+    @Test
+    fun `acceptFriendRequest adds friend, removes pending entry, and delegates to websocket`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        every { prefs.friendList } returns listOf(Friend("user-2", "Alice"))
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        wsMessages.emit(ServerMessage.FriendRequest("user-2", "Alice"))
+        advanceUntilIdle()
+
+        vm.acceptFriendRequest("user-2", "Alice")
+
+        verify { prefs.addFriend("user-2", "Alice") }
+        verify { ws.acceptFriendRequest("user-2") }
+        assertTrue(vm.pendingFriendRequests.value.none { it.fromUserId == "user-2" })
+    }
+
+    @Test
+    fun `declineFriendRequest removes pending entry and delegates to websocket`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        wsMessages.emit(ServerMessage.FriendRequest("user-2", "Alice"))
+        advanceUntilIdle()
+
+        vm.declineFriendRequest("user-2")
+
+        verify { ws.declineFriendRequest("user-2") }
+        assertTrue(vm.pendingFriendRequests.value.none { it.fromUserId == "user-2" })
+    }
+
+    @Test
+    fun `FriendAccepted message persists friend and acknowledges`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        every { prefs.friendList } returns listOf(Friend("user-3", "Bob"))
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        wsMessages.emit(ServerMessage.FriendAccepted("user-3", "Bob"))
+        advanceUntilIdle()
+
+        verify { prefs.addFriend("user-3", "Bob") }
+        verify { ws.acknowledgeAccepted("user-3") }
+        assertTrue(vm.friendList.value.any { it.userId == "user-3" })
+    }
+
+    @Test
+    fun `pendingFriendRequests cleared on leaveSession`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        wsMessages.emit(ServerMessage.FriendRequest("user-2", "Alice"))
+        advanceUntilIdle()
+        assertEquals(1, vm.pendingFriendRequests.value.size)
+
+        vm.leaveSession()
+        assertEquals(0, vm.pendingFriendRequests.value.size)
+    }
+
+    // ── known players ────────────────────────────────────────────────────────
+
+    @Test
+    fun `State message with other players triggers touchKnownPlayer`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        every { prefs.knownPlayers } returns listOf(KnownPlayer("other-id", "Alice", 0L))
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        val users = listOf(
+            UserState("test-user-id", "Test Player", life = 20u),
+            UserState("other-id", "Alice", life = 20u),
+        )
+        wsMessages.emit(ServerMessage.State(users))
+        advanceUntilIdle()
+
+        verify { prefs.touchKnownPlayer("other-id", "Alice") }
+        assertTrue(vm.knownPlayers.value.any { it.userId == "other-id" })
+    }
+
+    @Test
+    fun `State message does not call touchKnownPlayer for own user`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        wsMessages.emit(ServerMessage.State(listOf(UserState("test-user-id", "Test Player", life = 20u))))
+        advanceUntilIdle()
+
+        verify(exactly = 0) { prefs.touchKnownPlayer("test-user-id", any()) }
+    }
+
+    @Test
+    fun `State message updates friend display name when friend is in session`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        every { prefs.friendList } returns listOf(Friend("friend-id", "OldName"))
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        val users = listOf(
+            UserState("test-user-id", "Test Player", life = 20u),
+            UserState("friend-id", "NewName", life = 20u),
+        )
+        wsMessages.emit(ServerMessage.State(users))
+        advanceUntilIdle()
+
+        verify { prefs.addFriend("friend-id", "NewName") }
+    }
+
+    // ── local friend list management ─────────────────────────────────────────
+
+    @Test
+    fun `addFriend persists and updates friendList flow`() {
+        every { prefs.friendList } returns listOf(Friend("u1", "Alice"))
+        val vm = makeVm()
+        vm.addFriend("u1", "Alice")
+        verify { prefs.addFriend("u1", "Alice") }
+        assertTrue(vm.friendList.value.any { it.userId == "u1" })
+    }
+
+    @Test
+    fun `removeFriend persists and updates friendList flow`() {
+        every { prefs.friendList } returns emptyList()
+        val vm = makeVm()
+        vm.removeFriend("u1")
+        verify { prefs.removeFriend("u1") }
+        assertTrue(vm.friendList.value.isEmpty())
+    }
+
+    @Test
+    fun `forgetPlayer persists and updates knownPlayers flow`() {
+        every { prefs.knownPlayers } returns emptyList()
+        val vm = makeVm()
+        vm.forgetPlayer("u1")
+        verify { prefs.forgetKnownPlayer("u1") }
+        assertTrue(vm.knownPlayers.value.isEmpty())
     }
 }
