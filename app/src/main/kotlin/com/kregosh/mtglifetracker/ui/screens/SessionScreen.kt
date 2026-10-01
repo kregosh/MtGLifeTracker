@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -75,6 +76,12 @@ fun SessionScreen(vm: SessionViewModel) {
     val knownPlayers          by vm.knownPlayers.collectAsState()
     val context = LocalContext.current
     val hasBg   = LocalHasBackground.current
+    val view    = LocalView.current
+
+    DisposableEffect(view) {
+        view.keepScreenOn = true
+        onDispose { view.keepScreenOn = false }
+    }
 
     val friendIds = remember(friendList) { friendList.map { it.userId }.toSet() }
 

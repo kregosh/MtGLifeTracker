@@ -1,5 +1,6 @@
 package com.kregosh.mtglifetracker
 
+import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -54,11 +55,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         migrateLegacyPresetUri()
 
-        intent?.data?.let { uri ->
-            if (uri.scheme == "mtgtracker" && uri.host == "join") {
-                uri.lastPathSegment?.takeIf { it.isNotBlank() }?.let { vm.handleInviteLink(it) }
-            }
-        }
+        // On recreation (rotation, theme change) the launch intent was already handled.
+        if (savedInstanceState == null) handleInvite(intent)
 
         setContent {
             val screen          by vm.screen.collectAsState()
@@ -153,12 +151,16 @@ class MainActivity : ComponentActivity() {
         byId[uri]?.let(vm::setBackgroundImage)
     }
 
-    override fun onNewIntent(intent: android.content.Intent) {
+    override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        intent.data?.let { uri ->
-            if (uri.scheme == "mtgtracker" && uri.host == "join") {
-                uri.lastPathSegment?.takeIf { it.isNotBlank() }?.let { vm.handleInviteLink(it) }
-            }
+        setIntent(intent)
+        handleInvite(intent)
+    }
+
+    private fun handleInvite(intent: Intent?) {
+        val uri = intent?.data ?: return
+        if (uri.scheme == "mtgtracker" && uri.host == "join") {
+            uri.lastPathSegment?.takeIf { it.isNotBlank() }?.let { vm.handleInviteLink(it) }
         }
     }
 }

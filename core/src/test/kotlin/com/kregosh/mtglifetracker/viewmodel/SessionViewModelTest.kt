@@ -238,7 +238,7 @@ class SessionViewModelTest {
 
     @Test
     fun `displayName comes from prefs`() {
-        assertEquals("Test Player", makeVm().displayName)
+        assertEquals("Test Player", makeVm().displayName.value)
     }
 
     @Test
@@ -872,6 +872,39 @@ class SessionViewModelTest {
         verify { prefs.addFriend("friend-id", "NewName") }
     }
 
+    @Test
+    fun `repeated State with the same players does not rewrite prefs`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        val me    = UserState("test-user-id", "Test Player", life = 20u)
+        val alice = UserState("other-id", "Alice", life = 20u)
+        wsMessages.emit(ServerMessage.State(listOf(me, alice)))
+        wsMessages.emit(ServerMessage.State(listOf(me, alice.copy(life = 19u))))
+        wsMessages.emit(ServerMessage.State(listOf(me.copy(life = 18u), alice.copy(life = 17u))))
+        advanceUntilIdle()
+
+        verify(exactly = 1) { prefs.touchKnownPlayer("other-id", "Alice") }
+    }
+
+    @Test
+    fun `State touches prefs again when a player is renamed`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        val me = UserState("test-user-id", "Test Player", life = 20u)
+        wsMessages.emit(ServerMessage.State(listOf(me, UserState("other-id", "Alice"))))
+        wsMessages.emit(ServerMessage.State(listOf(me, UserState("other-id", "Alicia"))))
+        advanceUntilIdle()
+
+        verify(exactly = 1) { prefs.touchKnownPlayer("other-id", "Alice") }
+        verify(exactly = 1) { prefs.touchKnownPlayer("other-id", "Alicia") }
+    }
+
     // ── local friend list management ─────────────────────────────────────────
 
     @Test
@@ -1140,6 +1173,38 @@ class SessionViewModelTest {
         advanceUntilIdle()
 
         verify(exactly = 0) { ws.addCustomStat(any(), any()) }
+    }
+
+    @Test
+    fun `addCustomStat accepts the commander and poison presets`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid", "CODE01")
+
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        vm.addCustomStat("commander")
+        vm.addCustomStat("poison")
+        advanceUntilIdle()
+
+        verify { ws.addCustomStat("commander", StatType.NUMERIC) }
+        verify { ws.addCustomStat("poison", StatType.NUMERIC) }
+    }
+
+    @Test
+    fun `setDisplayName caps the name at the rules limit`() {
+        val vm = makeVm()
+        vm.setDisplayName("x".repeat(100))
+        verify { prefs.displayName = "x".repeat(MAX_DISPLAY_NAME_LENGTH) }
+        assertEquals(MAX_DISPLAY_NAME_LENGTH, vm.displayName.value.length)
+    }
+
+    @Test
+    fun `setDisplayName ignores a blank name`() {
+        val vm = makeVm()
+        vm.setDisplayName("   ")
+        verify(exactly = 0) { prefs.displayName = any() }
+        assertEquals("Test Player", vm.displayName.value)
     }
 
     @Test

@@ -22,9 +22,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import com.kregosh.mtglifetracker.R
 import com.kregosh.mtglifetracker.data.Friend
 import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
+import com.kregosh.mtglifetracker.viewmodel.MAX_DISPLAY_NAME_LENGTH
 import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -33,7 +35,7 @@ fun SettingsScreen(vm: SessionViewModel) {
     val hasBg   = LocalHasBackground.current
     val context = LocalContext.current
 
-    var nameInput      by remember { mutableStateOf(vm.displayName) }
+    val displayName    by vm.displayName.collectAsState()
     var showNameDialog by remember { mutableStateOf(false) }
 
     val appBgPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
@@ -56,12 +58,12 @@ fun SettingsScreen(vm: SessionViewModel) {
 
     if (showNameDialog) {
         DisplayNameDialog(
-            initial   = nameInput,
+            initial   = displayName,
             onConfirm = { name ->
                 vm.setDisplayName(name)
-                nameInput      = name
                 showNameDialog = false
             },
+            onDismiss = { showNameDialog = false },
         )
     }
 
@@ -102,7 +104,7 @@ fun SettingsScreen(vm: SessionViewModel) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
-                        text  = nameInput.ifBlank { "Player" },
+                        text  = displayName.ifBlank { "Player" },
                         style = MaterialTheme.typography.bodyLarge,
                     )
                     OutlinedButton(onClick = { showNameDialog = true }) {
@@ -439,20 +441,28 @@ fun SettingsScreen(vm: SessionViewModel) {
 
 @Composable
 internal fun DisplayNameDialog(
-    initial  : String,
-    onConfirm: (String) -> Unit,
+    initial    : String,
+    onConfirm  : (String) -> Unit,
+    onDismiss  : () -> Unit,
+    title      : String  = "Your display name",
+    dismissible: Boolean = true,
 ) {
     var name by remember { mutableStateOf(initial) }
 
     AlertDialog(
-        onDismissRequest = { if (name.isNotBlank()) onConfirm(name) },
-        title    = { Text("Your display name") },
+        onDismissRequest = { if (dismissible) onDismiss() },
+        properties       = DialogProperties(
+            dismissOnBackPress    = dismissible,
+            dismissOnClickOutside = dismissible,
+        ),
+        title    = { Text(title) },
         text     = {
             OutlinedTextField(
-                value         = name,
-                onValueChange = { name = it },
-                singleLine    = true,
-                placeholder   = { Text("e.g. Alice") },
+                value          = name,
+                onValueChange  = { if (it.length <= MAX_DISPLAY_NAME_LENGTH) name = it },
+                singleLine     = true,
+                placeholder    = { Text("e.g. Alice") },
+                supportingText = { Text("${name.length} / $MAX_DISPLAY_NAME_LENGTH") },
             )
         },
         confirmButton = {
@@ -461,6 +471,9 @@ internal fun DisplayNameDialog(
                 enabled  = name.isNotBlank(),
             ) { Text("OK") }
         },
+        dismissButton = if (dismissible) {
+            { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        } else null,
     )
 }
 
