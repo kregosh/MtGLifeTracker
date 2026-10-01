@@ -4,7 +4,8 @@
     "sessionCodes": {
       "$code": {
         ".read":  true,
-        ".write": "!data.exists()"
+        ".write": "auth != null && !data.exists()",
+        ".validate": "newData.isString()"
       }
     },
 
@@ -12,9 +13,12 @@
     "sessions": {
       "$sessionId": {
         ".read": true,
+        // Create-once: the app writes code + createdAt in one setValue here.
+        // After creation this grants nothing; child rules below take over.
+        ".write": "auth != null && !data.exists()",
 
-        "code":      { ".write": "!data.exists()" },
-        "createdAt": { ".write": "!data.exists()" },
+        "code":      { ".validate": "newData.isString() && newData.val().length == 6" },
+        "createdAt": { ".validate": "newData.isNumber()" },
 
         // ── Per-user state ─────────────────────────────────────────────
         // The app identifies itself with a stable UUID stored in device prefs;
