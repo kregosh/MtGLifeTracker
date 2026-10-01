@@ -31,6 +31,12 @@ sealed interface Screen {
     object Settings : Screen
 }
 
+// Stat names that would shadow Firebase data-model fields or built-in stats.
+internal val RESERVED_STAT_NAMES = setOf(
+    "life", "displayname", "conceded", "customstats",
+    "commander", "poison",
+)
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Friend-request pending entry (local to ViewModel, not shared over network)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -329,8 +335,10 @@ class SessionViewModel(
         }
     }
 
-    fun addCustomStat(name: String, type: StatType = StatType.NUMERIC) =
-        webSocket?.addCustomStat(name, type)
+    fun addCustomStat(name: String, type: StatType = StatType.NUMERIC) {
+        if (name.trim().lowercase() in RESERVED_STAT_NAMES) return
+        webSocket?.addCustomStat(name.trim(), type)
+    }
 
     fun removeCustomStat(name: String) = webSocket?.removeCustomStat(name)
 

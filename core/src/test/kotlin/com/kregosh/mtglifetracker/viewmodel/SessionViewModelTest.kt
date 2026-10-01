@@ -12,6 +12,7 @@ import com.kregosh.mtglifetracker.shared.ServerMessage
 import com.kregosh.mtglifetracker.shared.SessionInfoResponse
 import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.shared.UserState
+import com.kregosh.mtglifetracker.viewmodel.RESERVED_STAT_NAMES
 import io.mockk.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -1115,6 +1116,43 @@ class SessionViewModelTest {
         advanceUntilIdle()
 
         assertNull(vm.homeError.value)
+    }
+
+    // ── Reserved stat name guard ──────────────────────────────────────────
+
+    @Test
+    fun `addCustomStat silently ignores reserved names`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid", "CODE01")
+        every { wsFactory("sid", any(), any(), any()) } returns ws
+
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        RESERVED_STAT_NAMES.forEach { reserved ->
+            // Use the original casing variant to ensure the lowercase comparison fires
+            vm.addCustomStat(reserved)
+            vm.addCustomStat(reserved.uppercase())
+            vm.addCustomStat(reserved.replaceFirstChar { it.uppercase() })
+        }
+        advanceUntilIdle()
+
+        verify(exactly = 0) { ws.addCustomStat(any(), any()) }
+    }
+
+    @Test
+    fun `addCustomStat forwards non-reserved names`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid", "CODE01")
+        every { wsFactory("sid", any(), any(), any()) } returns ws
+
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        vm.addCustomStat("gold")
+        advanceUntilIdle()
+
+        verify(exactly = 1) { ws.addCustomStat("gold", StatType.NUMERIC) }
     }
 
     @Test

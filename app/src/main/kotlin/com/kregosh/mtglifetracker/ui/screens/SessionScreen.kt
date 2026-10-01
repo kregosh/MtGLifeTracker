@@ -30,6 +30,7 @@ import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.ui.components.PlayerCard
 import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
 import com.kregosh.mtglifetracker.viewmodel.FriendRequestInfo
+import com.kregosh.mtglifetracker.viewmodel.RESERVED_STAT_NAMES
 import com.kregosh.mtglifetracker.viewmodel.SessionUiState
 import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
 
@@ -789,6 +790,8 @@ private fun AddCustomStatDialog(
     onDismiss: () -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
+    val isReserved = name.trim().lowercase() in RESERVED_STAT_NAMES
+    val isValid    = name.isNotBlank() && !isReserved
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -800,12 +803,16 @@ private fun AddCustomStatDialog(
                 label         = { Text("Stat name") },
                 placeholder   = { Text("e.g. Gold, Lore…") },
                 singleLine    = true,
+                isError       = isReserved,
+                supportingText = if (isReserved) {
+                    { Text("\"${name.trim()}\" is a reserved name") }
+                } else null,
             )
         },
         confirmButton = {
             TextButton(
-                onClick  = { if (name.isNotBlank()) onConfirm(name.trim()) },
-                enabled  = name.isNotBlank(),
+                onClick  = { if (isValid) onConfirm(name.trim()) },
+                enabled  = isValid,
             ) { Text("Add") }
         },
         dismissButton = {
