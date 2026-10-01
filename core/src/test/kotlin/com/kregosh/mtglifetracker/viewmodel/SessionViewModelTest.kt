@@ -1035,4 +1035,109 @@ class SessionViewModelTest {
 
         assertEquals("FRND01", vm.sessionUi.value.sessionCode)
     }
+
+    // ── presence cleanup when friend is removed ──────────────────────────────
+
+    @Test
+    fun `removeFriend for last friend clears friendPresence`() = runTest {
+        val presenceFlow = MutableSharedFlow<Map<String, String?>>(replay = 1)
+        every { prefs.friendList } returnsMany listOf(
+            listOf(Friend("uid1", "Alice")),
+            emptyList(),
+        )
+        every { api.observeFriendPresence(listOf("uid1")) } returns presenceFlow
+
+        val vm = makeVm()
+        advanceUntilIdle()
+
+        presenceFlow.emit(mapOf("uid1" to "session-abc"))
+        advanceUntilIdle()
+        assertEquals("session-abc", vm.friendPresence.value["uid1"])
+
+        // Removing the friend updates the list to empty; flatMapLatest should
+        // switch to an empty-list branch that emits no presence entries.
+        vm.removeFriend("uid1")
+        advanceUntilIdle()
+
+        assertNull(vm.friendPresence.value["uid1"])
+    }
+
+    @Test
+    fun `removeFriend for one of two friends resubscribes with the remaining friend`() = runTest {
+        val flow1 = MutableSharedFlow<Map<String, String?>>(replay = 1)
+        val flow2 = MutableSharedFlow<Map<String, String?>>(replay = 1)
+        val both  = listOf(Friend("uid1", "Alice"), Friend("uid2", "Bob"))
+        val bobOnly = listOf(Friend("uid2", "Bob"))
+
+        every { prefs.friendList } returnsMany listOf(both, bobOnly)
+        every { api.observeFriendPresence(both.map { it.userId }) }   returns flow1
+        every { api.observeFriendPresence(listOf("uid2")) }            returns flow2
+
+        val vm = makeVm()
+        advanceUntilIdle()
+
+        flow1.emit(mapOf("uid1" to "session-1", "uid2" to "session-2"))
+        advanceUntilIdle()
+
+        // Remove Alice — flatMapLatest must resubscribe with only Bob's id
+        vm.removeFriend("uid1")
+        advanceUntilIdle()
+
+        flow2.emit(mapOf("uid2" to "session-2"))
+        advanceUntilIdle()
+
+        verify { api.observeFriendPresence(listOf("uid2")) }
+        assertEquals("session-2", vm.friendPresence.value["uid2"])
+    }
+
+    @Test
+    fun `joinFriendSession homeError contains the api exception message`() = runTest {
+        coEvery { api.getSessionById(any()) } throws RuntimeException("session expired")
+
+        val vm = makeVm()
+        vm.joinFriendSession("stale-id")
+        advanceUntilIdle()
+
+        assertEquals("session expired", vm.homeError.value)
+        assertEquals(Screen.Home, vm.screen.value)
+    }
+
+    @Test
+    fun `joinFriendSession homeError is null on success`() = runTest {
+        coEvery { api.getSessionById("sid-ok") } returns SessionInfoResponse("sid-ok", "CODEX1", 1)
+
+        val vm = makeVm()
+        // Seed a prior error to confirm it gets cleared
+        vm.joinFriendSession("bad-id")
+        advanceUntilIdle()
+
+        vm.joinFriendSession("sid-ok")
+        advanceUntilIdle()
+
+        assertNull(vm.homeError.value)
+    }
+
+    @Test
+    fun `friendPresence shows online friend before join is triggered`() = runTest {
+        val presenceFlow = MutableSharedFlow<Map<String, String?>>(replay = 1)
+        every { prefs.friendList }                                  returns listOf(Friend("uid1", "Alice"))
+        every { api.observeFriendPresence(listOf("uid1")) }         returns presenceFlow
+        coEvery { api.getSessionById("live-sid") }                  returns SessionInfoResponse("live-sid", "LIVE01", 1)
+
+        val vm = makeVm()
+        advanceUntilIdle()
+
+        presenceFlow.emit(mapOf("uid1" to "live-sid"))
+        advanceUntilIdle()
+
+        // HomeScreen reads presence and calls joinFriendSession with the discovered id
+        val sessionId = vm.friendPresence.value["uid1"]
+        assertNotNull(sessionId)
+
+        vm.joinFriendSession(sessionId)
+        advanceUntilIdle()
+
+        assertIs<Screen.Session>(vm.screen.value)
+        assertEquals("live-sid", (vm.screen.value as Screen.Session).sessionId)
+    }
 }
