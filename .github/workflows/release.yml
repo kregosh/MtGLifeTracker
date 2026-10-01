@@ -4,6 +4,11 @@ on:
   push:
     branches: [ "main" ]
 
+# Serialize runs so two prunes can't race each other
+concurrency:
+  group: debug-release
+  cancel-in-progress: false
+
 jobs:
   build:
     name: Build & publish debug APK
@@ -39,11 +44,12 @@ jobs:
              app/build/outputs/apk/debug/mtg-life-tracker-${SHORT_SHA}.apk
           echo "APK_NAME=mtg-life-tracker-${SHORT_SHA}.apk" >> "$GITHUB_ENV"
 
-      - name: Create or update rolling release
+      - name: Create debug release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: latest-debug
-          name: "Latest debug build"
+          tag_name: debug-${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          name: "Debug build #${{ github.run_number }}"
           body: |
             Auto-built from `main` @ ${{ github.sha }}
 
@@ -51,3 +57,16 @@ jobs:
             You may need to allow installs from unknown sources in Settings → Security.
           prerelease: true
           files: app/build/outputs/apk/debug/${{ env.APK_NAME }}
+
+      - name: Keep only the last 3 debug releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Old single rolling release, superseded by per-build releases
+          gh release delete latest-debug --cleanup-tag --yes -R "$GITHUB_REPOSITORY" 2>/dev/null || true
+          gh release list -R "$GITHUB_REPOSITORY" --limit 200 --json tagName,createdAt \
+            --jq '[.[] | select(.tagName | startswith("debug-"))] | sort_by(.createdAt) | reverse | .[3:] | .[].tagName' \
+          | while read -r tag; do
+              echo "Deleting old release $tag"
+              gh release delete "$tag" --cleanup-tag --yes -R "$GITHUB_REPOSITORY"
+            done
