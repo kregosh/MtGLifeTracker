@@ -816,4 +816,142 @@ class SessionViewModelTest {
         verify { prefs.forgetKnownPlayer("u1") }
         assertTrue(vm.knownPlayers.value.isEmpty())
     }
+
+    // ── friend presence ──────────────────────────────────────────────────────
+
+    @Test
+    fun `friendPresence starts empty`() {
+        assertEquals(emptyMap<String, String?>(), makeVm().friendPresence.value)
+    }
+
+    @Test
+    fun `friendPresence reflects values emitted by observeFriendPresence`() = runTest {
+        val presenceFlow = MutableSharedFlow<Map<String, String?>>(replay = 1)
+        every { prefs.friendList }                       returns listOf(Friend("uid1", "Alice"))
+        every { api.observeFriendPresence(listOf("uid1")) } returns presenceFlow
+
+        val vm = makeVm()
+        advanceUntilIdle()
+
+        presenceFlow.emit(mapOf("uid1" to "session-abc"))
+        advanceUntilIdle()
+
+        assertEquals(mapOf("uid1" to "session-abc"), vm.friendPresence.value)
+    }
+
+    @Test
+    fun `friendPresence stores null when friend is offline`() = runTest {
+        val presenceFlow = MutableSharedFlow<Map<String, String?>>(replay = 1)
+        every { prefs.friendList }                           returns listOf(Friend("uid1", "Alice"))
+        every { api.observeFriendPresence(listOf("uid1")) }  returns presenceFlow
+
+        val vm = makeVm()
+        advanceUntilIdle()
+
+        presenceFlow.emit(mapOf("uid1" to null))
+        advanceUntilIdle()
+
+        assertNull(vm.friendPresence.value["uid1"])
+    }
+
+    @Test
+    fun `observeFriendPresence is not called when friend list is empty`() = runTest {
+        every { prefs.friendList } returns emptyList()
+
+        val vm = makeVm()
+        advanceUntilIdle()
+
+        verify(exactly = 0) { api.observeFriendPresence(any()) }
+        assertEquals(emptyMap<String, String?>(), vm.friendPresence.value)
+    }
+
+    @Test
+    fun `friendPresence resubscribes via flatMapLatest when friend list grows`() = runTest {
+        val presenceFlow = MutableSharedFlow<Map<String, String?>>(replay = 1)
+        every { prefs.friendList }                           returnsMany listOf(
+            emptyList(),
+            listOf(Friend("uid1", "Alice")),
+        )
+        every { api.observeFriendPresence(listOf("uid1")) }  returns presenceFlow
+
+        val vm = makeVm()
+        advanceUntilIdle()
+        verify(exactly = 0) { api.observeFriendPresence(any()) }
+
+        vm.addFriend("uid1", "Alice")
+        advanceUntilIdle()
+
+        presenceFlow.emit(mapOf("uid1" to "session-xyz"))
+        advanceUntilIdle()
+
+        verify { api.observeFriendPresence(listOf("uid1")) }
+        assertEquals("session-xyz", vm.friendPresence.value["uid1"])
+    }
+
+    @Test
+    fun `friendPresence tracks multiple friends simultaneously`() = runTest {
+        val presenceFlow = MutableSharedFlow<Map<String, String?>>(replay = 1)
+        val friends = listOf(Friend("uid1", "Alice"), Friend("uid2", "Bob"))
+        every { prefs.friendList }                                        returns friends
+        every { api.observeFriendPresence(listOf("uid1", "uid2")) }       returns presenceFlow
+
+        val vm = makeVm()
+        advanceUntilIdle()
+
+        presenceFlow.emit(mapOf("uid1" to "session-1", "uid2" to null))
+        advanceUntilIdle()
+
+        assertEquals("session-1", vm.friendPresence.value["uid1"])
+        assertNull(vm.friendPresence.value["uid2"])
+    }
+
+    // ── joinFriendSession ────────────────────────────────────────────────────
+
+    @Test
+    fun `joinFriendSession on success navigates to Session screen`() = runTest {
+        coEvery { api.getSessionById("sid-5") } returns SessionInfoResponse("sid-5", "CODE05", 1)
+
+        val vm = makeVm()
+        vm.joinFriendSession("sid-5")
+        advanceUntilIdle()
+
+        assertIs<Screen.Session>(vm.screen.value)
+        assertEquals("sid-5", (vm.screen.value as Screen.Session).sessionId)
+        verify { ws.connect() }
+    }
+
+    @Test
+    fun `joinFriendSession on failure sets homeError`() = runTest {
+        coEvery { api.getSessionById(any()) } throws RuntimeException("session gone")
+
+        val vm = makeVm()
+        vm.joinFriendSession("bad-id")
+        advanceUntilIdle()
+
+        assertEquals(Screen.Home, vm.screen.value)
+        assertEquals("session gone", vm.homeError.value)
+    }
+
+    @Test
+    fun `joinFriendSession homeLoading is false after completion`() = runTest {
+        coEvery { api.getSessionById("sid-5") } returns SessionInfoResponse("sid-5", "CODE05", 1)
+
+        val vm = makeVm()
+        vm.joinFriendSession("sid-5")
+        advanceUntilIdle()
+
+        assertFalse(vm.homeLoading.value)
+        assertNull(vm.homeError.value)
+    }
+
+    @Test
+    fun `joinFriendSession uses session code from getSessionById response`() = runTest {
+        coEvery { api.getSessionById("sid-5") } returns SessionInfoResponse("sid-5", "FRND01", 1)
+
+        val vm = makeVm()
+        vm.joinFriendSession("sid-5")
+        advanceUntilIdle()
+
+        assertEquals("FRND01", vm.sessionUi.value.sessionCode)
+    }
 }
