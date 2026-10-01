@@ -137,6 +137,8 @@ class SessionViewModel(
                 val now = timerAccumulated + (timerMark?.elapsedNow() ?: Duration.ZERO)
                 if (limit != null && now >= limit) {
                     _timerElapsed.value = limit
+                    timerAccumulated = limit  // cap before pauseTimer re-reads the clock
+                    timerMark = null
                     pauseTimer()
                     break
                 }

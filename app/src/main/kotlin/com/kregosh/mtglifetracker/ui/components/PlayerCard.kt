@@ -2,6 +2,7 @@ package com.kregosh.mtglifetracker.ui.components
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -68,9 +69,10 @@ fun PlayerCard(
 
     Box(modifier = modifier.fillMaxWidth()) {
         Card(
-            shape    = RoundedCornerShape(14.dp),
-            colors   = CardDefaults.cardColors(containerColor = Color.Transparent),
-            modifier = Modifier.fillMaxWidth(),
+            shape     = RoundedCornerShape(14.dp),
+            colors    = CardDefaults.cardColors(containerColor = Color.Transparent),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            modifier  = Modifier.fillMaxWidth(),
         ) {
             Box {
                 // ── Card surface: custom image or default parchment ───────
@@ -88,6 +90,12 @@ fun PlayerCard(
                         contentDescription = null,
                         contentScale       = ContentScale.Crop,
                         modifier           = Modifier.matchParentSize(),
+                    )
+                    // Darken the parchment so text reads cleanly
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(Color.Black.copy(alpha = 0.22f))
                     )
                 }
 
@@ -182,23 +190,22 @@ fun PlayerCard(
                                 description = "Decrease life",
                                 enabled     = user.life > 0u,
                                 onClick     = { onAdjust("life", -1) },
-                                tint        = PARCHMENT_SEPIA,
                             )
                         }
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier         = Modifier.widthIn(min = 80.dp),
                         ) {
-                            // Cream highlight peeking from upper-left: carved-groove rim
+                            // Ink-bleed shadow: same dark tone, slightly offset, lower opacity
                             Text(
                                 text       = user.life.toString(),
                                 fontSize   = 56.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 textAlign  = TextAlign.Center,
-                                color      = PARCHMENT_LIGHT,
-                                modifier   = Modifier.offset((-1.5).dp, (-1.5).dp),
+                                color      = lifeColor.copy(alpha = 0.35f),
+                                modifier   = Modifier.offset(1.dp, 1.dp),
                             )
-                            // Dark ink on top: the depression itself
+                            // Primary ink layer on top
                             Text(
                                 text       = user.life.toString(),
                                 fontSize   = 56.sp,
@@ -212,7 +219,6 @@ fun PlayerCard(
                                 icon        = Icons.Default.Add,
                                 description = "Increase life",
                                 onClick     = { onAdjust("life", 1) },
-                                tint        = PARCHMENT_SEPIA,
                             )
                         }
                     }
@@ -321,7 +327,6 @@ private fun NumericStatRow(
                     description = "Decrease $label",
                     enabled     = value > 0u,
                     onClick     = { onAdjust(-1) },
-                    tint        = PARCHMENT_SEPIA,
                 )
             }
             Text(
@@ -337,7 +342,6 @@ private fun NumericStatRow(
                     icon        = Icons.Default.Add,
                     description = "Increase $label",
                     onClick     = { onAdjust(1) },
-                    tint        = PARCHMENT_SEPIA,
                 )
             }
         }
@@ -415,7 +419,6 @@ private fun RingStageRow(
                     description = "Previous ring stage",
                     enabled     = value > 0u,
                     onClick     = { onAdjust(-1) },
-                    tint        = PARCHMENT_SEPIA,
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -437,7 +440,6 @@ private fun RingStageRow(
                     description = "Next ring stage",
                     enabled     = value < 4u,
                     onClick     = { onAdjust(1) },
-                    tint        = PARCHMENT_SEPIA,
                 )
             }
         }
@@ -453,14 +455,24 @@ internal fun SmallAdjustButton(
     icon       : androidx.compose.ui.graphics.vector.ImageVector,
     description: String,
     enabled    : Boolean = true,
-    tint       : Color   = Color.Unspecified,
     onClick    : () -> Unit,
 ) {
-    FilledTonalIconButton(
-        onClick  = onClick,
-        enabled  = enabled,
-        modifier = Modifier.size(36.dp),
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(
+                if (enabled) PARCHMENT_INK.copy(alpha = 0.82f)
+                else         PARCHMENT_INK.copy(alpha = 0.28f)
+            )
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = description, modifier = Modifier.size(18.dp), tint = tint)
+        Icon(
+            imageVector        = icon,
+            contentDescription = description,
+            modifier           = Modifier.size(18.dp),
+            tint               = if (enabled) PARCHMENT_LIGHT else PARCHMENT_LIGHT.copy(alpha = 0.45f),
+        )
     }
 }
