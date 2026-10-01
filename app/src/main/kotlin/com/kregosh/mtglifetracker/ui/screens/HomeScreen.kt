@@ -21,6 +21,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
+import com.kregosh.mtglifetracker.viewmodel.Screen
 import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -28,9 +29,11 @@ import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
 fun HomeScreen(vm: SessionViewModel) {
     val loading        by vm.homeLoading.collectAsState()
     val error          by vm.homeError.collectAsState()
+    val screen         by vm.screen.collectAsState()
     val hasBg          = LocalHasBackground.current
     val friendList     by vm.friendList.collectAsState()
     val friendPresence by vm.friendPresence.collectAsState()
+    val inSession      = screen is Screen.Session
 
     var codeInput by remember { mutableStateOf("") }
 
@@ -118,7 +121,8 @@ fun HomeScreen(vm: SessionViewModel) {
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     friendList.forEach { friend ->
-                        val sessionId = friendPresence[friend.userId]
+                        val sessionId  = friendPresence[friend.userId]
+                        val canJoin    = sessionId != null && !inSession && !loading
                         Row(
                             modifier              = Modifier.fillMaxWidth(),
                             verticalAlignment     = Alignment.CenterVertically,
@@ -139,8 +143,8 @@ fun HomeScreen(vm: SessionViewModel) {
                                         MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                                 Text(
-                                    text      = friend.displayName,
-                                    style     = MaterialTheme.typography.bodyMedium,
+                                    text       = friend.displayName,
+                                    style      = MaterialTheme.typography.bodyMedium,
                                     fontWeight = if (sessionId != null) FontWeight.SemiBold else FontWeight.Normal,
                                 )
                                 if (sessionId != null) {
@@ -151,21 +155,19 @@ fun HomeScreen(vm: SessionViewModel) {
                                     )
                                 }
                             }
-                            if (sessionId != null) {
-                                FilledTonalButton(
-                                    onClick  = { vm.joinFriendSession(sessionId) },
-                                    enabled  = !loading,
-                                    modifier = Modifier.height(32.dp),
-                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                                ) {
-                                    Icon(
-                                        Icons.Default.Login,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(14.dp),
-                                    )
-                                    Spacer(Modifier.width(4.dp))
-                                    Text("Join", style = MaterialTheme.typography.labelSmall)
-                                }
+                            FilledTonalButton(
+                                onClick  = { if (sessionId != null) vm.joinFriendSession(sessionId) },
+                                enabled  = canJoin,
+                                modifier = Modifier.height(32.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                            ) {
+                                Icon(
+                                    Icons.Default.Login,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text("Join", style = MaterialTheme.typography.labelSmall)
                             }
                         }
                     }
