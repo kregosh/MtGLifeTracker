@@ -13,6 +13,7 @@ google-services = "4.4.2"
 # ── Firebase ─────────────────────────────────────────────────────────
 firebase-bom                     = { module = "com.google.firebase:firebase-bom",                        version.ref = "firebase-bom" }
 firebase-database                = { module = "com.google.firebase:firebase-database-ktx" }
+firebase-auth                    = { module = "com.google.firebase:firebase-auth-ktx" }
 
 # ── Coroutines ───────────────────────────────────────────────────────
 kotlinx-coroutines-android       = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android",       version.ref = "coroutines" }

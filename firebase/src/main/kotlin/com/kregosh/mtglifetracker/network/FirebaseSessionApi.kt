@@ -1,6 +1,7 @@
 package com.kregosh.mtglifetracker.network
 
 import android.util.Log
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
@@ -14,7 +15,6 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
-import java.util.UUID
 
 private const val TAG = "FirebaseSessionApi"
 private const val TIMEOUT_MS = 10_000L
@@ -23,9 +23,19 @@ private val CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 class FirebaseSessionApi : SessionApi {
 
-    private val db get() = FirebaseDatabase.getInstance()
+    private val db   get() = FirebaseDatabase.getInstance()
+    private val auth get() = FirebaseAuth.getInstance()
+
+    // Ensure an anonymous Firebase Auth session exists before any DB write.
+    // If already signed in this is a no-op; it uses the existing credential.
+    private suspend fun ensureSignedIn() {
+        if (auth.currentUser == null) {
+            withTimeout(TIMEOUT_MS) { auth.signInAnonymously().await() }
+        }
+    }
 
     override suspend fun createSession(): CreateSessionResponse {
+        ensureSignedIn()
         val sessionId = UUID.randomUUID().toString()
         val code      = (1..6).map { CODE_CHARS.random() }.joinToString("")
         Log.d(TAG, "createSession: id=$sessionId code=$code")
@@ -44,6 +54,7 @@ class FirebaseSessionApi : SessionApi {
     }
 
     override suspend fun getSessionByCode(code: String): SessionInfoResponse {
+        ensureSignedIn()
         val upper = code.uppercase()
         Log.d(TAG, "getSessionByCode: code=$upper")
 
@@ -60,6 +71,7 @@ class FirebaseSessionApi : SessionApi {
     }
 
     override suspend fun getSessionById(sessionId: String): SessionInfoResponse {
+        ensureSignedIn()
         Log.d(TAG, "getSessionById: id=$sessionId")
         return withTimeout(TIMEOUT_MS) {
             val snapshot       = db.getReference("sessions/$sessionId").get().await()
