@@ -30,6 +30,17 @@ fun HomeScreen(vm: SessionViewModel) {
     val hasBg        = LocalHasBackground.current
     val friendList   by vm.friendList.collectAsState()
     val knownPlayers by vm.knownPlayers.collectAsState()
+    val displayName  by vm.displayName.collectAsState()
+
+    if (displayName.isBlank()) {
+        DisplayNameDialog(
+            initial     = "",
+            title       = "Welcome! What's your name?",
+            dismissible = false,
+            onConfirm   = vm::setDisplayName,
+            onDismiss   = {},
+        )
+    }
 
     var codeInput        by remember { mutableStateOf("") }
     var showFriendsSheet by remember { mutableStateOf(false) }
@@ -79,7 +90,7 @@ fun HomeScreen(vm: SessionViewModel) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                text  = "Welcome, ${vm.displayName.ifBlank { "Player" }}",
+                text  = "Welcome, ${displayName.ifBlank { "Player" }}",
                 style = MaterialTheme.typography.headlineSmall,
             )
 

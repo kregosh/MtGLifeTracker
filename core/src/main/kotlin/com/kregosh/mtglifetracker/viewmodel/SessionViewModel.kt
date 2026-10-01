@@ -31,11 +31,11 @@ sealed interface Screen {
     object Settings : Screen
 }
 
-// Stat names that would shadow Firebase data-model fields or built-in stats.
-val RESERVED_STAT_NAMES = setOf(
-    "life", "displayname", "conceded", "customstats",
-    "commander", "poison",
-)
+// Stat names that would shadow Firebase data-model fields.
+val RESERVED_STAT_NAMES = setOf("life", "displayname", "conceded", "customstats")
+
+// Matches the length limit in database.rules.json.
+const val MAX_DISPLAY_NAME_LENGTH = 64
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Friend-request pending entry (local to ViewModel, not shared over network)
@@ -173,16 +173,20 @@ class SessionViewModel(
 
     // Debounce state: last server-confirmed snapshot + per-stat pending deltas
     private var serverUsers   = emptyList<UserState>()
+    private var lastRoster    = emptyMap<String, String>()
     private val pendingDeltas = mutableMapOf<String, Int>()
     private val debounceJobs  = mutableMapOf<String, Job>()
 
     // ── display name ─────────────────────────────────────────────────
 
-    val displayName: String get() = prefs.displayName
+    private val _displayName = MutableStateFlow(prefs.displayName)
+    val displayName: StateFlow<String> = _displayName.asStateFlow()
 
     fun setDisplayName(name: String) {
-        val trimmed = name.trim()
+        val trimmed = name.trim().take(MAX_DISPLAY_NAME_LENGTH)
+        if (trimmed.isEmpty()) return
         prefs.displayName = trimmed
+        _displayName.value = trimmed
         webSocket?.setDisplayName(trimmed)
     }
 
@@ -391,6 +395,29 @@ class SessionViewModel(
         }
     }
 
+    // State arrives on every life change; only touch prefs when someone joins or is renamed.
+    private fun rememberPlayers(users: List<UserState>) {
+        val myId   = _sessionUi.value.myUserId
+        val roster = users
+            .filter { it.id != myId && it.displayName.isNotBlank() }
+            .associate { it.id to it.displayName }
+        val changed = roster.filter { (id, name) -> lastRoster[id] != name }
+        lastRoster = roster
+        if (changed.isEmpty()) return
+
+        val friendIds = _friendList.value.map { it.userId }.toSet()
+        var friendDirty = false
+        changed.forEach { (id, name) ->
+            prefs.touchKnownPlayer(id, name)
+            if (id in friendIds) {
+                prefs.addFriend(id, name)
+                friendDirty = true
+            }
+        }
+        _knownPlayers.value = prefs.knownPlayers
+        if (friendDirty) _friendList.value = prefs.friendList
+    }
+
     private fun joinSession(sessionId: String, sessionCode: String) {
         val current = _screen.value
         if (current is Screen.Session && current.sessionId == sessionId) return
@@ -429,22 +456,7 @@ class SessionViewModel(
                                     globalStats = msg.globalStats,
                                 )
                             }
-                            val myId = _sessionUi.value.myUserId
-                            var knownDirty  = false
-                            var friendDirty = false
-                            val friendIds   = prefs.friendList.map { it.userId }.toSet()
-                            msg.users
-                                .filter { it.id != myId && it.displayName.isNotBlank() }
-                                .forEach { user ->
-                                    prefs.touchKnownPlayer(user.id, user.displayName)
-                                    knownDirty = true
-                                    if (user.id in friendIds) {
-                                        prefs.addFriend(user.id, user.displayName)
-                                        friendDirty = true
-                                    }
-                                }
-                            if (knownDirty)  _knownPlayers.value = prefs.knownPlayers
-                            if (friendDirty) _friendList.value   = prefs.friendList
+                            rememberPlayers(msg.users)
                         }
                         is ServerMessage.Joined -> _sessionUi.update {
                             it.copy(sessionCode = msg.sessionCode)
@@ -478,6 +490,7 @@ class SessionViewModel(
         debounceJobs.clear()
         pendingDeltas.clear()
         serverUsers = emptyList()
+        lastRoster  = emptyMap()
         _pendingFriendRequests.value = emptyList()
         wsCollectorJob?.cancel()
         wsCollectorJob = null
