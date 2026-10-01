@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -262,7 +263,7 @@ private fun SessionContent(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     contentPadding      = PaddingValues(bottom = 80.dp),
                 ) {
-                    items(ui.users, key = { it.id }) { user ->
+                    itemsIndexed(ui.users, key = { _, user -> user.id }) { index, user ->
                         val isMe = user.id == ui.myUserId
                         PlayerCard(
                             user        = user,
@@ -273,6 +274,7 @@ private fun SessionContent(
                             onUnconcede = if (isMe) vm::unconcede else null,
                             isFriend    = user.id in friendIds,
                             onAddFriend = if (!isMe) { { vm.sendFriendRequest(user.id) } } else null,
+                            playerIndex = index,
                         )
                     }
                 }
