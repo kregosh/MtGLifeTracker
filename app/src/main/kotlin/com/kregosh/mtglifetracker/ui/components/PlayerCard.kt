@@ -1,5 +1,6 @@
 package com.kregosh.mtglifetracker.ui.components
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -15,14 +16,26 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.random.Random
 import com.kregosh.mtglifetracker.R
 import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.shared.UserState
@@ -45,6 +58,123 @@ private val PARCHMENT_LIGHT   = Color(0xFFEDD9A0) // warm cream      — etched 
 private val PARCHMENT_SEPIA   = Color(0xFF5A3010) // mid sepia       — secondary labels
 private val PARCHMENT_ERROR   = Color(0xFF9B1010) // deep red        — dead life total
 
+// Life-total inks
+private val INK_IRON_GALL = Color(0xFF15254A) // dark bluish iron-gall ink
+private val INK_BLOOD     = Color(0xFF6E0C0C) // dried-blood red for a dead player
+
+private val BANDEROLE_WIDTH     = 70.dp
+private val BANDEROLE_HEIGHT    = 42.dp
+private val BANDEROLE_CLEARANCE = 34.dp
+
+// Corner banderole: asymmetric WUBRG sash; the player's own colour stripe is doubled.
+
+@Composable
+private fun ManaBanderole(accentIndex: Int) {
+    Canvas(Modifier.size(BANDEROLE_WIDTH, BANDEROLE_HEIGHT)) {
+        val w = size.width
+        val h = size.height
+        val inner   = 0.36f
+        val weights = MANA_COLORS.indices.map { if (it == accentIndex) 2f else 1f }
+        val total   = weights.sum()
+
+        // Soft drop shadow along the outer edge so the ribbon sits on the page
+        drawLine(
+            color       = Color.Black.copy(alpha = 0.28f),
+            start       = Offset(w + 2.dp.toPx(), 0f),
+            end         = Offset(0f, h + 2.dp.toPx()),
+            strokeWidth = 3.dp.toPx(),
+        )
+
+        var from = inner
+        weights.forEachIndexed { i, weight ->
+            val to = from + (1f - inner) * weight / total
+            val stripe = Path().apply {
+                moveTo(w * from, 0f)
+                lineTo(w * to, 0f)
+                lineTo(0f, h * to)
+                lineTo(0f, h * from)
+                close()
+            }
+            drawPath(stripe, MANA_COLORS[i].copy(alpha = 0.93f))
+            from = to
+        }
+
+        val edge = PARCHMENT_INK.copy(alpha = 0.7f)
+        drawLine(edge, Offset(w * inner, 0f), Offset(0f, h * inner), strokeWidth = 1.dp.toPx())
+        drawLine(edge, Offset(w, 0f), Offset(0f, h), strokeWidth = 1.2.dp.toPx())
+    }
+}
+
+// Ink on paper: bleed halo + jittered frayed edges + wet core + dry-brush dropouts.
+// Randomness is seeded by the text so the texture doesn't flicker on recomposition.
+
+@Composable
+private fun InkedNumber(
+    text    : String,
+    ink     : Color,
+    fontSize: TextUnit,
+    modifier: Modifier = Modifier,
+) {
+    val density = LocalDensity.current
+    val bleedBlur = with(density) { 5.dp.toPx() }
+    val wetBlur   = with(density) { 1.dp.toPx() }
+
+    val fray = remember(text) {
+        val rnd = Random(text.hashCode())
+        List(8) { Offset(rnd.nextFloat() * 2f - 1f, rnd.nextFloat() * 2f - 1f) }
+    }
+    val dropouts = remember(text) {
+        val rnd = Random(text.hashCode() * 31 + 7)
+        List(55) { Triple(rnd.nextFloat(), rnd.nextFloat(), rnd.nextFloat()) }
+    }
+
+    val base = TextStyle(
+        fontSize   = fontSize,
+        fontWeight = FontWeight.Black,
+        fontFamily = FontFamily.Serif,
+        textAlign  = TextAlign.Center,
+    )
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithContent {
+                drawContent()
+                dropouts.forEach { (fx, fy, fr) ->
+                    drawCircle(
+                        color     = Color.Black.copy(alpha = 0.35f + fr * 0.5f),
+                        radius    = (0.35f + fr * 1.1f).dp.toPx(),
+                        center    = Offset(fx * size.width, fy * size.height),
+                        blendMode = BlendMode.DstOut,
+                    )
+                }
+            },
+    ) {
+        Text(
+            text  = text,
+            style = base.copy(
+                color  = ink.copy(alpha = 0.22f),
+                shadow = Shadow(ink.copy(alpha = 0.6f), Offset.Zero, bleedBlur),
+            ),
+        )
+        fray.forEach { o ->
+            Text(
+                text     = text,
+                style    = base.copy(color = ink.copy(alpha = 0.2f)),
+                modifier = Modifier.offset((o.x * 1.4f).dp, (o.y * 1.4f).dp),
+            )
+        }
+        Text(
+            text  = text,
+            style = base.copy(
+                color  = ink,
+                shadow = Shadow(ink.copy(alpha = 0.85f), Offset.Zero, wetBlur),
+            ),
+        )
+    }
+}
+
 @Composable
 fun PlayerCard(
     user        : UserState,
@@ -62,7 +192,6 @@ fun PlayerCard(
     val conceded  = user.conceded
     val cardBg    = LocalCardBackground.current
     val hasCardBg = isMe && cardBg != null
-    val manaColor = MANA_COLORS[playerIndex % MANA_COLORS.size]
 
     // Alternate between two parchment textures so adjacent cards feel distinct
     val parchmentRes = if (playerIndex % 2 == 0) R.drawable.card_parchment_a else R.drawable.card_parchment_b
@@ -85,36 +214,22 @@ fun PlayerCard(
                         alpha              = 0.90f,
                     )
                 } else {
+                    // SrcAtop darkens only the page itself, so its transparent torn margins stay clear
                     Image(
                         painter            = painterResource(parchmentRes),
                         contentDescription = null,
                         contentScale       = ContentScale.Crop,
                         modifier           = Modifier.matchParentSize(),
-                    )
-                    // Darken the parchment so text reads cleanly
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .background(Color.Black.copy(alpha = 0.22f))
+                        colorFilter        = ColorFilter.tint(Color.Black.copy(alpha = 0.22f), BlendMode.SrcAtop),
                     )
                 }
 
-                // ── Asymmetric mana-color left band ───────────────────────
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .width(14.dp)
-                        .background(
-                            Brush.horizontalGradient(
-                                listOf(manaColor.copy(alpha = 0.88f), Color.Transparent),
-                            )
-                        )
-                )
+                ManaBanderole(accentIndex = playerIndex % MANA_COLORS.size)
 
                 // ── Content ───────────────────────────────────────────────
                 Column(
                     modifier = Modifier.padding(
-                        start  = 20.dp,
+                        start  = 16.dp,
                         end    = 12.dp,
                         top    = 10.dp,
                         bottom = 12.dp,
@@ -127,6 +242,7 @@ fun PlayerCard(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         modifier              = Modifier.fillMaxWidth(),
                     ) {
+                        Spacer(Modifier.width(BANDEROLE_CLEARANCE))
                         Text(
                             text       = user.displayName,
                             style      = MaterialTheme.typography.titleMedium,
@@ -177,8 +293,6 @@ fun PlayerCard(
 
                     Spacer(Modifier.height(4.dp))
 
-                    // Life total — layered Text to simulate etching into parchment
-                    val lifeColor = if (dead) PARCHMENT_ERROR else PARCHMENT_INK
                     Row(
                         verticalAlignment     = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center,
@@ -192,28 +306,12 @@ fun PlayerCard(
                                 onClick     = { onAdjust("life", -1) },
                             )
                         }
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier         = Modifier.widthIn(min = 80.dp),
-                        ) {
-                            // Ink-bleed shadow: same dark tone, slightly offset, lower opacity
-                            Text(
-                                text       = user.life.toString(),
-                                fontSize   = 56.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                textAlign  = TextAlign.Center,
-                                color      = lifeColor.copy(alpha = 0.35f),
-                                modifier   = Modifier.offset(1.dp, 1.dp),
-                            )
-                            // Primary ink layer on top
-                            Text(
-                                text       = user.life.toString(),
-                                fontSize   = 56.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                textAlign  = TextAlign.Center,
-                                color      = lifeColor,
-                            )
-                        }
+                        InkedNumber(
+                            text     = user.life.toString(),
+                            ink      = if (dead) INK_BLOOD else INK_IRON_GALL,
+                            fontSize = 60.sp,
+                            modifier = Modifier.widthIn(min = 96.dp),
+                        )
                         if (isMe) {
                             SmallAdjustButton(
                                 icon        = Icons.Default.Add,
