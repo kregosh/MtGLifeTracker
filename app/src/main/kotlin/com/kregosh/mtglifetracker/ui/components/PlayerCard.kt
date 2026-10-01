@@ -66,18 +66,17 @@ private val BANDEROLE_WIDTH     = 70.dp
 private val BANDEROLE_HEIGHT    = 42.dp
 private val BANDEROLE_CLEARANCE = 34.dp
 
-// Corner banderole: asymmetric WUBRG sash; the player's own colour stripe is doubled.
+// Corner banderole: solid single-MTG-color triangular sash in the player's assigned color.
 
 @Composable
 private fun ManaBanderole(accentIndex: Int) {
+    val color = MANA_COLORS[accentIndex]
     Canvas(Modifier.size(BANDEROLE_WIDTH, BANDEROLE_HEIGHT)) {
         val w = size.width
         val h = size.height
-        val inner   = 0.36f
-        val weights = MANA_COLORS.indices.map { if (it == accentIndex) 2f else 1f }
-        val total   = weights.sum()
+        val inner = 0.36f
 
-        // Soft drop shadow along the outer edge so the ribbon sits on the page
+        // Drop shadow along the outer edge
         drawLine(
             color       = Color.Black.copy(alpha = 0.28f),
             start       = Offset(w + 2.dp.toPx(), 0f),
@@ -85,19 +84,15 @@ private fun ManaBanderole(accentIndex: Int) {
             strokeWidth = 3.dp.toPx(),
         )
 
-        var from = inner
-        weights.forEachIndexed { i, weight ->
-            val to = from + (1f - inner) * weight / total
-            val stripe = Path().apply {
-                moveTo(w * from, 0f)
-                lineTo(w * to, 0f)
-                lineTo(0f, h * to)
-                lineTo(0f, h * from)
-                close()
-            }
-            drawPath(stripe, MANA_COLORS[i].copy(alpha = 0.93f))
-            from = to
+        // Single solid triangle from the inner edge to the outer corner
+        val sash = Path().apply {
+            moveTo(w * inner, 0f)
+            lineTo(w, 0f)
+            lineTo(0f, h)
+            lineTo(0f, h * inner)
+            close()
         }
+        drawPath(sash, color.copy(alpha = 0.93f))
 
         val edge = PARCHMENT_INK.copy(alpha = 0.7f)
         drawLine(edge, Offset(w * inner, 0f), Offset(0f, h * inner), strokeWidth = 1.dp.toPx())
