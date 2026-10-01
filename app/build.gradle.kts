@@ -13,13 +13,15 @@ android {
         applicationId = "com.kregosh.mtglifetracker"
         minSdk        = 26
         targetSdk     = 35
-        versionCode   = 1
+        // CI run number keeps every published build installable over the previous one
+        versionCode   = providers.environmentVariable("GITHUB_RUN_NUMBER").orElse("1").get().toInt()
         versionName   = "1.0"
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled   = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

@@ -72,6 +72,7 @@ class SessionViewModel(
     private val prefs: UserPrefs,
     private val api: SessionApi,
     private val wsFactory: (sessionId: String, userId: String, displayName: String, startLife: UInt) -> SessionConnection,
+    private val timeSource: TimeSource = TimeSource.Monotonic,
 ) : ViewModel() {
 
     private val _screen = MutableStateFlow<Screen>(Screen.Home)
@@ -134,7 +135,7 @@ class SessionViewModel(
     }
 
     private fun startTimer() {
-        timerMark = TimeSource.Monotonic.markNow()
+        timerMark = timeSource.markNow()
         _timerRunning.value = true
         timerJob = viewModelScope.launch {
             val limit = if (prefs.timerCountDown) prefs.timerLimitMinutes.toLong().minutes else null
