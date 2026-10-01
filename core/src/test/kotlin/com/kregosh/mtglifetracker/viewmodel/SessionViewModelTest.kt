@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.*
 import kotlin.test.*
+import kotlin.time.Duration.Companion.minutes
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SessionViewModelTest {
@@ -36,7 +37,7 @@ class SessionViewModelTest {
     }
     private val wsFactory  = mockk<(String, String, String, UInt) -> SessionConnection>()
 
-    private fun makeVm() = SessionViewModel(prefs, api, wsFactory)
+    private fun makeVm() = SessionViewModel(prefs, api, wsFactory, testDispatcher.scheduler.timeSource)
 
     @BeforeTest
     fun setUp() {
@@ -475,6 +476,7 @@ class SessionViewModelTest {
         vm.startPauseTimer()
         advanceTimeBy(2_000)
         assertTrue(vm.timerElapsed.value.inWholeSeconds >= 1)
+        vm.resetTimer()   // a running stopwatch would keep runTest draining forever
     }
 
     @Test

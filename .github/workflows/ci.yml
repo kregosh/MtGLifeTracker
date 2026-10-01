@@ -32,15 +32,20 @@ jobs:
       - name: Compile app (debug)
         run: ./gradlew --no-daemon :app:compileDebugKotlin
 
-      - name: Run unit tests
-        run: ./gradlew --no-daemon :app:testDebugUnitTest
+      - name: Run unit tests (all modules)
+        run: ./gradlew --no-daemon testDebugUnitTest
 
-      - name: Lint
-        run: ./gradlew --no-daemon :app:lintDebug
+      - name: Lint (all modules)
+        run: ./gradlew --no-daemon lintDebug
 
-      - name: Upload lint results
+      - name: Build minified release
+        run: ./gradlew --no-daemon :app:assembleRelease
+
+      - name: Upload test and lint reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lint-results
-          path: app/build/reports/lint-results-debug.html
+          name: reports
+          path: |
+            */build/reports/lint-results-debug.html
+            */build/reports/tests/
