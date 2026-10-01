@@ -1,7 +1,5 @@
 package com.kregosh.mtglifetracker.ui.screens
 
-import androidx.compose.ui.res.stringResource
-import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -17,8 +15,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
+import android.net.Uri
 import com.kregosh.mtglifetracker.R
 import com.kregosh.mtglifetracker.data.AppColorScheme
 import com.kregosh.mtglifetracker.ui.components.FriendsList

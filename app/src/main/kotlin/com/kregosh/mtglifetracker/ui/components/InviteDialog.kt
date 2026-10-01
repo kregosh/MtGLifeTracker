@@ -1,9 +1,5 @@
 package com.kregosh.mtglifetracker.ui.components
 
-import com.kregosh.mtglifetracker.R
-import androidx.compose.ui.res.stringResource
-import android.content.Intent
-import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -19,11 +15,15 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import android.content.Intent
+import android.graphics.Bitmap
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
+import com.kregosh.mtglifetracker.R
 import com.kregosh.mtglifetracker.shared.inviteUrl
 
 /** Session code, a QR code to scan and a share button with a link chat apps can open. */

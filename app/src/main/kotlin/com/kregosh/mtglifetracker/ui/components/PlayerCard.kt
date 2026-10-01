@@ -1,7 +1,5 @@
 package com.kregosh.mtglifetracker.ui.components
 
-import com.kregosh.mtglifetracker.shared.LIFE_STAT
-import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -31,6 +29,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -38,16 +37,17 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlin.random.Random
 import com.kregosh.mtglifetracker.R
 import com.kregosh.mtglifetracker.shared.COMMANDER_STAT
+import com.kregosh.mtglifetracker.shared.LIFE_STAT
 import com.kregosh.mtglifetracker.shared.POISON_STAT
 import com.kregosh.mtglifetracker.shared.StatType
-import com.kregosh.mtglifetracker.shared.commanderDamageStat
 import com.kregosh.mtglifetracker.shared.UserState
+import com.kregosh.mtglifetracker.shared.commanderDamageStat
 import com.kregosh.mtglifetracker.ui.theme.LocalCardBackground
 import com.kregosh.mtglifetracker.viewmodel.SessionUiState
 import com.kregosh.mtglifetracker.viewmodel.isDead
+import kotlin.random.Random
 
 // MTG mana color accent bands — assigned to players by index (mod 5)
 private val MANA_COLORS = listOf(
@@ -407,12 +407,6 @@ fun PlayerCard(
         }
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Stat label helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Numeric stat row (+/- counter)

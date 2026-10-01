@@ -1,12 +1,5 @@
 package com.kregosh.mtglifetracker.ui.screens
 
-import com.kregosh.mtglifetracker.ui.components.statTypeLabel
-import com.kregosh.mtglifetracker.ui.components.statLabel
-import com.kregosh.mtglifetracker.shared.PredefinedStat
-import com.kregosh.mtglifetracker.shared.DAY_NIGHT_GLOBAL
-import androidx.compose.ui.platform.LocalContext
-import com.kregosh.mtglifetracker.R
-import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -26,34 +19,36 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.minutes
+import com.kregosh.mtglifetracker.R
 import com.kregosh.mtglifetracker.data.Friend
 import com.kregosh.mtglifetracker.data.KnownPlayer
 import com.kregosh.mtglifetracker.network.ConnectionState
+import com.kregosh.mtglifetracker.shared.DAY_NIGHT_GLOBAL
+import com.kregosh.mtglifetracker.shared.PredefinedStat
 import com.kregosh.mtglifetracker.shared.SessionSettings
 import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.shared.UserState
-import com.kregosh.mtglifetracker.viewmodel.LifeChange
 import com.kregosh.mtglifetracker.ui.components.FriendsSheet
 import com.kregosh.mtglifetracker.ui.components.InviteDialog
-import com.kregosh.mtglifetracker.viewmodel.Screen
 import com.kregosh.mtglifetracker.ui.components.PlayerCard
+import com.kregosh.mtglifetracker.ui.components.statLabel
+import com.kregosh.mtglifetracker.ui.components.statTypeLabel
 import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
 import com.kregosh.mtglifetracker.viewmodel.FriendRequestInfo
+import com.kregosh.mtglifetracker.viewmodel.LifeChange
 import com.kregosh.mtglifetracker.viewmodel.MAX_STAT_NAME_LENGTH
 import com.kregosh.mtglifetracker.viewmodel.RESERVED_STAT_NAMES
-import com.kregosh.mtglifetracker.viewmodel.isValidStatName
+import com.kregosh.mtglifetracker.viewmodel.Screen
 import com.kregosh.mtglifetracker.viewmodel.SessionUiState
 import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Predefined per-player stat catalogue
-// ─────────────────────────────────────────────────────────────────────────────
-
+import com.kregosh.mtglifetracker.viewmodel.isValidStatName
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Session screen
@@ -683,9 +678,6 @@ private fun PickerRow(label: String, typeLabel: String, active: Boolean, onClick
         }
     }
 }
-
-
-// FriendsSheet is defined in ui/components/FriendsSheet.kt and shared with HomeScreen.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Friend request confirmation dialog

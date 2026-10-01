@@ -1,7 +1,5 @@
 package com.kregosh.mtglifetracker.ui.components
 
-import com.kregosh.mtglifetracker.R
-import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -9,7 +7,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.kregosh.mtglifetracker.R
 import com.kregosh.mtglifetracker.data.Friend
 import com.kregosh.mtglifetracker.data.KnownPlayer
 
