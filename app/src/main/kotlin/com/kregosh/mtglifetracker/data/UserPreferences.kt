@@ -75,6 +75,7 @@ class UserPreferences(
 
     override val knownPlayers: List<KnownPlayer>
         get() = parseKnownSet(prefs.getStringSet(KEY_KNOWN_PLAYERS, emptySet()))
+            .sortedByDescending { it.lastSeen }
 
     override fun touchKnownPlayer(userId: String, displayName: String) {
         val now     = clock()
