@@ -31,6 +31,9 @@ beforeEach(async () => {
       [SID]: {
         code: 'ABCDEFGH',
         createdAt: Date.now(),
+        hostUserId: ALICE,
+        game: 0,
+        settings: { startLife: 20, commanderDeathThreshold: 21, infectDeathThreshold: 10, maxPlayers: 0 },
         users: {
           [ALICE]: { displayName: 'Alice', life: 20, online: true },
           [BOB]:   { displayName: 'Bob',   life: 20, online: true },
@@ -221,6 +224,67 @@ describe('session lifecycle (#59)', () => {
 
   test('unknown session-level data is rejected', async () => {
     await assertFails(alice().ref(`sessions/${SID}/junk`).set('x'.repeat(1000)));
+  });
+});
+
+describe('host controls and shared rules (#44, #46)', () => {
+  const settings = { startLife: 40, commanderDeathThreshold: 21, infectDeathThreshold: 10, maxPlayers: 4 };
+
+  test('the creator can make themselves host with shared rules', async () => {
+    await assertSucceeds(alice().ref('sessions/session-2').set({
+      code: 'QWERTY23', createdAt: { '.sv': 'timestamp' }, hostUserId: ALICE, game: 0, settings,
+    }));
+  });
+
+  test('nobody can create a session with someone else as host', async () => {
+    await assertFails(bob().ref('sessions/session-2').set({
+      code: 'QWERTY23', createdAt: { '.sv': 'timestamp' }, hostUserId: ALICE, game: 0, settings,
+    }));
+  });
+
+  test('the host cannot be changed', async () => {
+    await assertFails(bob().ref(`sessions/${SID}/hostUserId`).set(BOB));
+    await assertFails(alice().ref(`sessions/${SID}/hostUserId`).set(BOB));
+  });
+
+  test('only the host changes the rules', async () => {
+    await assertSucceeds(alice().ref(`sessions/${SID}/settings`).set(settings));
+    await assertFails(bob().ref(`sessions/${SID}/settings`).set(settings));
+    await assertFails(bob().ref(`sessions/${SID}/settings/startLife`).set(1));
+  });
+
+  test('rules values are bounded', async () => {
+    await assertFails(alice().ref(`sessions/${SID}/settings/startLife`).set(0));
+    await assertFails(alice().ref(`sessions/${SID}/settings/maxPlayers`).set(100));
+    await assertFails(alice().ref(`sessions/${SID}/settings/cheats`).set(true));
+  });
+
+  test('only the host starts a new game, and the counter only goes up', async () => {
+    await assertSucceeds(alice().ref(`sessions/${SID}/game`).set(1));
+    await assertFails(bob().ref(`sessions/${SID}/game`).set(2));
+    await assertFails(alice().ref(`sessions/${SID}/game`).set(0));
+  });
+
+  test('the host can remove an online player; other players cannot', async () => {
+    await assertFails(bob().ref(`sessions/${SID}/users/${ALICE}`).remove());
+    await assertSucceeds(alice().ref(`sessions/${SID}/users/${BOB}`).remove());
+  });
+
+  test('the host cannot edit another player\'s stats', async () => {
+    await assertFails(alice().ref(`sessions/${SID}/users/${BOB}/life`).set(1));
+  });
+});
+
+describe('commander damage (#40)', () => {
+  const dmg = from => `sessions/${SID}/users/${ALICE}/commanderDamage/${from}`;
+
+  test('a player tracks damage per opposing commander', async () => {
+    await assertSucceeds(alice().ref(dmg(BOB)).set(7));
+    await assertFails(bob().ref(dmg(BOB)).set(0));
+  });
+
+  test('sources must be player IDs', async () => {
+    await assertFails(alice().ref(dmg('everyone')).set(7));
   });
 });
 

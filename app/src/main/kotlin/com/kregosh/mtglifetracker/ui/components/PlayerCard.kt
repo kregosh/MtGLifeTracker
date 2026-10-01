@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -37,7 +38,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.random.Random
 import com.kregosh.mtglifetracker.R
+import com.kregosh.mtglifetracker.shared.COMMANDER_STAT
+import com.kregosh.mtglifetracker.shared.POISON_STAT
 import com.kregosh.mtglifetracker.shared.StatType
+import com.kregosh.mtglifetracker.shared.commanderDamageStat
 import com.kregosh.mtglifetracker.shared.UserState
 import com.kregosh.mtglifetracker.ui.theme.LocalCardBackground
 import com.kregosh.mtglifetracker.viewmodel.SessionUiState
@@ -180,6 +184,7 @@ fun PlayerCard(
     onUnconcede : (() -> Unit)?  = null,
     isFriend    : Boolean        = false,
     onAddFriend : (() -> Unit)?  = null,
+    onRemove    : (() -> Unit)?  = null,
     playerIndex : Int            = 0,
     modifier    : Modifier       = Modifier,
 ) {
@@ -250,6 +255,19 @@ fun PlayerCard(
                                     text  = "offline",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = PARCHMENT_SEPIA,
+                                )
+                            }
+                        }
+                        if (onRemove != null) {
+                            IconButton(
+                                onClick  = onRemove,
+                                modifier = Modifier.size(28.dp),
+                            ) {
+                                Icon(
+                                    imageVector        = Icons.Default.PersonRemove,
+                                    contentDescription = "Remove ${user.displayName} from the session",
+                                    modifier           = Modifier.size(18.dp),
+                                    tint               = PARCHMENT_SEPIA.copy(alpha = 0.75f),
                                 )
                             }
                         }
@@ -332,22 +350,33 @@ fun PlayerCard(
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             sessionUi.statDefs.forEach { (name, type) ->
                                 val value = user.customStats[name] ?: 0u
-                                when (type) {
-                                    StatType.NUMERIC    -> NumericStatRow(
+                                when {
+                                    name == COMMANDER_STAT -> sessionUi.users
+                                        .filter { it.id != user.id }
+                                        .forEach { opponent ->
+                                            val damage = user.commanderDamage[opponent.id] ?: 0u
+                                            NumericStatRow(
+                                                label    = "CMD ${opponent.displayName}",
+                                                value    = damage,
+                                                isMe     = isMe,
+                                                isDead   = damage >= sessionUi.settings.commanderDeathThreshold,
+                                                onAdjust = { d -> onAdjust(commanderDamageStat(opponent.id), d) },
+                                            )
+                                        }
+                                    type == StatType.NUMERIC -> NumericStatRow(
                                         label    = statLabel(name),
                                         value    = value,
                                         isMe     = isMe,
-                                        isDead   = name == "commander" && value >= sessionUi.commanderDeathThreshold
-                                                || name == "poison"    && value >= sessionUi.infectDeathThreshold,
+                                        isDead   = name == POISON_STAT && value >= sessionUi.settings.infectDeathThreshold,
                                         onAdjust = { d -> onAdjust(name, d) },
                                     )
-                                    StatType.TOGGLE     -> ToggleStatRow(
+                                    type == StatType.TOGGLE -> ToggleStatRow(
                                         label    = statLabel(name),
                                         value    = value,
                                         isMe     = isMe,
                                         onToggle = { onAdjust(name, if (value > 0u) -1 else 1) },
                                     )
-                                    StatType.RING_STAGE -> RingStageRow(
+                                    else -> RingStageRow(
                                         label    = statLabel(name),
                                         value    = value,
                                         isMe     = isMe,

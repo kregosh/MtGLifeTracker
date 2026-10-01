@@ -8,9 +8,15 @@ import com.kregosh.mtglifetracker.data.UserPrefs
 import com.kregosh.mtglifetracker.network.SessionApi
 import com.kregosh.mtglifetracker.network.SessionConnection
 import com.kregosh.mtglifetracker.network.WsState
+import com.kregosh.mtglifetracker.shared.COMMANDER_STAT
+import com.kregosh.mtglifetracker.shared.LIFE_STAT
+import com.kregosh.mtglifetracker.shared.POISON_STAT
 import com.kregosh.mtglifetracker.shared.ServerMessage
+import com.kregosh.mtglifetracker.shared.SessionInfoResponse
+import com.kregosh.mtglifetracker.shared.SessionSettings
 import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.shared.UserState
+import com.kregosh.mtglifetracker.shared.commanderDamageSource
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -55,21 +61,30 @@ data class FriendRequestInfo(val fromUserId: String, val fromDisplayName: String
 // ─────────────────────────────────────────────────────────────────────────────
 
 data class SessionUiState(
-    val sessionCode              : String               = "",
-    val myUserId                 : String               = "",
-    val users                    : List<UserState>      = emptyList(),
-    val statDefs                 : Map<String, StatType> = emptyMap(),
-    val globalStats              : Map<String, UInt>    = emptyMap(),
-    val wsState                  : WsState              = WsState.Connecting,
-    val error                    : String?              = null,
-    val commanderDeathThreshold  : UInt                 = 21u,
-    val infectDeathThreshold     : UInt                 = 10u,
-)
+    val sessionCode : String                = "",
+    val myUserId    : String                = "",
+    val users       : List<UserState>       = emptyList(),
+    val statDefs    : Map<String, StatType> = emptyMap(),
+    val globalStats : Map<String, UInt>     = emptyMap(),
+    val wsState     : WsState               = WsState.Connecting,
+    val error       : String?               = null,
+    val settings    : SessionSettings       = SessionSettings(),
+    val hostUserId  : String?               = null,
+    val game        : Long                  = 0,
+) {
+    val isHost: Boolean get() = hostUserId != null && hostUserId == myUserId
+}
 
+/** Dead at 0 life, or at the threshold of commander damage from any single commander, or of poison. */
 fun UserState.isDead(state: SessionUiState): Boolean =
     life == 0u
-        || (customStats["commander"] ?: 0u) >= state.commanderDeathThreshold
-        || (customStats["poison"]    ?: 0u) >= state.infectDeathThreshold
+        || (commanderDamage.values.maxOrNull() ?: 0u) >= state.settings.commanderDeathThreshold
+        || (customStats[POISON_STAT] ?: 0u) >= state.settings.infectDeathThreshold
+
+/** One committed change to the local player's life total, newest first in the history. */
+data class LifeChange(val id: Long, val delta: Int, val lifeAfter: UInt)
+
+private const val MAX_LIFE_HISTORY = 50
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ViewModel
@@ -181,6 +196,16 @@ class SessionViewModel(
     // Debounce state: last server-confirmed snapshot + per-stat pending deltas
     private var serverUsers   = emptyList<UserState>()
     private var lastRoster    = emptyMap<String, String>()
+    private var hadSeat       = false
+
+    // ── life history / undo ───────────────────────────────────────────
+
+    private val _lifeHistory = MutableStateFlow<List<LifeChange>>(emptyList())
+    val lifeHistory: StateFlow<List<LifeChange>> = _lifeHistory.asStateFlow()
+
+    private var nextLifeChangeId = 0L
+    // Part of the pending life delta that comes from undo and must not be recorded again.
+    private var unrecordedLifeDelta = 0
     private val pendingDeltas = mutableMapOf<String, Int>()
     private val debounceJobs  = mutableMapOf<String, Job>()
 
@@ -303,12 +328,19 @@ class SessionViewModel(
 
     // ── home screen actions ──────────────────────────────────────────
 
+    private fun defaultSettings() = SessionSettings(
+        startLife               = prefs.startLife,
+        commanderDeathThreshold = prefs.commanderDeathThreshold,
+        infectDeathThreshold    = prefs.infectDeathThreshold,
+    )
+
     fun createSession() {
         viewModelScope.launch {
             _homeLoading.value = true
             _homeError.value   = null
-            runCatching { api.createSession() }
-                .onSuccess { resp -> joinSession(resp.sessionId, resp.sessionCode) }
+            val settings = defaultSettings()
+            runCatching { api.createSession(prefs.userId, settings) }
+                .onSuccess { resp -> joinSession(resp.sessionId, resp.sessionCode, settings) }
                 .onFailure { _homeError.value = it.message ?: "Failed to create session" }
             _homeLoading.value = false
         }
@@ -319,7 +351,7 @@ class SessionViewModel(
             _homeLoading.value = true
             _homeError.value   = null
             runCatching { api.getSessionByCode(code.trim().uppercase()) }
-                .onSuccess { info -> joinSession(info.sessionId, info.sessionCode) }
+                .onSuccess { info -> joinIfRoom(info) }
                 .onFailure { _homeError.value = "Session not found" }
             _homeLoading.value = false
         }
@@ -330,7 +362,7 @@ class SessionViewModel(
             _homeLoading.value = true
             _homeError.value   = null
             runCatching { api.getSessionById(sessionId) }
-                .onSuccess { info -> joinSession(info.sessionId, info.sessionCode) }
+                .onSuccess { info -> joinIfRoom(info) }
                 .onFailure { _homeError.value = it.message ?: "Failed to join session" }
             _homeLoading.value = false
         }
@@ -347,16 +379,40 @@ class SessionViewModel(
         viewModelScope.launch {
             _homeLoading.value = true
             runCatching { api.getSessionById(sessionId) }
-                .onSuccess { info -> joinSession(info.sessionId, info.sessionCode) }
+                .onSuccess { info -> if (!joinIfRoom(info, quiet = true)) prefs.lastSessionId = null }
                 .onFailure { prefs.lastSessionId = null }
             _homeLoading.value = false
         }
+    }
+
+    private fun joinIfRoom(info: SessionInfoResponse, quiet: Boolean = false): Boolean {
+        val max = info.settings?.maxPlayers ?: 0
+        if (max > 0 && prefs.userId !in info.userIds && info.userIds.size >= max) {
+            if (!quiet) _homeError.value = "This session is full ($max players)"
+            return false
+        }
+        joinSession(info.sessionId, info.sessionCode, info.settings)
+        return true
     }
 
     // ── session screen actions ───────────────────────────────────────
 
     fun adjust(stat: String, delta: Int) {
         webSocket ?: return
+        queueDelta(stat, delta)
+    }
+
+    /** Reverts the most recent recorded change to the local player's life. */
+    fun undoLastLifeChange() {
+        webSocket ?: return
+        val last = _lifeHistory.value.firstOrNull() ?: return
+        _lifeHistory.update { it.drop(1) }
+        unrecordedLifeDelta -= last.delta
+        queueDelta(LIFE_STAT, -last.delta)
+    }
+
+    // Rapid taps are coalesced into one network write per stat.
+    private fun queueDelta(stat: String, delta: Int) {
         pendingDeltas[stat] = (pendingDeltas[stat] ?: 0) + delta
         _sessionUi.update { it.copy(users = applyPendingDeltas(serverUsers)) }
         debounceJobs[stat]?.cancel()
@@ -364,8 +420,35 @@ class SessionViewModel(
             delay(400)
             val accumulated = pendingDeltas.remove(stat) ?: return@launch
             debounceJobs.remove(stat)
-            webSocket?.adjust(stat, accumulated)
+            if (stat == LIFE_STAT) recordLifeChange(accumulated - unrecordedLifeDelta)
+            if (stat == LIFE_STAT) unrecordedLifeDelta = 0
+            if (accumulated != 0) webSocket?.adjust(stat, accumulated)
         }
+    }
+
+    private fun recordLifeChange(delta: Int) {
+        if (delta == 0) return
+        val me = _sessionUi.value.users.find { it.id == _sessionUi.value.myUserId } ?: return
+        val change = LifeChange(nextLifeChangeId++, delta, me.life)
+        _lifeHistory.update { (listOf(change) + it).take(MAX_LIFE_HISTORY) }
+    }
+
+    // ── host controls ─────────────────────────────────────────────────
+
+    fun updateSessionSettings(settings: SessionSettings) {
+        if (!_sessionUi.value.isHost) return
+        webSocket?.updateSettings(settings)
+    }
+
+    fun startNewGame() {
+        if (!_sessionUi.value.isHost) return
+        webSocket?.startNewGame()
+    }
+
+    fun removePlayer(userId: String) {
+        val ui = _sessionUi.value
+        if (!ui.isHost || userId == ui.myUserId) return
+        webSocket?.removePlayer(userId)
     }
 
     fun addCustomStat(name: String, type: StatType = StatType.NUMERIC) {
@@ -416,12 +499,13 @@ class SessionViewModel(
 
     private fun UserState.withDelta(stat: String, delta: Int): UserState {
         fun clamp(v: Long) = v.coerceIn(0L, UInt.MAX_VALUE.toLong()).toUInt()
-        return when (stat) {
-            "life" -> copy(life = clamp(life.toLong() + delta))
-            else   -> copy(customStats = customStats.toMutableMap().also { map ->
-                val current = map[stat] ?: 0u
-                map[stat] = clamp(current.toLong() + delta)
-            })
+        val opponent = commanderDamageSource(stat)
+        return when {
+            stat == LIFE_STAT -> copy(life = clamp(life.toLong() + delta))
+            opponent != null  -> copy(commanderDamage = commanderDamage +
+                (opponent to clamp((commanderDamage[opponent] ?: 0u).toLong() + delta)))
+            else -> copy(customStats = customStats +
+                (stat to clamp((customStats[stat] ?: 0u).toLong() + delta)))
         }
     }
 
@@ -448,7 +532,7 @@ class SessionViewModel(
         if (friendDirty) _friendList.value = prefs.friendList
     }
 
-    private fun joinSession(sessionId: String, sessionCode: String) {
+    private fun joinSession(sessionId: String, sessionCode: String, settings: SessionSettings?) {
         val current = _screen.value
         if (current is Screen.Session && current.sessionId == sessionId) return
 
@@ -457,16 +541,16 @@ class SessionViewModel(
         val myId = prefs.userId
         val name = prefs.displayName.ifBlank { "Player" }
 
+        val rules = settings ?: defaultSettings()
         _sessionUi.value = SessionUiState(
-            sessionCode             = sessionCode,
-            myUserId                = myId,
-            commanderDeathThreshold = prefs.commanderDeathThreshold,
-            infectDeathThreshold    = prefs.infectDeathThreshold,
+            sessionCode = sessionCode,
+            myUserId    = myId,
+            settings    = rules,
         )
         _screen.value = Screen.Session(sessionId)
         prefs.lastSessionId = sessionId
 
-        val ws = wsFactory(sessionId, myId, name, prefs.startLife)
+        val ws = wsFactory(sessionId, myId, name, rules.startLife)
         webSocket = ws
 
         wsCollectorJob = viewModelScope.launch {
@@ -479,12 +563,25 @@ class SessionViewModel(
                 ws.messages.collect { msg ->
                     when (msg) {
                         is ServerMessage.State  -> {
+                            if (msg.users.any { it.id == myId }) {
+                                hadSeat = true
+                            } else if (hadSeat) {
+                                removedFromSession()
+                                return@collect
+                            }
+                            if (msg.game > _sessionUi.value.game) {
+                                resetTimer()
+                                _lifeHistory.value = emptyList()
+                            }
                             serverUsers = msg.users
                             _sessionUi.update {
                                 it.copy(
                                     users       = applyPendingDeltas(msg.users),
                                     statDefs    = msg.statDefs,
                                     globalStats = msg.globalStats,
+                                    settings    = msg.settings ?: it.settings,
+                                    hostUserId  = msg.hostUserId,
+                                    game        = msg.game,
                                 )
                             }
                             rememberPlayers(msg.users)
@@ -514,8 +611,16 @@ class SessionViewModel(
         ws.connect()
 
         if (prefs.commanderDefaultEnabled) {
-            ws.addCustomStat("commander", StatType.NUMERIC)
+            ws.addCustomStat(COMMANDER_STAT, StatType.NUMERIC)
         }
+    }
+
+    // Our seat disappeared: the host removed us, or the game ended while we were offline.
+    private fun removedFromSession() {
+        prefs.lastSessionId = null
+        tearDownWebSocket(removePlayer = false)
+        _screen.value    = Screen.Home
+        _homeError.value = "You are no longer in that session"
     }
 
     private fun tearDownWebSocket(removePlayer: Boolean = true) {
@@ -524,7 +629,10 @@ class SessionViewModel(
         pendingDeltas.clear()
         serverUsers = emptyList()
         lastRoster  = emptyMap()
+        hadSeat     = false
         sentFriendRequests.clear()
+        _lifeHistory.value  = emptyList()
+        unrecordedLifeDelta = 0
         _pendingFriendRequests.value = emptyList()
         wsCollectorJob?.cancel()
         wsCollectorJob = null

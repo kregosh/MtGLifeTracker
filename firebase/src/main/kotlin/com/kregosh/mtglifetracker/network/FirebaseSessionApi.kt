@@ -10,6 +10,7 @@ import com.google.firebase.database.ServerValue
 import com.google.firebase.database.ValueEventListener
 import com.kregosh.mtglifetracker.shared.CreateSessionResponse
 import com.kregosh.mtglifetracker.shared.SessionInfoResponse
+import com.kregosh.mtglifetracker.shared.SessionSettings
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -39,16 +40,24 @@ class FirebaseSessionApi : SessionApi {
         }
     }
 
-    override suspend fun createSession(): CreateSessionResponse {
+    override suspend fun createSession(hostUserId: String, settings: SessionSettings): CreateSessionResponse {
         ensureSignedIn()
         val sessionId = UUID.randomUUID().toString()
 
         return withTimeout(TIMEOUT_MS) {
+            // The rules check that the host ID belongs to this sign-in.
+            db.getReference("userAuth/$hostUserId").setValue(auth.currentUser?.uid).await()
             repeat(CODE_ATTEMPTS) {
                 val code = (1..CODE_LENGTH).map { CODE_CHARS.random() }.joinToString("")
                 if (claimCode(code, sessionId)) {
                     db.getReference("sessions/$sessionId").setValue(
-                        mapOf("code" to code, "createdAt" to ServerValue.TIMESTAMP)
+                        mapOf(
+                            "code"       to code,
+                            "createdAt"  to ServerValue.TIMESTAMP,
+                            "hostUserId" to hostUserId,
+                            "game"       to 0L,
+                            "settings"   to settings.toMap(),
+                        )
                     ).await()
                     Log.d(TAG, "createSession: created")
                     return@withTimeout CreateSessionResponse(sessionId = sessionId, sessionCode = code)
@@ -87,9 +96,9 @@ class FirebaseSessionApi : SessionApi {
             val sessionId = snapshot.getValue(String::class.java)
                 ?: throw Exception("Session '$upper' not found")
 
-            val sessionSnap    = db.getReference("sessions/$sessionId").get().await()
-            val connectedUsers = sessionSnap.child("users").childrenCount.toInt()
-            SessionInfoResponse(sessionId = sessionId, sessionCode = upper, connectedUsers = connectedUsers)
+            val sessionSnap = db.getReference("sessions/$sessionId").get().await()
+            if (!sessionSnap.exists()) throw Exception("Session '$upper' not found")
+            sessionSnap.toInfo(sessionId)
         }
     }
 
@@ -98,10 +107,19 @@ class FirebaseSessionApi : SessionApi {
         return withTimeout(TIMEOUT_MS) {
             val snapshot       = db.getReference("sessions/$sessionId").get().await()
             if (!snapshot.exists()) throw Exception("Session no longer exists")
-            val code           = snapshot.child("code").getValue(String::class.java) ?: ""
-            val connectedUsers = snapshot.child("users").childrenCount.toInt()
-            SessionInfoResponse(sessionId = sessionId, sessionCode = code, connectedUsers = connectedUsers)
+            snapshot.toInfo(sessionId)
         }
+    }
+
+    private fun DataSnapshot.toInfo(sessionId: String): SessionInfoResponse {
+        val users = child("users")
+        return SessionInfoResponse(
+            sessionId      = sessionId,
+            sessionCode    = child("code").getValue(String::class.java) ?: "",
+            connectedUsers = users.childrenCount.toInt(),
+            settings       = child("settings").toSessionSettings(),
+            userIds        = users.children.mapNotNull { it.key }.toSet(),
+        )
     }
 
     override fun observeFriendPresence(friendUserIds: List<String>): Flow<Map<String, String?>> {

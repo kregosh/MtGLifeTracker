@@ -10,6 +10,8 @@ import io.mockk.coVerify
 import com.kregosh.mtglifetracker.shared.CreateSessionResponse
 import com.kregosh.mtglifetracker.shared.ServerMessage
 import com.kregosh.mtglifetracker.shared.SessionInfoResponse
+import com.kregosh.mtglifetracker.shared.SessionSettings
+import com.kregosh.mtglifetracker.shared.commanderDamageStat
 import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.shared.UserState
 import com.kregosh.mtglifetracker.viewmodel.RESERVED_STAT_NAMES
@@ -72,7 +74,7 @@ class SessionViewModelTest {
 
     @Test
     fun `createSession on success navigates to Session screen`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "ABC123")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "ABC123")
 
         val vm = makeVm()
         vm.createSession()
@@ -85,7 +87,7 @@ class SessionViewModelTest {
 
     @Test
     fun `createSession on failure sets homeError`() = runTest {
-        coEvery { api.createSession() } throws RuntimeException("network error")
+        coEvery { api.createSession(any(), any()) } throws RuntimeException("network error")
 
         val vm = makeVm()
         vm.createSession()
@@ -119,7 +121,7 @@ class SessionViewModelTest {
 
     @Test
     fun `State message updates sessionUi users and statDefs`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
 
         val vm = makeVm()
         vm.createSession()
@@ -135,7 +137,7 @@ class SessionViewModelTest {
 
     @Test
     fun `leaveSession navigates back to Home`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
 
         val vm = makeVm()
         vm.createSession()
@@ -149,7 +151,7 @@ class SessionViewModelTest {
 
     @Test
     fun `adjust delegates to websocket after debounce`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
 
         val vm = makeVm()
         vm.createSession()
@@ -166,7 +168,7 @@ class SessionViewModelTest {
 
     @Test
     fun `adjust accumulates rapid taps into a single websocket call`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
 
         val vm = makeVm()
         vm.createSession()
@@ -179,7 +181,7 @@ class SessionViewModelTest {
 
     @Test
     fun `adjust shows optimistic state immediately without waiting for server`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
 
         val vm = makeVm()
         vm.createSession()
@@ -195,7 +197,7 @@ class SessionViewModelTest {
 
     @Test
     fun `adjust reapplies pending deltas when server State arrives mid-debounce`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
 
         val vm = makeVm()
         vm.createSession()
@@ -215,7 +217,7 @@ class SessionViewModelTest {
 
     @Test
     fun `addCustomStat delegates to websocket`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
 
         val vm = makeVm()
         vm.createSession()
@@ -227,7 +229,7 @@ class SessionViewModelTest {
 
     @Test
     fun `removeCustomStat delegates to websocket`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
 
         val vm = makeVm()
         vm.createSession()
@@ -244,7 +246,7 @@ class SessionViewModelTest {
 
     @Test
     fun `stale collectors do not fire after leaveSession`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
 
         val vm = makeVm()
         vm.createSession()
@@ -262,7 +264,7 @@ class SessionViewModelTest {
 
     @Test
     fun `homeLoading is false after createSession completes`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
@@ -271,7 +273,7 @@ class SessionViewModelTest {
 
     @Test
     fun `Joined message updates sessionCode in sessionUi`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
@@ -284,7 +286,7 @@ class SessionViewModelTest {
 
     @Test
     fun `Error message updates error field in sessionUi`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
@@ -297,7 +299,7 @@ class SessionViewModelTest {
 
     @Test
     fun `wsState change propagates to sessionUi`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
@@ -370,7 +372,7 @@ class SessionViewModelTest {
             every { connectionState } returns ws2State
         }
 
-        coEvery { api.createSession() } returnsMany listOf(
+        coEvery { api.createSession(any(), any()) } returnsMany listOf(
             CreateSessionResponse("sid-1", "CODE01"),
             CreateSessionResponse("sid-2", "CODE02"),
         )
@@ -396,7 +398,7 @@ class SessionViewModelTest {
     @Test
     fun `commanderDefaultEnabled auto-adds commander stat when joining`() = runTest {
         every { prefs.commanderDefaultEnabled } returns true
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
 
         val vm = makeVm()
         vm.createSession()
@@ -407,7 +409,7 @@ class SessionViewModelTest {
 
     @Test
     fun `globalStats are updated from State message`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
@@ -420,7 +422,7 @@ class SessionViewModelTest {
 
     @Test
     fun `toggleGlobal flips global stat value`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
@@ -435,7 +437,7 @@ class SessionViewModelTest {
 
     @Test
     fun `isDead uses commander in customStats`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
@@ -444,7 +446,7 @@ class SessionViewModelTest {
             id          = "test-user-id",
             displayName = "Test Player",
             life        = 20u,
-            customStats = mapOf("commander" to 21u),
+            commanderDamage = mapOf("opponent" to 21u),
         )
         wsMessages.emit(ServerMessage.State(listOf(deadUser)))
         advanceUntilIdle()
@@ -503,7 +505,7 @@ class SessionViewModelTest {
 
     @Test
     fun `leaveSession resets the timer`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
@@ -631,7 +633,7 @@ class SessionViewModelTest {
 
     @Test
     fun `setDisplayName propagates to live websocket when session is active`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
@@ -649,7 +651,7 @@ class SessionViewModelTest {
 
     @Test
     fun `setDisplayName trims before propagating to websocket`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
@@ -663,7 +665,7 @@ class SessionViewModelTest {
 
     @Test
     fun `concede delegates setConceded(true) to websocket`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
@@ -674,7 +676,7 @@ class SessionViewModelTest {
 
     @Test
     fun `unconcede delegates setConceded(false) to websocket`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
@@ -685,7 +687,7 @@ class SessionViewModelTest {
 
     @Test
     fun `concede updates local user state optimistically`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
@@ -700,7 +702,7 @@ class SessionViewModelTest {
 
     @Test
     fun `unconcede updates local user state optimistically`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
@@ -717,7 +719,7 @@ class SessionViewModelTest {
 
     @Test
     fun `sendFriendRequest delegates to websocket`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
@@ -728,7 +730,7 @@ class SessionViewModelTest {
 
     @Test
     fun `FriendRequest message adds entry to pendingFriendRequests`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
@@ -744,7 +746,7 @@ class SessionViewModelTest {
 
     @Test
     fun `duplicate FriendRequest message is not added twice`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
@@ -758,7 +760,7 @@ class SessionViewModelTest {
 
     @Test
     fun `acceptFriendRequest adds friend, removes pending entry, and delegates to websocket`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         every { prefs.friendList } returns listOf(Friend("user-2", "Alice"))
         val vm = makeVm()
         vm.createSession()
@@ -776,7 +778,7 @@ class SessionViewModelTest {
 
     @Test
     fun `declineFriendRequest removes pending entry and delegates to websocket`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
@@ -792,7 +794,7 @@ class SessionViewModelTest {
 
     @Test
     fun `FriendAccepted message persists friend and acknowledges`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         every { prefs.friendList } returns listOf(Friend("user-3", "Bob"))
         val vm = makeVm()
         vm.createSession()
@@ -809,7 +811,7 @@ class SessionViewModelTest {
 
     @Test
     fun `unsolicited FriendAccepted is acknowledged but not added as a friend`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
@@ -823,7 +825,7 @@ class SessionViewModelTest {
 
     @Test
     fun `pendingFriendRequests cleared on leaveSession`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
@@ -840,7 +842,7 @@ class SessionViewModelTest {
 
     @Test
     fun `State message with other players triggers touchKnownPlayer`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         every { prefs.knownPlayers } returns listOf(KnownPlayer("other-id", "Alice", 0L))
         val vm = makeVm()
         vm.createSession()
@@ -859,7 +861,7 @@ class SessionViewModelTest {
 
     @Test
     fun `State message does not call touchKnownPlayer for own user`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
@@ -872,7 +874,7 @@ class SessionViewModelTest {
 
     @Test
     fun `State message updates friend display name when friend is in session`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         every { prefs.friendList } returns listOf(Friend("friend-id", "OldName"))
         val vm = makeVm()
         vm.createSession()
@@ -890,7 +892,7 @@ class SessionViewModelTest {
 
     @Test
     fun `repeated State with the same players does not rewrite prefs`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
@@ -907,7 +909,7 @@ class SessionViewModelTest {
 
     @Test
     fun `State touches prefs again when a player is renamed`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
@@ -925,7 +927,7 @@ class SessionViewModelTest {
 
     @Test
     fun `joining a session remembers it for resume`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
@@ -935,7 +937,7 @@ class SessionViewModelTest {
 
     @Test
     fun `leaveSession forgets the session and removes the player`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
@@ -1236,7 +1238,7 @@ class SessionViewModelTest {
 
     @Test
     fun `addCustomStat silently ignores reserved names`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid", "CODE01")
         every { wsFactory("sid", any(), any(), any()) } returns ws
 
         val vm = makeVm()
@@ -1256,7 +1258,7 @@ class SessionViewModelTest {
 
     @Test
     fun `addCustomStat accepts the commander and poison presets`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid", "CODE01")
 
         val vm = makeVm()
         vm.createSession()
@@ -1288,7 +1290,7 @@ class SessionViewModelTest {
 
     @Test
     fun `addCustomStat ignores names Firebase cannot store`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid", "CODE01")
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
@@ -1311,7 +1313,7 @@ class SessionViewModelTest {
 
     @Test
     fun `addCustomStat forwards non-reserved names`() = runTest {
-        coEvery { api.createSession() } returns CreateSessionResponse("sid", "CODE01")
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid", "CODE01")
         every { wsFactory("sid", any(), any(), any()) } returns ws
 
         val vm = makeVm()
@@ -1346,5 +1348,212 @@ class SessionViewModelTest {
 
         assertIs<Screen.Session>(vm.screen.value)
         assertEquals("live-sid", (vm.screen.value as Screen.Session).sessionId)
+    }
+
+    // ── game features: commander damage, settings, undo, host controls ───────
+
+    private suspend fun TestScope.inSession(
+        users: List<UserState> = listOf(UserState("test-user-id", "Test Player", life = 20u)),
+        hostUserId: String? = null,
+    ): SessionViewModel {
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+        wsMessages.emit(ServerMessage.State(users, hostUserId = hostUserId))
+        advanceUntilIdle()
+        return vm
+    }
+
+    @Test
+    fun `commander damage is tracked per opponent`() = runTest {
+        val vm = inSession()
+
+        vm.adjust(commanderDamageStat("bob"), 3)
+        vm.adjust(commanderDamageStat("carol"), 5)
+
+        val me = vm.sessionUi.value.users.single()
+        assertEquals(mapOf("bob" to 3u, "carol" to 5u), me.commanderDamage)
+        advanceUntilIdle()
+        verify { ws.adjust(commanderDamageStat("bob"), 3) }
+        verify { ws.adjust(commanderDamageStat("carol"), 5) }
+    }
+
+    @Test
+    fun `createSession makes us host with our default game rules`() = runTest {
+        every { prefs.startLife } returns 40u
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        coVerify { api.createSession("test-user-id", SessionSettings(startLife = 40u)) }
+        verify { wsFactory("sid-1", "test-user-id", any(), 40u) }
+    }
+
+    @Test
+    fun `joining uses the session's rules instead of local ones`() = runTest {
+        val rules = SessionSettings(startLife = 30u, commanderDeathThreshold = 15u)
+        coEvery { api.getSessionByCode("ABCDEFGH") } returns
+            SessionInfoResponse("sid-2", "ABCDEFGH", 1, rules, setOf("host"))
+        val vm = makeVm()
+        vm.joinByCode("ABCDEFGH")
+        advanceUntilIdle()
+
+        verify { wsFactory("sid-2", any(), any(), 30u) }
+        assertEquals(rules, vm.sessionUi.value.settings)
+    }
+
+    @Test
+    fun `a full session cannot be joined`() = runTest {
+        coEvery { api.getSessionByCode(any()) } returns
+            SessionInfoResponse("sid-2", "ABCDEFGH", 2, SessionSettings(maxPlayers = 2), setOf("a", "b"))
+        val vm = makeVm()
+        vm.joinByCode("ABCDEFGH")
+        advanceUntilIdle()
+
+        assertEquals(Screen.Home, vm.screen.value)
+        assertEquals("This session is full (2 players)", vm.homeError.value)
+    }
+
+    @Test
+    fun `a member can rejoin a full session`() = runTest {
+        coEvery { api.getSessionByCode(any()) } returns
+            SessionInfoResponse("sid-2", "ABCDEFGH", 2, SessionSettings(maxPlayers = 2), setOf("test-user-id", "b"))
+        val vm = makeVm()
+        vm.joinByCode("ABCDEFGH")
+        advanceUntilIdle()
+
+        assertIs<Screen.Session>(vm.screen.value)
+    }
+
+    @Test
+    fun `settings and host come from the session state`() = runTest {
+        val vm = inSession()
+        val rules = SessionSettings(startLife = 40u, infectDeathThreshold = 7u)
+        wsMessages.emit(ServerMessage.State(
+            listOf(UserState("test-user-id", "Test Player")), hostUserId = "test-user-id", settings = rules,
+        ))
+        advanceUntilIdle()
+
+        assertEquals(rules, vm.sessionUi.value.settings)
+        assertTrue(vm.sessionUi.value.isHost)
+    }
+
+    @Test
+    fun `host controls are ignored for non-hosts`() = runTest {
+        val vm = inSession(hostUserId = "someone-else")
+
+        vm.startNewGame()
+        vm.removePlayer("other")
+        vm.updateSessionSettings(SessionSettings(startLife = 40u))
+
+        verify(exactly = 0) { ws.startNewGame() }
+        verify(exactly = 0) { ws.removePlayer(any()) }
+        verify(exactly = 0) { ws.updateSettings(any()) }
+    }
+
+    @Test
+    fun `host controls reach the connection for the host`() = runTest {
+        val vm = inSession(hostUserId = "test-user-id")
+
+        vm.startNewGame()
+        vm.removePlayer("other")
+        vm.removePlayer("test-user-id")   // not yourself
+        vm.updateSessionSettings(SessionSettings(startLife = 40u))
+
+        verify { ws.startNewGame() }
+        verify(exactly = 1) { ws.removePlayer("other") }
+        verify { ws.updateSettings(SessionSettings(startLife = 40u)) }
+    }
+
+    @Test
+    fun `losing our seat returns to Home with a message`() = runTest {
+        val vm = inSession()
+        wsMessages.emit(ServerMessage.State(listOf(UserState("other", "Bob"))))
+        advanceUntilIdle()
+
+        assertEquals(Screen.Home, vm.screen.value)
+        assertEquals("You are no longer in that session", vm.homeError.value)
+        verify { prefs.lastSessionId = null }
+    }
+
+    @Test
+    fun `a state without our seat before we sat down is not a removal`() = runTest {
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+        wsMessages.emit(ServerMessage.State(listOf(UserState("other", "Bob"))))
+        advanceUntilIdle()
+
+        assertIs<Screen.Session>(vm.screen.value)
+    }
+
+    @Test
+    fun `life changes are recorded once per burst of taps`() = runTest {
+        val vm = inSession()
+        vm.adjust("life", -1)
+        vm.adjust("life", -1)
+        vm.adjust("life", -1)
+        advanceUntilIdle()
+
+        val history = vm.lifeHistory.value
+        assertEquals(1, history.size)
+        assertEquals(-3, history.single().delta)
+        assertEquals(17u, history.single().lifeAfter)
+    }
+
+    @Test
+    fun `other stats are not recorded in the life history`() = runTest {
+        val vm = inSession()
+        vm.adjust("poison", 1)
+        advanceUntilIdle()
+        assertTrue(vm.lifeHistory.value.isEmpty())
+    }
+
+    @Test
+    fun `undo reverts the last life change without recording itself`() = runTest {
+        val vm = inSession()
+        vm.adjust("life", -5)
+        advanceUntilIdle()
+        wsMessages.emit(ServerMessage.State(listOf(UserState("test-user-id", "Test Player", life = 15u))))
+        advanceUntilIdle()
+
+        vm.undoLastLifeChange()
+        assertEquals(20u, vm.sessionUi.value.users.single().life)
+        advanceUntilIdle()
+
+        verify { ws.adjust("life", -5) }
+        verify { ws.adjust("life", 5) }
+        assertTrue(vm.lifeHistory.value.isEmpty())
+    }
+
+    @Test
+    fun `undo merged with new taps records only the taps`() = runTest {
+        val vm = inSession()
+        vm.adjust("life", -5)
+        advanceUntilIdle()
+
+        vm.undoLastLifeChange()
+        vm.adjust("life", -2)
+        advanceUntilIdle()
+
+        verify { ws.adjust("life", 3) }
+        assertEquals(listOf(-2), vm.lifeHistory.value.map { it.delta })
+    }
+
+    @Test
+    fun `a new game clears the life history`() = runTest {
+        val vm = inSession()
+        vm.adjust("life", -5)
+        advanceUntilIdle()
+        assertEquals(1, vm.lifeHistory.value.size)
+
+        wsMessages.emit(ServerMessage.State(listOf(UserState("test-user-id", "Test Player")), game = 1))
+        advanceUntilIdle()
+
+        assertTrue(vm.lifeHistory.value.isEmpty())
+        assertEquals(1L, vm.sessionUi.value.game)
     }
 }

@@ -1,6 +1,7 @@
 package com.kregosh.mtglifetracker.network
 
 import com.kregosh.mtglifetracker.shared.ServerMessage
+import com.kregosh.mtglifetracker.shared.SessionSettings
 import com.kregosh.mtglifetracker.shared.StatType
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,6 +16,11 @@ interface SessionConnection {
     fun setGlobal(stat: String, value: UInt)
     fun setConceded(conceded: Boolean)
     fun setDisplayName(name: String)
+
+    // ── Host controls ─────────────────────────────────────────────────────
+    fun updateSettings(settings: SessionSettings)
+    fun startNewGame()
+    fun removePlayer(userId: String)
 
     // ── Friend requests ───────────────────────────────────────────────────
     fun sendFriendRequest(toUserId: String)

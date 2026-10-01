@@ -4,6 +4,8 @@ import com.google.android.gms.tasks.Tasks
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
 import com.kregosh.mtglifetracker.shared.ServerMessage
+import com.kregosh.mtglifetracker.shared.SessionSettings
+import com.kregosh.mtglifetracker.shared.commanderDamageSource
 import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.shared.UserState
 import kotlinx.coroutines.CoroutineScope
@@ -79,21 +81,22 @@ class FirebaseSessionConnection(
                         id          = userSnap.key ?: "",
                         displayName = userSnap.child("displayName").getValue(String::class.java) ?: "",
                         life        = userSnap.child("life").longOrZero(startLife.toLong()).toUInt(),
-                        customStats = userSnap.child("customStats").children.associate { stat ->
-                            (stat.key ?: "") to (stat.getValue(Long::class.java) ?: 0L).toUInt()
-                        },
+                        customStats = userSnap.child("customStats").toUIntMap(),
                         conceded    = userSnap.child("conceded").getValue(Boolean::class.java) ?: false,
                         online      = userSnap.child("online").getValue(Boolean::class.java) ?: true,
+                        commanderDamage = userSnap.child("commanderDamage").toUIntMap(),
                     )
                 }
+                val settings = snapshot.child("settings").toSessionSettings()
+                val game     = snapshot.child("game").getValue(Long::class.java) ?: 0L
+                resetSeatIfNewGame(snapshot.child("users/$userId"), game, settings)
                 val statDefs = snapshot.child("customStatNames").children.associate { child ->
                     (child.key ?: "") to child.getValue(String::class.java).toStatType()
                 }
-                val globalStats = snapshot.child("globalStats").children.associate { child ->
-                    (child.key ?: "") to (child.getValue(Long::class.java) ?: 0L).toUInt()
-                }
+                val globalStats = snapshot.child("globalStats").toUIntMap()
+                val hostUserId  = snapshot.child("hostUserId").getValue(String::class.java)
                 scope.launch {
-                    _messages.emit(ServerMessage.State(users, statDefs, globalStats))
+                    _messages.emit(ServerMessage.State(users, statDefs, globalStats, hostUserId, settings, game))
                 }
             }
             override fun onCancelled(error: DatabaseError) {
@@ -163,10 +166,30 @@ class FirebaseSessionConnection(
         presenceRef.setValue(sessionId)
     }
 
+    // Each player resets their own seat when the host starts a new game, so the
+    // rules never have to let one player write another player's stats.
+    private var resetForGame = -1L
+
+    private fun resetSeatIfNewGame(mySeat: DataSnapshot, game: Long, settings: SessionSettings?) {
+        val seatGame = mySeat.child("game").getValue(Long::class.java) ?: 0L
+        if (!mySeat.exists() || game <= seatGame || game <= resetForGame) return
+        resetForGame = game
+        myUserRef.setValue(
+            mapOf(
+                "displayName" to displayName,
+                "life"        to (settings?.startLife ?: startLife).toLong(),
+                "online"      to true,
+                "game"        to game,
+            )
+        )
+    }
+
     override fun adjust(stat: String, delta: Int) {
-        val fieldRef = when (stat) {
-            "life" -> myUserRef.child("life")
-            else   -> myUserRef.child("customStats/$stat")
+        val opponent = commanderDamageSource(stat)
+        val fieldRef = when {
+            stat == "life"   -> myUserRef.child("life")
+            opponent != null -> myUserRef.child("commanderDamage/$opponent")
+            else             -> myUserRef.child("customStats/$stat")
         }
         fieldRef.runTransaction(object : Transaction.Handler {
             override fun doTransaction(data: MutableData): Transaction.Result {
@@ -203,6 +226,26 @@ class FirebaseSessionConnection(
     override fun setDisplayName(name: String) {
         displayName = name
         myUserRef.child("displayName").setValue(name)
+    }
+
+    // ── Host controls (the rules only accept these from the host) ─────────
+
+    override fun updateSettings(settings: SessionSettings) {
+        sessionRef.child("settings").setValue(settings.toMap())
+    }
+
+    override fun startNewGame() {
+        sessionRef.child("game").runTransaction(object : Transaction.Handler {
+            override fun doTransaction(data: MutableData): Transaction.Result {
+                data.value = (data.getValue(Long::class.java) ?: 0L) + 1
+                return Transaction.success(data)
+            }
+            override fun onComplete(error: DatabaseError?, committed: Boolean, snapshot: DataSnapshot?) {}
+        })
+    }
+
+    override fun removePlayer(userId: String) {
+        sessionRef.child("users/$userId").removeValue()
     }
 
     // ── Friend requests ───────────────────────────────────────────────────

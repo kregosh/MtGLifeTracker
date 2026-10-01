@@ -34,18 +34,42 @@
         "code":      { ".validate": "newData.isString() && newData.val().matches(/^[A-Z0-9]{6,8}$/) && !data.exists()" },
         "createdAt": { ".validate": "newData.isNumber() && newData.val() <= now && !data.exists()" },
 
+        // ── Host and shared game rules ─────────────────────────────────
+        // The creator becomes host. Only the host changes the rules or starts
+        // a new game; each player then resets their own seat.
+        "hostUserId": { ".validate": "newData.isString() && !data.exists() && root.child('userAuth').child(newData.val()).val() == auth.uid" },
+        "game": {
+          ".write":    "auth != null && root.child('userAuth').child(root.child('sessions').child($sessionId).child('hostUserId').val()).val() == auth.uid",
+          ".validate": "newData.isNumber() && (!data.exists() || newData.val() > data.val())"
+        },
+        "settings": {
+          ".write":    "auth != null && root.child('userAuth').child(root.child('sessions').child($sessionId).child('hostUserId').val()).val() == auth.uid",
+          ".validate": "newData.hasChildren(['startLife', 'commanderDeathThreshold', 'infectDeathThreshold', 'maxPlayers'])",
+          "startLife":               { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 1000" },
+          "commanderDeathThreshold": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 100" },
+          "infectDeathThreshold":    { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 100" },
+          "maxPlayers":              { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 16" },
+          "$other": { ".validate": false }
+        },
+
         // ── Per-player state ───────────────────────────────────────────
         "users": {
           "$userId": {
-            // The owner writes their own seat. Anyone may clear the seat of a
-            // player who is offline (ghosts left behind by a killed app).
-            ".write": "auth != null && (root.child('userAuth').child($userId).val() == auth.uid || (!newData.exists() && data.child('online').val() == false))",
+            // The owner writes their own seat. The host may remove anyone, and any
+            // player may clear the seat of someone offline (ghosts left behind by a killed app).
+            ".write": "auth != null && (root.child('userAuth').child($userId).val() == auth.uid || (!newData.exists() && (data.child('online').val() == false || root.child('userAuth').child(root.child('sessions').child($sessionId).child('hostUserId').val()).val() == auth.uid)))",
             ".validate": "newData.hasChildren(['displayName', 'life'])",
 
             "displayName": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 64" },
             "life":        { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000" },
             "conceded":    { ".validate": "newData.isBoolean()" },
             "online":      { ".validate": "newData.isBoolean()" },
+            "game":        { ".validate": "newData.isNumber() && newData.val() >= 0" },
+            "commanderDamage": {
+              "$fromUserId": {
+                ".validate": "$fromUserId.matches(/^[0-9a-f-]{36}$/) && newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000"
+              }
+            },
             "customStats": {
               "$stat": {
                 ".validate": "$stat.matches(/^[A-Za-z0-9 _'-]{1,32}$/) && newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000"
