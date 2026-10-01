@@ -171,7 +171,11 @@ class SessionViewModel(
 
     val displayName: String get() = prefs.displayName
 
-    fun setDisplayName(name: String) { prefs.displayName = name.trim() }
+    fun setDisplayName(name: String) {
+        val trimmed = name.trim()
+        prefs.displayName = trimmed
+        webSocket?.setDisplayName(trimmed)
+    }
 
     // ── background images ─────────────────────────────────────────────
 

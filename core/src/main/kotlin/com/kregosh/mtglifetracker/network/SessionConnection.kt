@@ -14,6 +14,7 @@ interface SessionConnection {
     fun removeCustomStat(name: String)
     fun setGlobal(stat: String, value: UInt)
     fun setConceded(conceded: Boolean)
+    fun setDisplayName(name: String)
 
     // ── Friend requests ───────────────────────────────────────────────────
     fun sendFriendRequest(toUserId: String)
