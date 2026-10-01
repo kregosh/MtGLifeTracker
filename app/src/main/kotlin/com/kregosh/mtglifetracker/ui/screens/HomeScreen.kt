@@ -30,6 +30,7 @@ fun HomeScreen(vm: SessionViewModel) {
     val hasBg        = LocalHasBackground.current
     val friendList   by vm.friendList.collectAsState()
     val knownPlayers by vm.knownPlayers.collectAsState()
+    val friendPresence by vm.friendPresence.collectAsState()
     val displayName  by vm.displayName.collectAsState()
 
     if (displayName.isBlank()) {
@@ -52,6 +53,9 @@ fun HomeScreen(vm: SessionViewModel) {
             friendList     = friendList,
             knownPlayers   = knownPlayers,
             friendIds      = friendIds,
+            friendPresence = friendPresence,
+            currentSessionId = null,
+            onJoinSession  = vm::joinFriendSession,
             onRemoveFriend = vm::removeFriend,
             onAddFriend    = { uid, name -> vm.addFriend(uid, name) },
             onForgetPlayer = vm::forgetPlayer,
