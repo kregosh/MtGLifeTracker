@@ -1,6 +1,7 @@
 package com.kregosh.mtglifetracker.ui.screens
 
 import android.content.Intent
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -118,6 +119,26 @@ private fun SessionContent(
 ) {
 
     var showStatPicker   by remember { mutableStateOf(false) }
+    var showLeaveDialog  by remember { mutableStateOf(false) }
+
+    BackHandler { showLeaveDialog = true }
+
+    if (showLeaveDialog) {
+        AlertDialog(
+            onDismissRequest = { showLeaveDialog = false },
+            title = { Text("Leave session?") },
+            text  = { Text("Your life total and stats will be removed from this game.") },
+            confirmButton = {
+                TextButton(
+                    onClick = { showLeaveDialog = false; vm.leaveSession() },
+                    colors  = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) { Text("Leave") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLeaveDialog = false }) { Text("Stay") }
+            },
+        )
+    }
     var showCustomDialog by remember { mutableStateOf(false) }
     var showFriendsSheet by remember { mutableStateOf(false) }
 
@@ -177,7 +198,7 @@ private fun SessionContent(
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = vm::leaveSession) {
+                    IconButton(onClick = { showLeaveDialog = true }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Leave session")
                     }
                 },

@@ -43,25 +43,20 @@ class FirebaseSessionConnection(
 
     private val presenceRef = db.getReference("presence/$userId")
 
-    override fun connect() {
-        presenceRef.setValue(sessionId)
-        presenceRef.onDisconnect().removeValue()
+    private val onlineRef = myUserRef.child("online")
 
-        myUserRef.setValue(
-            mapOf(
-                "displayName" to displayName,
-                "life"        to startLife.toLong(),
-                "customStats" to emptyMap<String, Any>(),
-            )
-        )
+    override fun connect() {
+        claimSeat()
 
         // ── Connection state ──────────────────────────────────────────────
         val connListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                _state.value = if (snapshot.getValue(Boolean::class.java) == true)
-                    WsState.Connected
-                else
-                    WsState.Reconnecting
+                if (snapshot.getValue(Boolean::class.java) == true) {
+                    _state.value = WsState.Connected
+                    markOnline()
+                } else {
+                    _state.value = WsState.Reconnecting
+                }
             }
             override fun onCancelled(error: DatabaseError) {
                 _state.value = WsState.Failed(error.message)
@@ -82,6 +77,7 @@ class FirebaseSessionConnection(
                             (stat.key ?: "") to (stat.getValue(Long::class.java) ?: 0L).toUInt()
                         },
                         conceded    = userSnap.child("conceded").getValue(Boolean::class.java) ?: false,
+                        online      = userSnap.child("online").getValue(Boolean::class.java) ?: true,
                     )
                 }
                 val statDefs = snapshot.child("customStatNames").children.associate { child ->
@@ -136,6 +132,29 @@ class FirebaseSessionConnection(
         }
         acceptedChildListener = accListener
         inboundAcceptedRef.addChildEventListener(accListener)
+    }
+
+    // Rejoining (after a crash, a restart or a dropped connection) must not reset the
+    // player's life and stats, so only a missing seat is initialised.
+    private fun claimSeat() {
+        myUserRef.runTransaction(object : Transaction.Handler {
+            override fun doTransaction(data: MutableData): Transaction.Result {
+                data.child("displayName").value = displayName
+                if (!data.hasChild("life")) data.child("life").value = startLife.toLong()
+                return Transaction.success(data)
+            }
+            override fun onComplete(error: DatabaseError?, committed: Boolean, snapshot: DataSnapshot?) {
+                if (error != null) scope.launch { _messages.emit(ServerMessage.Error(error.message)) }
+            }
+        })
+    }
+
+    // onDisconnect handlers are consumed when they fire, so they are re-armed on every reconnect.
+    private fun markOnline() {
+        onlineRef.onDisconnect().setValue(false)
+        onlineRef.setValue(true)
+        presenceRef.onDisconnect().removeValue()
+        presenceRef.setValue(sessionId)
     }
 
     override fun adjust(stat: String, delta: Int) {
@@ -205,14 +224,17 @@ class FirebaseSessionConnection(
         inboundAcceptedRef.child(fromUserId).removeValue()
     }
 
-    override fun close() {
+    override fun close(removePlayer: Boolean) {
         _state.value = WsState.Closed
         connectedListener?.let     { db.getReference(".info/connected").removeEventListener(it) }
         sessionListener?.let       { sessionRef.removeEventListener(it) }
         requestChildListener?.let  { inboundRequestRef.removeEventListener(it) }
         acceptedChildListener?.let { inboundAcceptedRef.removeEventListener(it) }
+        presenceRef.onDisconnect().cancel()
         presenceRef.removeValue()
-        myUserRef.removeValue()
+        // A pending onDisconnect write would recreate a nameless stub of a removed player.
+        onlineRef.onDisconnect().cancel()
+        if (removePlayer) myUserRef.removeValue() else onlineRef.setValue(false)
         scope.cancel()
     }
 }

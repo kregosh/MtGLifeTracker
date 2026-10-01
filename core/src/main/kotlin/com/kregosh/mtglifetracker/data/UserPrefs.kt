@@ -13,6 +13,7 @@ interface UserPrefs {
     var timerVisible            : Boolean
     var timerCountDown          : Boolean
     var timerLimitMinutes       : UInt
+    var lastSessionId           : String?
 
     // ── Known players (auto-populated, LRU, max 10) ───────────────────────
     // Ordered newest-first by last-seen time.

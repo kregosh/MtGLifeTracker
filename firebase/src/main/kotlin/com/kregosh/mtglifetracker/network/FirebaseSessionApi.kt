@@ -76,6 +76,7 @@ class FirebaseSessionApi : SessionApi {
         Log.d(TAG, "getSessionById: id=$sessionId")
         return withTimeout(TIMEOUT_MS) {
             val snapshot       = db.getReference("sessions/$sessionId").get().await()
+            if (!snapshot.exists()) throw Exception("Session no longer exists")
             val code           = snapshot.child("code").getValue(String::class.java) ?: ""
             val connectedUsers = snapshot.child("users").childrenCount.toInt()
             SessionInfoResponse(sessionId = sessionId, sessionCode = code, connectedUsers = connectedUsers)

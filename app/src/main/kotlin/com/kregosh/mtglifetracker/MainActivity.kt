@@ -56,7 +56,7 @@ class MainActivity : ComponentActivity() {
         migrateLegacyPresetUri()
 
         // On recreation (rotation, theme change) the launch intent was already handled.
-        if (savedInstanceState == null) handleInvite(intent)
+        if (savedInstanceState == null && !handleInvite(intent)) vm.resumeLastSession()
 
         setContent {
             val screen          by vm.screen.collectAsState()
@@ -157,10 +157,11 @@ class MainActivity : ComponentActivity() {
         handleInvite(intent)
     }
 
-    private fun handleInvite(intent: Intent?) {
-        val uri = intent?.data ?: return
-        if (uri.scheme == "mtgtracker" && uri.host == "join") {
-            uri.lastPathSegment?.takeIf { it.isNotBlank() }?.let { vm.handleInviteLink(it) }
-        }
+    private fun handleInvite(intent: Intent?): Boolean {
+        val uri = intent?.data ?: return false
+        if (uri.scheme != "mtgtracker" || uri.host != "join") return false
+        val code = uri.lastPathSegment?.takeIf { it.isNotBlank() } ?: return false
+        vm.handleInviteLink(code)
+        return true
     }
 }

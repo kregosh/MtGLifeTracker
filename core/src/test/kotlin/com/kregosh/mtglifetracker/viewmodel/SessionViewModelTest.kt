@@ -56,6 +56,7 @@ class SessionViewModelTest {
         every { prefs.timerLimitMinutes }       returns 60u
         every { prefs.knownPlayers }            returns emptyList()
         every { prefs.friendList }              returns emptyList()
+        every { prefs.lastSessionId }           returns null
         every { wsFactory(any(), any(), any(), any()) } returns ws
     }
 
@@ -903,6 +904,69 @@ class SessionViewModelTest {
 
         verify(exactly = 1) { prefs.touchKnownPlayer("other-id", "Alice") }
         verify(exactly = 1) { prefs.touchKnownPlayer("other-id", "Alicia") }
+    }
+
+    // ── resume after restart ─────────────────────────────────────────────────
+
+    @Test
+    fun `joining a session remembers it for resume`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        verify { prefs.lastSessionId = "sid-1" }
+    }
+
+    @Test
+    fun `leaveSession forgets the session and removes the player`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        vm.leaveSession()
+
+        verify { prefs.lastSessionId = null }
+        verify { ws.close(true) }
+    }
+
+    @Test
+    fun `resumeLastSession rejoins the remembered session`() = runTest {
+        every { prefs.lastSessionId } returns "sid-9"
+        coEvery { api.getSessionById("sid-9") } returns SessionInfoResponse("sid-9", "RESUME", 2)
+        val vm = makeVm()
+
+        vm.resumeLastSession()
+        advanceUntilIdle()
+
+        assertEquals(Screen.Session("sid-9"), vm.screen.value)
+        assertEquals("RESUME", vm.sessionUi.value.sessionCode)
+        verify { ws.connect() }
+    }
+
+    @Test
+    fun `resumeLastSession forgets a session that no longer exists`() = runTest {
+        every { prefs.lastSessionId } returns "gone"
+        coEvery { api.getSessionById("gone") } throws RuntimeException("Session no longer exists")
+        val vm = makeVm()
+
+        vm.resumeLastSession()
+        advanceUntilIdle()
+
+        assertEquals(Screen.Home, vm.screen.value)
+        assertNull(vm.homeError.value)
+        verify { prefs.lastSessionId = null }
+    }
+
+    @Test
+    fun `resumeLastSession without a remembered session does nothing`() = runTest {
+        val vm = makeVm()
+        vm.resumeLastSession()
+        advanceUntilIdle()
+
+        assertEquals(Screen.Home, vm.screen.value)
+        coVerify(exactly = 0) { api.getSessionById(any()) }
     }
 
     // ── local friend list management ─────────────────────────────────────────

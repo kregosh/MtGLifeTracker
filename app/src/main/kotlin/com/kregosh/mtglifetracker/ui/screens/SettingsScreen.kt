@@ -1,6 +1,7 @@
 package com.kregosh.mtglifetracker.ui.screens
 
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -66,6 +67,8 @@ fun SettingsScreen(vm: SessionViewModel) {
             onDismiss = { showNameDialog = false },
         )
     }
+
+    BackHandler(onBack = vm::closeSettings)
 
     val topBarColors = if (hasBg) TopAppBarDefaults.topAppBarColors(
         containerColor             = Color.Black.copy(alpha = 0.45f),

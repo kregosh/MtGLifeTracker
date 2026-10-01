@@ -22,5 +22,9 @@ interface SessionConnection {
     fun declineFriendRequest(fromUserId: String)
     fun acknowledgeAccepted(fromUserId: String)
 
-    fun close()
+    /**
+     * Detaches from the session. With [removePlayer] the player leaves for good;
+     * without it they stay in the session as offline so they can resume later.
+     */
+    fun close(removePlayer: Boolean = true)
 }
