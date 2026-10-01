@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Login
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PersonRemove
@@ -228,9 +229,10 @@ fun SettingsScreen(vm: SessionViewModel) {
             }
 
             // ── Friends ───────────────────────────────────────────────────────
-            val friendList   by vm.friendList.collectAsState()
-            val knownPlayers by vm.knownPlayers.collectAsState()
-            val friendIds    = friendList.map { it.userId }.toSet()
+            val friendList     by vm.friendList.collectAsState()
+            val knownPlayers   by vm.knownPlayers.collectAsState()
+            val friendPresence by vm.friendPresence.collectAsState()
+            val friendIds      = friendList.map { it.userId }.toSet()
 
             if (friendList.isNotEmpty()) {
                 SettingsSection(title = "Friends") {
@@ -260,16 +262,32 @@ fun SettingsScreen(vm: SessionViewModel) {
                                     )
                                     Text(friend.displayName, style = MaterialTheme.typography.bodyMedium)
                                 }
-                                IconButton(
-                                    onClick  = { vm.removeFriend(friend.userId) },
-                                    modifier = Modifier.size(36.dp),
-                                ) {
-                                    Icon(
-                                        imageVector        = Icons.Default.PersonRemove,
-                                        contentDescription = "Remove ${friend.displayName}",
-                                        modifier           = Modifier.size(18.dp),
-                                        tint               = MaterialTheme.colorScheme.error,
-                                    )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    val sessionId = friendPresence[friend.userId]
+                                    if (sessionId != null) {
+                                        IconButton(
+                                            onClick  = { vm.joinFriendSession(sessionId) },
+                                            modifier = Modifier.size(36.dp),
+                                        ) {
+                                            Icon(
+                                                imageVector        = Icons.Default.Login,
+                                                contentDescription = "Join ${friend.displayName}'s session",
+                                                modifier           = Modifier.size(18.dp),
+                                                tint               = MaterialTheme.colorScheme.primary,
+                                            )
+                                        }
+                                    }
+                                    IconButton(
+                                        onClick  = { vm.removeFriend(friend.userId) },
+                                        modifier = Modifier.size(36.dp),
+                                    ) {
+                                        Icon(
+                                            imageVector        = Icons.Default.PersonRemove,
+                                            contentDescription = "Remove ${friend.displayName}",
+                                            modifier           = Modifier.size(18.dp),
+                                            tint               = MaterialTheme.colorScheme.error,
+                                        )
+                                    }
                                 }
                             }
                         }

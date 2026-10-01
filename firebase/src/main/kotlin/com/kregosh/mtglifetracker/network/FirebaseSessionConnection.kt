@@ -41,7 +41,12 @@ class FirebaseSessionConnection(
     private var requestChildListener  : ChildEventListener?  = null
     private var acceptedChildListener : ChildEventListener?  = null
 
+    private val presenceRef = db.getReference("presence/$userId")
+
     override fun connect() {
+        presenceRef.setValue(sessionId)
+        presenceRef.onDisconnect().removeValue()
+
         myUserRef.setValue(
             mapOf(
                 "displayName" to displayName,
@@ -206,6 +211,7 @@ class FirebaseSessionConnection(
         sessionListener?.let       { sessionRef.removeEventListener(it) }
         requestChildListener?.let  { inboundRequestRef.removeEventListener(it) }
         acceptedChildListener?.let { inboundAcceptedRef.removeEventListener(it) }
+        presenceRef.removeValue()
         myUserRef.removeValue()
         scope.cancel()
     }
