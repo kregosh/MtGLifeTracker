@@ -34,8 +34,15 @@ sealed interface Screen {
 // Stat names that would shadow Firebase data-model fields.
 val RESERVED_STAT_NAMES = setOf("life", "displayname", "conceded", "customstats")
 
-// Matches the length limit in database.rules.json.
+// Limits below mirror database.rules.json.
 const val MAX_DISPLAY_NAME_LENGTH = 64
+const val MAX_STAT_NAME_LENGTH    = 32
+
+private val STAT_NAME_PATTERN = Regex("^[A-Za-z0-9 _'-]{1,$MAX_STAT_NAME_LENGTH}$")
+
+/** Whether [name] can be stored as a stat: Firebase keys can't contain . # $ [ ] or /. */
+fun isValidStatName(name: String): Boolean =
+    STAT_NAME_PATTERN.matches(name) && name.lowercase() !in RESERVED_STAT_NAMES
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Friend-request pending entry (local to ViewModel, not shared over network)
@@ -251,7 +258,15 @@ class SessionViewModel(
         _friendList.value = prefs.friendList
     }
 
-    fun sendFriendRequest(toUserId: String) = webSocket?.sendFriendRequest(toUserId)
+    // Acceptances are only honoured for requests we sent, so nobody can add themselves
+    // to our friends list (and see where we play) without our consent.
+    private val sentFriendRequests = mutableSetOf<String>()
+
+    fun sendFriendRequest(toUserId: String) {
+        val ws = webSocket ?: return
+        sentFriendRequests += toUserId
+        ws.sendFriendRequest(toUserId)
+    }
 
     fun acceptFriendRequest(fromUserId: String, fromDisplayName: String) {
         prefs.addFriend(fromUserId, fromDisplayName)
@@ -354,8 +369,9 @@ class SessionViewModel(
     }
 
     fun addCustomStat(name: String, type: StatType = StatType.NUMERIC) {
-        if (name.trim().lowercase() in RESERVED_STAT_NAMES) return
-        webSocket?.addCustomStat(name.trim(), type)
+        val trimmed = name.trim()
+        if (!isValidStatName(trimmed)) return
+        webSocket?.addCustomStat(trimmed, type)
     }
 
     fun removeCustomStat(name: String) = webSocket?.removeCustomStat(name)
@@ -484,8 +500,10 @@ class SessionViewModel(
                             }
                         }
                         is ServerMessage.FriendAccepted -> {
-                            prefs.addFriend(msg.fromUserId, msg.fromDisplayName)
-                            _friendList.value = prefs.friendList
+                            if (sentFriendRequests.remove(msg.fromUserId)) {
+                                prefs.addFriend(msg.fromUserId, msg.fromDisplayName)
+                                _friendList.value = prefs.friendList
+                            }
                             webSocket?.acknowledgeAccepted(msg.fromUserId)
                         }
                     }
@@ -506,6 +524,7 @@ class SessionViewModel(
         pendingDeltas.clear()
         serverUsers = emptyList()
         lastRoster  = emptyMap()
+        sentFriendRequests.clear()
         _pendingFriendRequests.value = emptyList()
         wsCollectorJob?.cancel()
         wsCollectorJob = null

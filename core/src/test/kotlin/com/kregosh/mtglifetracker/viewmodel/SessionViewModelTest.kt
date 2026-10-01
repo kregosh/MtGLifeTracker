@@ -798,12 +798,27 @@ class SessionViewModelTest {
         vm.createSession()
         advanceUntilIdle()
 
+        vm.sendFriendRequest("user-3")
         wsMessages.emit(ServerMessage.FriendAccepted("user-3", "Bob"))
         advanceUntilIdle()
 
         verify { prefs.addFriend("user-3", "Bob") }
         verify { ws.acknowledgeAccepted("user-3") }
         assertTrue(vm.friendList.value.any { it.userId == "user-3" })
+    }
+
+    @Test
+    fun `unsolicited FriendAccepted is acknowledged but not added as a friend`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid-1", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        wsMessages.emit(ServerMessage.FriendAccepted("stalker", "Mallory"))
+        advanceUntilIdle()
+
+        verify(exactly = 0) { prefs.addFriend("stalker", any()) }
+        verify { ws.acknowledgeAccepted("stalker") }
     }
 
     @Test
@@ -1269,6 +1284,29 @@ class SessionViewModelTest {
         vm.setDisplayName("   ")
         verify(exactly = 0) { prefs.displayName = any() }
         assertEquals("Test Player", vm.displayName.value)
+    }
+
+    @Test
+    fun `addCustomStat ignores names Firebase cannot store`() = runTest {
+        coEvery { api.createSession() } returns CreateSessionResponse("sid", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        listOf("a.b", "a#b", "a\$b", "a[b]", "a/b", "x".repeat(33), "   ").forEach(vm::addCustomStat)
+        advanceUntilIdle()
+
+        verify(exactly = 0) { ws.addCustomStat(any(), any()) }
+    }
+
+    @Test
+    fun `isValidStatName accepts presets and ordinary names`() {
+        listOf("commander", "poison", "Lore Counters", "Gold", "city's-blessing_2").forEach {
+            assertTrue(isValidStatName(it), it)
+        }
+        listOf("", "life", "LIFE", "gold!", "a.b").forEach {
+            assertFalse(isValidStatName(it), it)
+        }
     }
 
     @Test

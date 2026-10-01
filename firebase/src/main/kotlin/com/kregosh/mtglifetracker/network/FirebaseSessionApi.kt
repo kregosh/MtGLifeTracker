@@ -20,6 +20,10 @@ import kotlinx.coroutines.withTimeout
 private const val TAG = "FirebaseSessionApi"
 private const val TIMEOUT_MS = 10_000L
 
+// 32^8 ≈ 10^12 codes: guessing a live one is impractical.
+private const val CODE_LENGTH   = 8
+private const val CODE_ATTEMPTS = 5
+private const val ABANDONED_AFTER_MS = 24 * 60 * 60 * 1000L
 private val CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 class FirebaseSessionApi : SessionApi {
@@ -38,32 +42,50 @@ class FirebaseSessionApi : SessionApi {
     override suspend fun createSession(): CreateSessionResponse {
         ensureSignedIn()
         val sessionId = UUID.randomUUID().toString()
-        val code      = (1..6).map { CODE_CHARS.random() }.joinToString("")
-        Log.d(TAG, "createSession: id=$sessionId code=$code")
 
-        withTimeout(TIMEOUT_MS) {
-            Log.d(TAG, "createSession: writing sessions/$sessionId …")
-            db.getReference("sessions/$sessionId").setValue(
-                mapOf("code" to code, "createdAt" to ServerValue.TIMESTAMP)
-            ).await()
-            Log.d(TAG, "createSession: writing sessionCodes/$code …")
-            db.getReference("sessionCodes/$code").setValue(sessionId).await()
+        return withTimeout(TIMEOUT_MS) {
+            repeat(CODE_ATTEMPTS) {
+                val code = (1..CODE_LENGTH).map { CODE_CHARS.random() }.joinToString("")
+                if (claimCode(code, sessionId)) {
+                    db.getReference("sessions/$sessionId").setValue(
+                        mapOf("code" to code, "createdAt" to ServerValue.TIMESTAMP)
+                    ).await()
+                    Log.d(TAG, "createSession: created")
+                    return@withTimeout CreateSessionResponse(sessionId = sessionId, sessionCode = code)
+                }
+            }
+            throw Exception("Could not find a free session code")
         }
+    }
 
-        Log.d(TAG, "createSession: done")
-        return CreateSessionResponse(sessionId = sessionId, sessionCode = code)
+    private suspend fun claimCode(code: String, sessionId: String): Boolean {
+        val codeRef  = db.getReference("sessionCodes/$code")
+        val existing = codeRef.get().await().getValue(String::class.java)
+        if (existing != null && !releaseIfAbandoned(code, existing)) return false
+        return runCatching { codeRef.setValue(sessionId).await() }.isSuccess
+    }
+
+    // Sessions that everyone abandoned without leaving are reclaimed lazily, when
+    // a new session happens to draw their code.
+    private suspend fun releaseIfAbandoned(code: String, sessionId: String): Boolean {
+        val sessionRef = db.getReference("sessions/$sessionId")
+        val snapshot   = sessionRef.get().await()
+        if (snapshot.exists()) {
+            val createdAt = snapshot.child("createdAt").getValue(Long::class.java) ?: return false
+            if (System.currentTimeMillis() - createdAt < ABANDONED_AFTER_MS) return false
+            if (runCatching { sessionRef.removeValue().await() }.isFailure) return false
+        }
+        return runCatching { db.getReference("sessionCodes/$code").removeValue().await() }.isSuccess
     }
 
     override suspend fun getSessionByCode(code: String): SessionInfoResponse {
         ensureSignedIn()
         val upper = code.uppercase()
-        Log.d(TAG, "getSessionByCode: code=$upper")
 
         return withTimeout(TIMEOUT_MS) {
             val snapshot  = db.getReference("sessionCodes/$upper").get().await()
             val sessionId = snapshot.getValue(String::class.java)
                 ?: throw Exception("Session '$upper' not found")
-            Log.d(TAG, "getSessionByCode: resolved sessionId=$sessionId")
 
             val sessionSnap    = db.getReference("sessions/$sessionId").get().await()
             val connectedUsers = sessionSnap.child("users").childrenCount.toInt()
@@ -73,7 +95,6 @@ class FirebaseSessionApi : SessionApi {
 
     override suspend fun getSessionById(sessionId: String): SessionInfoResponse {
         ensureSignedIn()
-        Log.d(TAG, "getSessionById: id=$sessionId")
         return withTimeout(TIMEOUT_MS) {
             val snapshot       = db.getReference("sessions/$sessionId").get().await()
             if (!snapshot.exists()) throw Exception("Session no longer exists")
@@ -86,6 +107,7 @@ class FirebaseSessionApi : SessionApi {
     override fun observeFriendPresence(friendUserIds: List<String>): Flow<Map<String, String?>> {
         if (friendUserIds.isEmpty()) return flowOf(emptyMap())
         return callbackFlow {
+            ensureSignedIn()
             val presence  = friendUserIds.associateWithTo(mutableMapOf()) { null as String? }
             val listeners = mutableMapOf<String, ValueEventListener>()
             friendUserIds.forEach { uid ->

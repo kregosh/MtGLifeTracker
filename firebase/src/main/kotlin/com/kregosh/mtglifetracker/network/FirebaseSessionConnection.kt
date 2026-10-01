@@ -1,5 +1,7 @@
 package com.kregosh.mtglifetracker.network
 
+import com.google.android.gms.tasks.Tasks
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
 import com.kregosh.mtglifetracker.shared.ServerMessage
 import com.kregosh.mtglifetracker.shared.StatType
@@ -17,7 +19,7 @@ import kotlinx.coroutines.launch
 class FirebaseSessionConnection(
     private val sessionId   : String,
     private val userId      : String,
-    private val displayName : String,
+    private var displayName : String,
     private val startLife   : UInt,
 ) : SessionConnection {
 
@@ -46,6 +48,10 @@ class FirebaseSessionConnection(
     private val onlineRef = myUserRef.child("online")
 
     override fun connect() {
+        // Must be the first write: every other rule checks this mapping.
+        FirebaseAuth.getInstance().currentUser?.uid?.let { uid ->
+            db.getReference("userAuth/$userId").setValue(uid)
+        }
         claimSeat()
 
         // ── Connection state ──────────────────────────────────────────────
@@ -195,6 +201,7 @@ class FirebaseSessionConnection(
     }
 
     override fun setDisplayName(name: String) {
+        displayName = name
         myUserRef.child("displayName").setValue(name)
     }
 
@@ -234,8 +241,29 @@ class FirebaseSessionConnection(
         presenceRef.removeValue()
         // A pending onDisconnect write would recreate a nameless stub of a removed player.
         onlineRef.onDisconnect().cancel()
-        if (removePlayer) myUserRef.removeValue() else onlineRef.setValue(false)
+        if (removePlayer) {
+            myUserRef.removeValue().addOnSuccessListener { closeSessionIfEmpty() }
+        } else {
+            onlineRef.setValue(false)
+        }
         scope.cancel()
+    }
+
+    // The last player out deletes the session (and any offline ghosts) so game data
+    // doesn't pile up in the database.
+    private fun closeSessionIfEmpty() {
+        sessionRef.get().addOnSuccessListener { snapshot ->
+            if (!snapshot.exists()) return@addOnSuccessListener
+            val others = snapshot.child("users").children.filter { it.key != userId }
+            if (others.any { it.child("online").getValue(Boolean::class.java) != false }) return@addOnSuccessListener
+
+            val code   = snapshot.child("code").getValue(String::class.java)
+            val ghosts = others.mapNotNull { it.key }.associate { "users/$it" to null as Any? }
+            val cleared = if (ghosts.isEmpty()) Tasks.forResult<Void>(null) else sessionRef.updateChildren(ghosts)
+            cleared
+                .onSuccessTask { sessionRef.removeValue() }
+                .addOnSuccessListener { code?.let { db.getReference("sessionCodes/$it").removeValue() } }
+        }
     }
 }
 
