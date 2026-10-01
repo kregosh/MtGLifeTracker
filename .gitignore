@@ -22,3 +22,7 @@ app/google-services.json
 # OS
 .DS_Store
 Thumbs.db
+
+# Rules tests
+node_modules/
+*-debug.log

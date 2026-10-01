@@ -1,0 +1,13 @@
+{
+  "name": "mtglifetracker-rules-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "firebase emulators:exec --config ../firebase.json --only database --project demo-mtglifetracker \"node --test\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^11.0.2",
+    "firebase-tools": "^14.0.0"
+  }
+}

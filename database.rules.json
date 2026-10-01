@@ -1,43 +1,57 @@
 {
   "rules": {
+    // ── Player identity ──────────────────────────────────────────────────
+    // The app identifies players by a UUID kept in device prefs. The first
+    // anonymous sign-in to use a UUID claims it here; every other rule checks
+    // ownership through this mapping.
+    "userAuth": {
+      "$userId": {
+        ".read":     "auth != null",
+        ".write":    "auth != null && newData.val() == auth.uid && (!data.exists() || data.val() == auth.uid)",
+        ".validate": "$userId.matches(/^[0-9a-f-]{36}$/)"
+      }
+    },
+
     // ── Session code lookup ──────────────────────────────────────────────
     "sessionCodes": {
       "$code": {
-        ".read":  true,
-        ".write": "auth != null && !data.exists()",
-        ".validate": "newData.isString()"
+        ".read":  "auth != null",
+        // Claim a free code, or release one whose session is gone.
+        ".write": "auth != null && ((!data.exists() && newData.exists()) || (!newData.exists() && !root.child('sessions').child(data.val()).exists()))",
+        ".validate": "$code.matches(/^[A-Z0-9]{6,8}$/) && newData.isString()"
       }
     },
 
     // ── Per-session data ─────────────────────────────────────────────────
     "sessions": {
       "$sessionId": {
-        ".read": true,
-        // Create-once: the app writes code + createdAt in one setValue here.
-        // After creation this grants nothing; child rules below take over.
-        ".write": "auth != null && !data.exists()",
+        ".read": "auth != null",
+        // Create once. Delete when nobody is left in it, or when it is more
+        // than a day old (abandoned sessions are reclaimed on code collisions).
+        ".write": "auth != null && ((!data.exists() && newData.exists()) || (data.exists() && !newData.exists() && (!data.child('users').exists() || data.child('createdAt').val() < now - 86400000)))",
+        ".validate": "newData.hasChildren(['code', 'createdAt'])",
 
-        "code":      { ".validate": "newData.isString() && newData.val().length == 6" },
-        "createdAt": { ".validate": "newData.isNumber()" },
+        "code":      { ".validate": "newData.isString() && newData.val().matches(/^[A-Z0-9]{6,8}$/) && !data.exists()" },
+        "createdAt": { ".validate": "newData.isNumber() && newData.val() <= now && !data.exists()" },
 
-        // ── Per-user state ─────────────────────────────────────────────
-        // The app identifies itself with a stable UUID stored in device prefs;
-        // Firebase anonymous auth is used so writes are authenticated, but
-        // the auth.uid differs from the app's userId. Ownership is enforced
-        // structurally: each client only knows its own userId and only writes
-        // to that path.
+        // ── Per-player state ───────────────────────────────────────────
         "users": {
           "$userId": {
-            ".write": "auth != null",
+            // The owner writes their own seat. Anyone may clear the seat of a
+            // player who is offline (ghosts left behind by a killed app).
+            ".write": "auth != null && (root.child('userAuth').child($userId).val() == auth.uid || (!newData.exists() && data.child('online').val() == false))",
+            ".validate": "newData.hasChildren(['displayName', 'life'])",
 
             "displayName": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 64" },
-            "life":        { ".validate": "newData.isNumber() && newData.val() >= 0" },
+            "life":        { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000" },
             "conceded":    { ".validate": "newData.isBoolean()" },
+            "online":      { ".validate": "newData.isBoolean()" },
             "customStats": {
               "$stat": {
-                ".validate": "$stat != 'life' && $stat != 'displayName' && $stat != 'conceded' && $stat != 'customStats' && newData.isNumber() && newData.val() >= 0"
+                ".validate": "$stat.matches(/^[A-Za-z0-9 _'-]{1,32}$/) && newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000"
               }
-            }
+            },
+            "$other": { ".validate": false }
           }
         },
 
@@ -45,7 +59,7 @@
         "customStatNames": {
           "$name": {
             ".write": "auth != null",
-            ".validate": "$name != 'life' && $name != 'displayName' && $name != 'conceded' && $name != 'customStats' && (newData.val() == 'NUMERIC' || newData.val() == 'TOGGLE' || newData.val() == 'RING_STAGE')"
+            ".validate": "$name.matches(/^[A-Za-z0-9 _'-]{1,32}$/) && $name.toLowerCase() != 'life' && $name.toLowerCase() != 'displayname' && $name.toLowerCase() != 'conceded' && $name.toLowerCase() != 'customstats' && (newData.val() == 'NUMERIC' || newData.val() == 'TOGGLE' || newData.val() == 'RING_STAGE')"
           }
         },
 
@@ -53,38 +67,42 @@
         "globalStats": {
           "$stat": {
             ".write": "auth != null",
-            ".validate": "newData.isNumber() && newData.val() >= 0"
+            ".validate": "$stat.matches(/^[A-Za-z0-9_]{1,32}$/) && newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000"
           }
         },
 
         // ── Friend requests ────────────────────────────────────────────
+        // Only the sender can send; only the recipient can dismiss.
         "friendRequests": {
           "$toUserId": {
             "$fromUserId": {
-              ".write": "auth != null",
-              ".validate": "!newData.exists() || (newData.child('displayName').isString() && newData.child('displayName').val().length > 0)"
+              ".write": "auth != null && ((newData.exists() && root.child('userAuth').child($fromUserId).val() == auth.uid) || (!newData.exists() && root.child('userAuth').child($toUserId).val() == auth.uid))",
+              ".validate": "newData.hasChildren(['displayName']) && newData.child('displayName').isString() && newData.child('displayName').val().length > 0 && newData.child('displayName').val().length <= 64"
             }
           }
         },
 
         // ── Friend acceptances ─────────────────────────────────────────
+        // Only the accepting player can write; only the original sender can dismiss.
         "friendAccepted": {
           "$toUserId": {
             "$fromUserId": {
-              ".write": "auth != null",
-              ".validate": "!newData.exists() || (newData.child('displayName').isString() && newData.child('displayName').val().length > 0)"
+              ".write": "auth != null && ((newData.exists() && root.child('userAuth').child($fromUserId).val() == auth.uid) || (!newData.exists() && root.child('userAuth').child($toUserId).val() == auth.uid))",
+              ".validate": "newData.hasChildren(['displayName']) && newData.child('displayName').isString() && newData.child('displayName').val().length > 0 && newData.child('displayName').val().length <= 64"
             }
           }
-        }
+        },
+
+        "$other": { ".validate": false }
       }
     },
 
-    // ── Presence ─────────────────────────────────────────────────────────
+    // ── Presence (which session a player is in) ──────────────────────────
     "presence": {
       "$userId": {
-        ".read":     true,
-        ".write":    "auth != null",
-        ".validate": "newData.isString() || !newData.exists()"
+        ".read":     "auth != null",
+        ".write":    "auth != null && root.child('userAuth').child($userId).val() == auth.uid",
+        ".validate": "newData.isString()"
       }
     },
 

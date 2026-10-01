@@ -33,7 +33,9 @@ import com.kregosh.mtglifetracker.ui.components.FriendsSheet
 import com.kregosh.mtglifetracker.ui.components.PlayerCard
 import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
 import com.kregosh.mtglifetracker.viewmodel.FriendRequestInfo
+import com.kregosh.mtglifetracker.viewmodel.MAX_STAT_NAME_LENGTH
 import com.kregosh.mtglifetracker.viewmodel.RESERVED_STAT_NAMES
+import com.kregosh.mtglifetracker.viewmodel.isValidStatName
 import com.kregosh.mtglifetracker.viewmodel.SessionUiState
 import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
 
@@ -636,8 +638,10 @@ private fun AddCustomStatDialog(
     onDismiss: () -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
-    val isReserved = name.trim().lowercase() in RESERVED_STAT_NAMES
-    val isValid    = name.isNotBlank() && !isReserved
+    val trimmed    = name.trim()
+    val isReserved = trimmed.lowercase() in RESERVED_STAT_NAMES
+    val isValid    = isValidStatName(trimmed)
+    val showError  = trimmed.isNotEmpty() && !isValid
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -645,19 +649,24 @@ private fun AddCustomStatDialog(
         text  = {
             OutlinedTextField(
                 value         = name,
-                onValueChange = { if (it.length <= 32) name = it },
+                onValueChange = { if (it.length <= MAX_STAT_NAME_LENGTH) name = it },
                 label         = { Text("Stat name") },
                 placeholder   = { Text("e.g. Gold, Lore…") },
                 singleLine    = true,
-                isError       = isReserved,
-                supportingText = if (isReserved) {
-                    { Text("\"${name.trim()}\" is a reserved name") }
+                isError       = showError,
+                supportingText = if (showError) {
+                    {
+                        Text(
+                            if (isReserved) "\"$trimmed\" is a reserved name"
+                            else "Use letters, digits, spaces, - _ or '"
+                        )
+                    }
                 } else null,
             )
         },
         confirmButton = {
             TextButton(
-                onClick  = { if (isValid) onConfirm(name.trim()) },
+                onClick  = { if (isValid) onConfirm(trimmed) },
                 enabled  = isValid,
             ) { Text("Add") }
         },
