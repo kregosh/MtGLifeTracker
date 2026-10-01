@@ -66,5 +66,6 @@ dependencies {
 
     // ── Test ─────────────────────────────────────────────────────────────
     testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
     testImplementation(kotlin("test"))
 }
