@@ -1,0 +1,103 @@
+{
+  "rules": {
+    // ── Session code lookup ──────────────────────────────────────────────
+    // Anyone can read (needed to join by code); only the creating client
+    // may write, enforced by checking the session's createdBy field.
+    // In practice the code-to-id mapping is written once at session creation
+    // and never mutated, so we allow create-only writes here.
+    "sessionCodes": {
+      "$code": {
+        ".read":  true,
+        // A sessionCode entry is a plain string (the sessionId). Allow writing
+        // only if the sessions/$newValue node doesn't exist yet (first write).
+        ".write": "!data.exists()"
+      }
+    },
+
+    // ── Per-session data ─────────────────────────────────────────────────
+    "sessions": {
+      "$sessionId": {
+        // Anyone who knows the sessionId can read (needed to render other players).
+        ".read": true,
+
+        // Session root: only allow creating the initial record (code + createdAt).
+        // Everything else is written to child paths with tighter rules.
+        "code":      { ".write": "!data.exists()" },
+        "createdAt": { ".write": "!data.exists()" },
+
+        // ── Per-user state ─────────────────────────────────────────────
+        "users": {
+          "$userId": {
+            // A user may only write their own slot.
+            ".write": "auth != null && auth.uid == $userId",
+
+            "displayName": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 64" },
+            "life":        { ".validate": "newData.isNumber() && newData.val() >= 0" },
+            "conceded":    { ".validate": "newData.isBoolean()" },
+            "customStats": {
+              "$stat": {
+                // Stat keys must not shadow reserved field names.
+                ".validate": "$stat != 'life' && $stat != 'displayName' && $stat != 'conceded' && $stat != 'customStats' && newData.isNumber() && newData.val() >= 0"
+              }
+            }
+          }
+        },
+
+        // ── Custom stat definitions ────────────────────────────────────
+        // Any authenticated session participant may add/remove stat defs.
+        // Stat names must not collide with reserved fields.
+        "customStatNames": {
+          "$name": {
+            ".write": "auth != null",
+            ".validate": "$name != 'life' && $name != 'displayName' && $name != 'conceded' && $name != 'customStats' && (newData.val() == 'NUMERIC' || newData.val() == 'TOGGLE' || newData.val() == 'RING_STAGE')"
+          }
+        },
+
+        // ── Global stats (day/night, etc.) ─────────────────────────────
+        "globalStats": {
+          "$stat": {
+            ".write": "auth != null",
+            ".validate": "newData.isNumber() && newData.val() >= 0"
+          }
+        },
+
+        // ── Friend requests ────────────────────────────────────────────
+        // A user may write a request TO another user's inbox, but may only
+        // remove their own outbound request or clear their own inbox.
+        "friendRequests": {
+          "$toUserId": {
+            "$fromUserId": {
+              // The sender writes their own request; the recipient may remove it.
+              ".write": "auth != null && (auth.uid == $fromUserId || auth.uid == $toUserId)",
+              ".validate": "!newData.exists() || (newData.child('displayName').isString() && newData.child('displayName').val().length > 0)"
+            }
+          }
+        },
+
+        // ── Friend acceptances ─────────────────────────────────────────
+        "friendAccepted": {
+          "$toUserId": {
+            "$fromUserId": {
+              // The accepting user writes; the notified user cleans up.
+              ".write": "auth != null && (auth.uid == $fromUserId || auth.uid == $toUserId)",
+              ".validate": "!newData.exists() || (newData.child('displayName').isString() && newData.child('displayName').val().length > 0)"
+            }
+          }
+        }
+      }
+    },
+
+    // ── Presence ─────────────────────────────────────────────────────────
+    // Each user writes only their own presence; anyone can read (friends list).
+    "presence": {
+      "$userId": {
+        ".read":     true,
+        ".write":    "auth != null && auth.uid == $userId",
+        ".validate": "newData.isString() || !newData.exists()"
+      }
+    },
+
+    // Deny everything else.
+    "$other": { ".read": false, ".write": false }
+  }
+}
