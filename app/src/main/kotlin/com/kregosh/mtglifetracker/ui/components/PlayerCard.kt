@@ -14,18 +14,35 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kregosh.mtglifetracker.R
 import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.shared.UserState
 import com.kregosh.mtglifetracker.ui.theme.LocalCardBackground
-import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
 import com.kregosh.mtglifetracker.viewmodel.SessionUiState
 import com.kregosh.mtglifetracker.viewmodel.isDead
+
+// MTG mana color accent bands — assigned to players by index (mod 5)
+private val MANA_COLORS = listOf(
+    Color(0xFFD4AF37), // White → old gold (parchment is already cream; gold reads as "white mana")
+    Color(0xFF1763C6), // Blue
+    Color(0xFF3D1055), // Black → deep violet
+    Color(0xFFC4391F), // Red
+    Color(0xFF1A6B2E), // Green
+)
+
+// Ink palette for text rendered on parchment
+private val PARCHMENT_INK     = Color(0xFF1E0A00) // very dark brown — names, numbers
+private val PARCHMENT_LIGHT   = Color(0xFFEDD9A0) // warm cream      — etched highlight layer
+private val PARCHMENT_SEPIA   = Color(0xFF5A3010) // mid sepia       — secondary labels
+private val PARCHMENT_ERROR   = Color(0xFF9B1010) // deep red        — dead life total
 
 @Composable
 fun PlayerCard(
@@ -37,44 +54,66 @@ fun PlayerCard(
     onUnconcede : (() -> Unit)?  = null,
     isFriend    : Boolean        = false,
     onAddFriend : (() -> Unit)?  = null,
-    modifier    : Modifier = Modifier,
+    playerIndex : Int            = 0,
+    modifier    : Modifier       = Modifier,
 ) {
     val dead      = user.isDead(sessionUi)
     val conceded  = user.conceded
-    val hasBg     = LocalHasBackground.current
     val cardBg    = LocalCardBackground.current
     val hasCardBg = isMe && cardBg != null
+    val manaColor = MANA_COLORS[playerIndex % MANA_COLORS.size]
 
-    val containerColor = when {
-        conceded -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (hasBg) 0.35f else 0.5f)
-        dead     -> MaterialTheme.colorScheme.errorContainer.copy(alpha = if (hasBg || hasCardBg) 0.45f else 0.6f)
-        isMe     -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (hasCardBg) 0.65f else if (hasBg) 0.72f else 1f)
-        else     -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (hasBg) 0.60f else 1f)
-    }
-
-    val contentColor = if (hasBg || hasCardBg) Color.White else Color.Unspecified
+    // Alternate between two parchment textures so adjacent cards feel distinct
+    val parchmentRes = if (playerIndex % 2 == 0) R.drawable.card_parchment_a else R.drawable.card_parchment_b
 
     Box(modifier = modifier.fillMaxWidth()) {
         Card(
-            colors   = CardDefaults.cardColors(
-                containerColor = containerColor,
-                contentColor   = contentColor,
-            ),
+            shape    = RoundedCornerShape(14.dp),
+            colors   = CardDefaults.cardColors(containerColor = Color.Transparent),
             modifier = Modifier.fillMaxWidth(),
         ) {
             Box {
+                // ── Card surface: custom image or default parchment ───────
                 if (hasCardBg) {
                     Image(
                         bitmap             = cardBg!!,
                         contentDescription = null,
                         contentScale       = ContentScale.Crop,
                         modifier           = Modifier.matchParentSize(),
-                        alpha              = 0.55f,
+                        alpha              = 0.90f,
+                    )
+                } else {
+                    Image(
+                        painter            = painterResource(parchmentRes),
+                        contentDescription = null,
+                        contentScale       = ContentScale.Crop,
+                        modifier           = Modifier.matchParentSize(),
                     )
                 }
-                Column(modifier = Modifier.padding(12.dp)) {
 
-                    // ── Header ────────────────────────────────────────────
+                // ── Asymmetric mana-color left band ───────────────────────
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(14.dp)
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(manaColor.copy(alpha = 0.88f), Color.Transparent),
+                            )
+                        )
+                )
+
+                // ── Content ───────────────────────────────────────────────
+                Column(
+                    modifier = Modifier.padding(
+                        start  = 20.dp,
+                        end    = 12.dp,
+                        top    = 10.dp,
+                        bottom = 12.dp,
+                    )
+                ) {
+
+                    // Header row: name + action button
                     Row(
                         verticalAlignment     = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -84,6 +123,7 @@ fun PlayerCard(
                             text       = user.displayName,
                             style      = MaterialTheme.typography.titleMedium,
                             fontWeight = if (isMe) FontWeight.Bold else FontWeight.Normal,
+                            color      = PARCHMENT_INK,
                             modifier   = Modifier.weight(1f),
                         )
                         if (!isMe && !isFriend && onAddFriend != null) {
@@ -95,25 +135,28 @@ fun PlayerCard(
                                     imageVector        = Icons.Default.PersonAdd,
                                     contentDescription = "Send friend request",
                                     modifier           = Modifier.size(18.dp),
-                                    tint               = LocalContentColor.current.copy(alpha = 0.7f),
+                                    tint               = PARCHMENT_SEPIA.copy(alpha = 0.75f),
                                 )
                             }
                         } else if (isMe && conceded) {
                             TextButton(
-                                onClick      = { onUnconcede?.invoke() },
-                                modifier     = Modifier.height(28.dp),
+                                onClick        = { onUnconcede?.invoke() },
+                                modifier       = Modifier.height(28.dp),
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                             ) {
-                                Text("Undo", style = MaterialTheme.typography.labelSmall)
+                                Text("Undo", style = MaterialTheme.typography.labelSmall, color = PARCHMENT_SEPIA)
                             }
                         } else if (isMe && !dead) {
                             TextButton(
-                                onClick      = { onConcede?.invoke() },
-                                modifier     = Modifier.height(28.dp),
+                                onClick        = { onConcede?.invoke() },
+                                modifier       = Modifier.height(28.dp),
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                             ) {
-                                Text("Concede", style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.error)
+                                Text(
+                                    "Concede",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = PARCHMENT_ERROR,
+                                )
                             }
                         } else if (isMe) {
                             SuggestionChip(
@@ -126,7 +169,8 @@ fun PlayerCard(
 
                     Spacer(Modifier.height(4.dp))
 
-                    // ── Life total ────────────────────────────────────────
+                    // Life total — layered Text to simulate etching into parchment
+                    val lifeColor = if (dead) PARCHMENT_ERROR else PARCHMENT_INK
                     Row(
                         verticalAlignment     = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center,
@@ -138,30 +182,45 @@ fun PlayerCard(
                                 description = "Decrease life",
                                 enabled     = user.life > 0u,
                                 onClick     = { onAdjust("life", -1) },
+                                tint        = PARCHMENT_SEPIA,
                             )
                         }
-                        Text(
-                            text       = user.life.toString(),
-                            fontSize   = 56.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            textAlign  = TextAlign.Center,
-                            modifier   = Modifier.widthIn(min = 80.dp),
-                            color      = if (dead) MaterialTheme.colorScheme.onErrorContainer
-                                         else     LocalContentColor.current,
-                        )
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier         = Modifier.widthIn(min = 80.dp),
+                        ) {
+                            // Cream highlight peeking from upper-left: carved-groove rim
+                            Text(
+                                text       = user.life.toString(),
+                                fontSize   = 56.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                textAlign  = TextAlign.Center,
+                                color      = PARCHMENT_LIGHT,
+                                modifier   = Modifier.offset((-1.5).dp, (-1.5).dp),
+                            )
+                            // Dark ink on top: the depression itself
+                            Text(
+                                text       = user.life.toString(),
+                                fontSize   = 56.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                textAlign  = TextAlign.Center,
+                                color      = lifeColor,
+                            )
+                        }
                         if (isMe) {
                             SmallAdjustButton(
                                 icon        = Icons.Default.Add,
                                 description = "Increase life",
                                 onClick     = { onAdjust("life", 1) },
+                                tint        = PARCHMENT_SEPIA,
                             )
                         }
                     }
 
-                    // ── Optional stats ────────────────────────────────────
+                    // Custom stats
                     if (sessionUi.statDefs.isNotEmpty()) {
                         Spacer(Modifier.height(8.dp))
-                        HorizontalDivider()
+                        HorizontalDivider(color = PARCHMENT_SEPIA.copy(alpha = 0.35f))
                         Spacer(Modifier.height(8.dp))
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             sessionUi.statDefs.forEach { (name, type) ->
@@ -195,13 +254,13 @@ fun PlayerCard(
             }
         }
 
-        // ── Overlays for eliminated / conceded opponents ──────────────────
+        // Overlay for eliminated / conceded opponents
         if (!isMe && (dead || conceded)) {
-            val overlayAlpha = if (dead) 0.65f else 0.50f
+            val overlayAlpha = if (dead) 0.60f else 0.45f
             Box(
                 modifier = Modifier
                     .matchParentSize()
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(14.dp))
                     .background(Color.Black.copy(alpha = overlayAlpha)),
                 contentAlignment = Alignment.Center,
             ) {
@@ -241,7 +300,6 @@ private fun NumericStatRow(
     isDead  : Boolean,
     onAdjust: (Int) -> Unit,
 ) {
-    val labelColor = LocalContentColor.current.copy(alpha = 0.75f)
     Row(
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -250,7 +308,7 @@ private fun NumericStatRow(
         Text(
             text     = label,
             style    = MaterialTheme.typography.labelMedium,
-            color    = if (isDead) MaterialTheme.colorScheme.error else labelColor,
+            color    = if (isDead) PARCHMENT_ERROR else PARCHMENT_SEPIA,
             modifier = Modifier.widthIn(min = 72.dp),
         )
         Row(
@@ -263,6 +321,7 @@ private fun NumericStatRow(
                     description = "Decrease $label",
                     enabled     = value > 0u,
                     onClick     = { onAdjust(-1) },
+                    tint        = PARCHMENT_SEPIA,
                 )
             }
             Text(
@@ -271,13 +330,14 @@ private fun NumericStatRow(
                 fontWeight = FontWeight.Bold,
                 textAlign  = TextAlign.Center,
                 modifier   = Modifier.widthIn(min = 32.dp),
-                color      = if (isDead) MaterialTheme.colorScheme.error else LocalContentColor.current,
+                color      = if (isDead) PARCHMENT_ERROR else PARCHMENT_INK,
             )
             if (isMe) {
                 SmallAdjustButton(
                     icon        = Icons.Default.Add,
                     description = "Increase $label",
                     onClick     = { onAdjust(1) },
+                    tint        = PARCHMENT_SEPIA,
                 )
             }
         }
@@ -295,8 +355,7 @@ private fun ToggleStatRow(
     isMe    : Boolean,
     onToggle: () -> Unit,
 ) {
-    val active     = value > 0u
-    val labelColor = LocalContentColor.current.copy(alpha = 0.75f)
+    val active = value > 0u
     Row(
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -305,7 +364,7 @@ private fun ToggleStatRow(
         Text(
             text     = label,
             style    = MaterialTheme.typography.labelMedium,
-            color    = labelColor,
+            color    = PARCHMENT_SEPIA,
             modifier = Modifier.widthIn(min = 72.dp),
         )
         if (isMe) {
@@ -331,11 +390,10 @@ private fun ToggleStatRow(
 @Composable
 private fun RingStageRow(
     label   : String,
-    value   : UInt,   // 0 = not tempted, 1–4 = stage
+    value   : UInt,
     isMe    : Boolean,
     onAdjust: (Int) -> Unit,
 ) {
-    val labelColor = LocalContentColor.current.copy(alpha = 0.75f)
     Row(
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -344,7 +402,7 @@ private fun RingStageRow(
         Text(
             text     = label,
             style    = MaterialTheme.typography.labelMedium,
-            color    = labelColor,
+            color    = PARCHMENT_SEPIA,
             modifier = Modifier.widthIn(min = 72.dp),
         )
         Row(
@@ -357,9 +415,9 @@ private fun RingStageRow(
                     description = "Previous ring stage",
                     enabled     = value > 0u,
                     onClick     = { onAdjust(-1) },
+                    tint        = PARCHMENT_SEPIA,
                 )
             }
-            // 4 pips
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 (1..4).forEach { stage ->
                     Box(
@@ -367,8 +425,8 @@ private fun RingStageRow(
                             .size(10.dp)
                             .clip(CircleShape)
                             .background(
-                                if (value >= stage.toUInt()) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.surfaceVariant
+                                if (value >= stage.toUInt()) PARCHMENT_INK
+                                else PARCHMENT_SEPIA.copy(alpha = 0.25f)
                             )
                     )
                 }
@@ -379,6 +437,7 @@ private fun RingStageRow(
                     description = "Next ring stage",
                     enabled     = value < 4u,
                     onClick     = { onAdjust(1) },
+                    tint        = PARCHMENT_SEPIA,
                 )
             }
         }
@@ -394,6 +453,7 @@ internal fun SmallAdjustButton(
     icon       : androidx.compose.ui.graphics.vector.ImageVector,
     description: String,
     enabled    : Boolean = true,
+    tint       : Color   = Color.Unspecified,
     onClick    : () -> Unit,
 ) {
     FilledTonalIconButton(
@@ -401,6 +461,6 @@ internal fun SmallAdjustButton(
         enabled  = enabled,
         modifier = Modifier.size(36.dp),
     ) {
-        Icon(icon, contentDescription = description, modifier = Modifier.size(18.dp))
+        Icon(icon, contentDescription = description, modifier = Modifier.size(18.dp), tint = tint)
     }
 }
