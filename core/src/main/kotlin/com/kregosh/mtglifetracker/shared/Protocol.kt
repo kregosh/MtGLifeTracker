@@ -22,11 +22,6 @@ sealed interface ServerMessage {
         val game        : Long                  = 0,
     ) : ServerMessage
 
-    data class Joined(
-        val userId      : String,
-        val sessionCode : String,
-    ) : ServerMessage
-
     data class Error(val message: String) : ServerMessage
 
     /** Received when someone in the session sends us a friend request. */

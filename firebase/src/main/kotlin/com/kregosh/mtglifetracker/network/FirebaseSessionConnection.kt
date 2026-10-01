@@ -3,6 +3,7 @@ package com.kregosh.mtglifetracker.network
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
+import com.kregosh.mtglifetracker.shared.LIFE_STAT
 import com.kregosh.mtglifetracker.shared.ServerMessage
 import com.kregosh.mtglifetracker.shared.SessionSettings
 import com.kregosh.mtglifetracker.shared.commanderDamageSource
@@ -34,11 +35,11 @@ class FirebaseSessionConnection(
     private val inboundAcceptedRef = sessionRef.child("friendAccepted/$userId")
 
     private val _messages = MutableSharedFlow<ServerMessage>(extraBufferCapacity = 64)
-    private val _state    = MutableStateFlow<WsState>(WsState.Connecting)
+    private val _state    = MutableStateFlow<ConnectionState>(ConnectionState.Connecting)
     private val scope     = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override val messages        : SharedFlow<ServerMessage> = _messages
-    override val connectionState : StateFlow<WsState>        = _state
+    override val connectionState : StateFlow<ConnectionState>        = _state
 
     private var connectedListener     : ValueEventListener?  = null
     private var sessionListener       : ValueEventListener?  = null
@@ -60,14 +61,14 @@ class FirebaseSessionConnection(
         val connListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (snapshot.getValue(Boolean::class.java) == true) {
-                    _state.value = WsState.Connected
+                    _state.value = ConnectionState.Connected
                     markOnline()
                 } else {
-                    _state.value = WsState.Reconnecting
+                    _state.value = ConnectionState.Reconnecting
                 }
             }
             override fun onCancelled(error: DatabaseError) {
-                _state.value = WsState.Failed(error.message)
+                _state.value = ConnectionState.Failed(error.message)
             }
         }
         connectedListener = connListener
@@ -187,9 +188,9 @@ class FirebaseSessionConnection(
     override fun adjust(stat: String, delta: Int) {
         val opponent = commanderDamageSource(stat)
         val fieldRef = when {
-            stat == "life"   -> myUserRef.child("life")
-            opponent != null -> myUserRef.child("commanderDamage/$opponent")
-            else             -> myUserRef.child("customStats/$stat")
+            stat == LIFE_STAT -> myUserRef.child("life")
+            opponent != null  -> myUserRef.child("commanderDamage/$opponent")
+            else              -> myUserRef.child("customStats/$stat")
         }
         fieldRef.runTransaction(object : Transaction.Handler {
             override fun doTransaction(data: MutableData): Transaction.Result {
@@ -275,7 +276,7 @@ class FirebaseSessionConnection(
     }
 
     override fun close(removePlayer: Boolean) {
-        _state.value = WsState.Closed
+        _state.value = ConnectionState.Closed
         connectedListener?.let     { db.getReference(".info/connected").removeEventListener(it) }
         sessionListener?.let       { sessionRef.removeEventListener(it) }
         requestChildListener?.let  { inboundRequestRef.removeEventListener(it) }

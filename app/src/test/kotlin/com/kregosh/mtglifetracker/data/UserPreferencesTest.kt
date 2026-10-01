@@ -236,7 +236,25 @@ class UserPreferencesTest {
 
     @Test
     fun `colorScheme defaults to dark`() {
-        assertEquals("dark", prefs.colorScheme)
+        assertEquals(AppColorScheme.DARK, prefs.colorScheme)
+    }
+
+    @Test
+    fun `colorScheme round-trips every value`() {
+        AppColorScheme.entries.forEach {
+            prefs.colorScheme = it
+            assertEquals(it, prefs.colorScheme)
+        }
+    }
+
+    @Test
+    fun `colorScheme reads values saved by earlier versions`() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val raw = app.getSharedPreferences("user_prefs", android.content.Context.MODE_PRIVATE)
+        raw.edit().putString("color_scheme", "light").commit()
+        assertEquals(AppColorScheme.LIGHT, prefs.colorScheme)
+        raw.edit().putString("color_scheme", "something-else").commit()
+        assertEquals(AppColorScheme.DARK, prefs.colorScheme)
     }
 
     @Test

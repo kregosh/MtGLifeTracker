@@ -5,6 +5,9 @@ import com.kregosh.mtglifetracker.shared.SessionInfoResponse
 import com.kregosh.mtglifetracker.shared.SessionSettings
 import kotlinx.coroutines.flow.Flow
 
+/** The session (or code) doesn't exist, as opposed to a network or sign-in failure. */
+class SessionNotFoundException(message: String) : Exception(message)
+
 interface SessionApi {
     suspend fun createSession(hostUserId: String, settings: SessionSettings): CreateSessionResponse
     suspend fun getSessionByCode(code: String): SessionInfoResponse

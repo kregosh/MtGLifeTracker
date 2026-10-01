@@ -1,98 +1,116 @@
 # MtG Life Tracker
 
-A shared life-total tracker for Magic: The Gathering. Multiple players join the
-same session; each player sees everyone's counter in real time and can use
-**+** / **−** buttons to change their own value.
+A shared life tracker for Magic: The Gathering. Everyone at the table joins the
+same session on their own phone; each player changes their own life total and
+counters, and sees everyone else's update in real time.
+
+## Features
+
+- Life totals with optimistic updates, plus an undo snackbar and a per-game history
+- Per-player counters: commander damage (tracked per opposing commander), poison,
+  energy, experience, storm, commander tax, the Ring, monarch, initiative,
+  city's blessing, and custom counters
+- Session-wide Day/Night toggle and a game timer (stopwatch or countdown)
+- Host controls: shared game rules (starting life, damage limits, player cap),
+  new game in the same session, removing players
+- Invites by code, QR code or a shareable https link
+- Friends: send requests in a session, see when friends are in a game and join them
+- Resumes the last session after the app is restarted
 
 ## UI Mockup
 
-Interactive HTML mock of all app screens:
+Interactive HTML mock of the app screens:
 **[https://claude.ai/artifact/FDwKP6PLyLT7dUc1NKhWiP](https://claude.ai/artifact/FDwKP6PLyLT7dUc1NKhWiP)**
-
-Covers Home, Session (4-player, death states), Settings, Add-stat dialog, and all
-connection-state banners. Toggle light/dark in the top-right corner.
 
 ## Architecture
 
 ```
 MtGLifeTracker/
-├── shared/     Kotlin JVM library — WebSocket protocol + REST DTOs (shared by both)
-├── backend/    Ktor server — session management + WebSocket relay
-└── app/        Android app — Jetpack Compose UI, Ktor client
+├── core/         Android library, no Firebase: SessionViewModel, data model,
+│                 SessionApi / SessionConnection interfaces, UserPrefs interface
+├── firebase/     Firebase implementations of SessionApi and SessionConnection
+├── app/          Jetpack Compose UI, SharedPreferences-backed UserPrefs
+├── rules-tests/  Emulator tests for database.rules.json
+└── docs/join/    Invite landing page served by GitHub Pages
 ```
+
+The app talks directly to **Firebase Realtime Database**; there is no server of
+our own. Every client signs in anonymously with **Firebase Authentication**
+before touching the database.
+
+### Data model
+
+```
+userAuth/<playerId>            auth uid that owns this player ID (claimed once)
+presence/<playerId>            session the player is currently in
+sessionCodes/<CODE>            session ID for an 8-character invite code
+sessions/<sessionId>/
+    code, createdAt, hostUserId, game
+    settings/                  startLife, commanderDeathThreshold, infectDeathThreshold, maxPlayers
+    users/<playerId>/          displayName, life, conceded, online, game,
+                               customStats/<stat>, commanderDamage/<opponentId>
+    customStatNames/<stat>     NUMERIC | TOGGLE | RING_STAGE
+    globalStats/<stat>         session-wide values (Day/Night)
+    friendRequests/<to>/<from>, friendAccepted/<to>/<from>
+```
+
+A player ID is a UUID stored on the device. The first anonymous sign-in to use
+it claims it under `userAuth/`, and the security rules only let that sign-in
+write the player's seat, presence and friend requests. The host's actions
+(rules, new game, removing players) are checked against `hostUserId`.
 
 ### Session flow
 
-1. One player taps **Create new session** → the backend mints a UUID session ID
-   and a 6-character invite code (e.g. `ABC123`).
-2. That player taps **Share** and sends the code (or a `mtgtracker://join/ABC123`
-   deep link) to their friends.
-3. Friends enter the code on the home screen or tap the link; the app opens the
-   live session automatically.
-4. Every player's counter is an unsigned 32-bit integer. Each player controls
-   their own row; changes propagate via WebSocket to all connected clients
-   within milliseconds.
+1. A player taps **Create new session**. The app claims a free 8-character code
+   and becomes host; the session uses the host's game rules from Settings.
+2. They tap the QR icon to show a QR code or share an https invite link
+   (`https://kregosh.github.io/MtGLifeTracker/join/?code=…`). The link opens a
+   small page that hands the code to the app via `mtgtracker://join/<code>`.
+3. Other players scan the code, tap the link, or type the code on the home screen.
+4. Life changes are batched for 400 ms and written with Firebase transactions.
+   A player who loses connection is shown as offline (via `onDisconnect`) and
+   keeps their seat, so they can resume. The last player to leave deletes the
+   session.
 
----
+## Setup
 
-## Building
+### Firebase
 
-### Prerequisites
+1. Create a Firebase project with a Realtime Database.
+2. **Authentication → Sign-in method**: enable **Anonymous**.
+3. Add an Android app with package `com.kregosh.mtglifetracker` and download
+   `google-services.json` into `app/`. The file is gitignored; CI writes it from
+   the `GOOGLE_SERVICES_JSON` secret (raw JSON).
+4. Deploy the rules whenever `database.rules.json` changes, together with the
+   matching app version:
+
+   ```bash
+   npx firebase-tools deploy --only database --project <your-project-id>
+   ```
+
+   or paste the file into **Realtime Database → Rules** in the console.
+
+### Invite page
+
+Enable **GitHub Pages** for the repository (**Settings → Pages → Deploy from a
+branch → `main` / `docs`**) so the invite links resolve.
+
+## Building and testing
 
 | Tool        | Version |
 |-------------|---------|
 | JDK         | 17+     |
 | Android SDK | API 35  |
-| Gradle      | 8.14.3  |
-
-### Backend
+| Node.js     | 22 (rules tests only) |
 
 ```bash
-# Run locally (default port 8080)
-./gradlew :backend:run
+./gradlew :app:assembleDebug        # debug APK
+./gradlew testDebugUnitTest         # unit tests for every module
+./gradlew lintDebug                 # Android lint for every module
 
-# Build fat jar
-./gradlew :backend:jar
-java -jar backend/build/libs/backend.jar
+cd rules-tests && npm ci && npm test   # security rules against the database emulator
 ```
 
-Override the port with `PORT=9000 ./gradlew :backend:run`.
-
-### Android app
-
-Open the project in **Android Studio Ladybug (2024.2.1)** or later and click
-**Run** on the `:app` configuration.
-
-The app is configured to talk to `10.0.2.2:8080` by default (Android emulator
-localhost alias). For a physical device or a remote server, change
-`SERVER_BASE_URL` and `SERVER_WS_URL` in `app/build.gradle.kts`:
-
-```kotlin
-buildConfigField("String", "SERVER_BASE_URL", "\"https://your-server.example.com\"")
-buildConfigField("String", "SERVER_WS_URL",   "\"wss://your-server.example.com\"")
-```
-
----
-
-## Protocol
-
-WebSocket endpoint: `ws://host/ws/sessions/{sessionId}`
-
-### Client → Server
-
-| Message            | JSON                                              |
-|--------------------|---------------------------------------------------|
-| Join session       | `{"type":"join","userId":"<uuid>","displayName":"Alice"}` |
-| Increment counter  | `{"type":"increment"}`                            |
-| Decrement counter  | `{"type":"decrement"}`                            |
-
-### Server → Client
-
-| Message          | JSON                                              |
-|------------------|---------------------------------------------------|
-| Joined           | `{"type":"joined","userId":"...","sessionCode":"ABC123"}` |
-| State snapshot   | `{"type":"state","users":[{"id":"...","displayName":"Alice","value":42}]}` |
-| Error            | `{"type":"error","message":"..."}` |
-
-State snapshots are broadcast to **all** connected clients after every join,
-increment, decrement, and disconnect.
+CI (`.github/workflows/ci.yml`) runs all of the above plus a minified release
+build on every pull request. Every push to `main` publishes a debug APK as a
+GitHub release (`.github/workflows/release.yml`).

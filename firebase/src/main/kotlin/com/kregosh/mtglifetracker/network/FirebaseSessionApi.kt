@@ -94,10 +94,10 @@ class FirebaseSessionApi : SessionApi {
         return withTimeout(TIMEOUT_MS) {
             val snapshot  = db.getReference("sessionCodes/$upper").get().await()
             val sessionId = snapshot.getValue(String::class.java)
-                ?: throw Exception("Session '$upper' not found")
+                ?: throw SessionNotFoundException("Session '$upper' not found")
 
             val sessionSnap = db.getReference("sessions/$sessionId").get().await()
-            if (!sessionSnap.exists()) throw Exception("Session '$upper' not found")
+            if (!sessionSnap.exists()) throw SessionNotFoundException("Session '$upper' not found")
             sessionSnap.toInfo(sessionId)
         }
     }
@@ -106,7 +106,7 @@ class FirebaseSessionApi : SessionApi {
         ensureSignedIn()
         return withTimeout(TIMEOUT_MS) {
             val snapshot       = db.getReference("sessions/$sessionId").get().await()
-            if (!snapshot.exists()) throw Exception("Session no longer exists")
+            if (!snapshot.exists()) throw SessionNotFoundException("Session no longer exists")
             snapshot.toInfo(sessionId)
         }
     }

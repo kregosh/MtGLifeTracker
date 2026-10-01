@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 interface SessionConnection {
     val messages: SharedFlow<ServerMessage>
-    val connectionState: StateFlow<WsState>
+    val connectionState: StateFlow<ConnectionState>
     fun connect()
     fun adjust(stat: String, delta: Int)
     fun addCustomStat(name: String, type: StatType = StatType.NUMERIC)

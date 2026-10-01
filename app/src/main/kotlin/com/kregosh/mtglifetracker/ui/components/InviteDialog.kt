@@ -1,5 +1,7 @@
 package com.kregosh.mtglifetracker.ui.components
 
+import com.kregosh.mtglifetracker.R
+import androidx.compose.ui.res.stringResource
 import android.content.Intent
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
@@ -30,10 +32,12 @@ fun InviteDialog(code: String, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val link    = inviteUrl(code)
     val qr      = remember(link) { qrCode(link) }
+    val shareText    = stringResource(R.string.invite_share_text, link, code)
+    val chooserTitle = stringResource(R.string.invite_share_chooser)
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Invite players") },
+        title = { Text(stringResource(R.string.invite_title)) },
         text  = {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -42,13 +46,13 @@ fun InviteDialog(code: String, onDismiss: () -> Unit) {
             ) {
                 Image(
                     bitmap             = qr,
-                    contentDescription = "QR code that opens this session",
+                    contentDescription = stringResource(R.string.invite_qr_description),
                     filterQuality      = FilterQuality.None,
                     modifier           = Modifier
                         .size(220.dp)
                         .background(Color.White),
                 )
-                Text("Scan with the phone camera, or enter the code:")
+                Text(stringResource(R.string.invite_hint))
                 Text(
                     code,
                     style      = MaterialTheme.typography.headlineMedium,
@@ -58,20 +62,19 @@ fun InviteDialog(code: String, onDismiss: () -> Unit) {
         },
         confirmButton = {
             TextButton(onClick = {
-                val text = "Join my MtG Life Tracker game: $link\nSession code: $code"
                 val intent = Intent(Intent.ACTION_SEND).apply {
                     type = "text/plain"
-                    putExtra(Intent.EXTRA_TEXT, text)
+                    putExtra(Intent.EXTRA_TEXT, shareText)
                 }
-                context.startActivity(Intent.createChooser(intent, "Share invite"))
+                context.startActivity(Intent.createChooser(intent, chooserTitle))
             }) {
                 Icon(Icons.Default.Share, contentDescription = null)
                 Spacer(Modifier.width(6.dp))
-                Text("Share link")
+                Text(stringResource(R.string.invite_share))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Close") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
         },
     )
 }

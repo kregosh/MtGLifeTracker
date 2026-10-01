@@ -50,9 +50,14 @@ class UserPreferences(
         get() = prefs.getInt(KEY_INFECT_THRESHOLD, 10).toUInt()
         set(value) { prefs.edit().putInt(KEY_INFECT_THRESHOLD, value.toInt()).apply() }
 
-    override var colorScheme: String
-        get() = prefs.getString(KEY_COLOR_SCHEME, "dark") ?: "dark"
-        set(value) { prefs.edit().putString(KEY_COLOR_SCHEME, value).apply() }
+    // Stored as the lowercase name ("dark", "light", "system"), as earlier versions did.
+    override var colorScheme: AppColorScheme
+        get() {
+            val stored = prefs.getString(KEY_COLOR_SCHEME, null)
+            return AppColorScheme.entries.firstOrNull { it.name.equals(stored, ignoreCase = true) }
+                ?: AppColorScheme.DARK
+        }
+        set(value) { prefs.edit().putString(KEY_COLOR_SCHEME, value.name.lowercase()).apply() }
 
     override var commanderDefaultEnabled: Boolean
         get() = prefs.getBoolean(KEY_COMMANDER_DEFAULT, false)

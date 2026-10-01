@@ -1,5 +1,7 @@
 package com.kregosh.mtglifetracker.ui.screens
 
+import com.kregosh.mtglifetracker.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
@@ -20,6 +22,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import com.kregosh.mtglifetracker.ui.components.FriendsSheet
 import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
+import com.kregosh.mtglifetracker.viewmodel.HomeError
 import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -36,7 +39,7 @@ fun HomeScreen(vm: SessionViewModel) {
     if (displayName.isBlank()) {
         DisplayNameDialog(
             initial     = "",
-            title       = "Welcome! What's your name?",
+            title       = stringResource(R.string.home_first_launch_title),
             dismissible = false,
             onConfirm   = vm::setDisplayName,
             onDismiss   = {},
@@ -67,7 +70,7 @@ fun HomeScreen(vm: SessionViewModel) {
         containerColor = if (hasBg) Color.Transparent else MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("MtG Life Tracker") },
+                title = { Text(stringResource(R.string.app_name)) },
                 colors = if (hasBg) TopAppBarDefaults.topAppBarColors(
                     containerColor         = Color.Black.copy(alpha = 0.45f),
                     titleContentColor      = Color.White,
@@ -75,10 +78,10 @@ fun HomeScreen(vm: SessionViewModel) {
                 ) else TopAppBarDefaults.topAppBarColors(),
                 actions = {
                     IconButton(onClick = { showFriendsSheet = true }) {
-                        Icon(Icons.Default.People, contentDescription = "Friends")
+                        Icon(Icons.Default.People, contentDescription = stringResource(R.string.friends))
                     }
                     IconButton(onClick = vm::openSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings))
                     }
                 },
             )
@@ -94,7 +97,7 @@ fun HomeScreen(vm: SessionViewModel) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                text  = "Welcome, ${displayName.ifBlank { "Player" }}",
+                text  = stringResource(R.string.home_welcome, displayName.ifBlank { stringResource(R.string.default_player_name) }),
                 style = MaterialTheme.typography.headlineSmall,
             )
 
@@ -107,14 +110,14 @@ fun HomeScreen(vm: SessionViewModel) {
             ) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("Create new session")
+                Text(stringResource(R.string.home_create_session))
             }
 
             OutlinedTextField(
                 value          = codeInput,
                 onValueChange  = { codeInput = it.uppercase() },
-                label          = { Text("Invite code") },
-                placeholder    = { Text("ABC123") },
+                label          = { Text(stringResource(R.string.home_invite_code)) },
+                placeholder    = { Text(stringResource(R.string.home_invite_code_placeholder)) },
                 singleLine     = true,
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.Characters,
@@ -133,7 +136,7 @@ fun HomeScreen(vm: SessionViewModel) {
             ) {
                 Icon(Icons.Default.Link, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("Join session")
+                Text(stringResource(R.string.home_join_session))
             }
 
             if (loading) {
@@ -142,11 +145,12 @@ fun HomeScreen(vm: SessionViewModel) {
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                    Text("Connecting to Firebase…", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.home_connecting), style = MaterialTheme.typography.bodySmall)
                 }
             }
 
-            error?.let { msg ->
+            error?.let { err ->
+                val msg = homeErrorText(err)
                 Card(
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer,
@@ -162,5 +166,17 @@ fun HomeScreen(vm: SessionViewModel) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun homeErrorText(error: HomeError): String {
+    val unknown = stringResource(R.string.error_unknown)
+    return when (error) {
+        HomeError.SessionNotFound    -> stringResource(R.string.error_session_not_found)
+        HomeError.RemovedFromSession -> stringResource(R.string.error_removed)
+        is HomeError.SessionFull     -> stringResource(R.string.error_session_full, error.maxPlayers)
+        is HomeError.CreateFailed    -> stringResource(R.string.error_create_failed, error.detail ?: unknown)
+        is HomeError.JoinFailed      -> stringResource(R.string.error_join_failed, error.detail ?: unknown)
     }
 }
