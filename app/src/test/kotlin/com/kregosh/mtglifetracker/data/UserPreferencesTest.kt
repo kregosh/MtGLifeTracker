@@ -143,7 +143,7 @@ class UserPreferencesTest {
     @Test
     fun `knownPlayers is ordered newest-first`() {
         prefs.touchKnownPlayer("uid-1", "First")
-        Thread.sleep(50)
+        Thread.sleep(200)
         prefs.touchKnownPlayer("uid-2", "Second")
         val ids = prefs.knownPlayers.map { it.userId }
         assertEquals(listOf("uid-2", "uid-1"), ids)
@@ -152,7 +152,7 @@ class UserPreferencesTest {
     @Test
     fun `touchKnownPlayer is capped at 10 entries evicting the oldest`() {
         repeat(11) { i ->
-            Thread.sleep(50)
+            Thread.sleep(100)
             prefs.touchKnownPlayer("uid-$i", "Player $i")
         }
         val known = prefs.knownPlayers
@@ -166,9 +166,9 @@ class UserPreferencesTest {
     @Test
     fun `touchKnownPlayer re-touching an existing entry moves it to the front`() {
         prefs.touchKnownPlayer("uid-1", "Alice")
-        Thread.sleep(50)
+        Thread.sleep(200)
         prefs.touchKnownPlayer("uid-2", "Bob")
-        Thread.sleep(50)
+        Thread.sleep(200)
         prefs.touchKnownPlayer("uid-1", "Alice") // re-touch uid-1
         assertEquals("uid-1", prefs.knownPlayers.first().userId)
     }
