@@ -116,9 +116,14 @@ class UserPreferences(
 
     private fun parseKnownSet(set: Set<String>?): List<KnownPlayer> =
         set.orEmpty().mapNotNull { entry ->
-            val parts = entry.split(SEP)
-            if (parts.size < 3) null
-            else KnownPlayer(parts[0], parts[1], parts[2].toLongOrNull() ?: 0L)
+            val first = entry.indexOf(SEP)
+            val last  = entry.lastIndexOf(SEP)
+            if (first < 0 || last == first) null
+            else KnownPlayer(
+                entry.substring(0, first),
+                entry.substring(first + 1, last),
+                entry.substring(last + 1).toLongOrNull() ?: 0L
+            )
         }
 
     private fun List<KnownPlayer>.toEncodedSet(): Set<String> =

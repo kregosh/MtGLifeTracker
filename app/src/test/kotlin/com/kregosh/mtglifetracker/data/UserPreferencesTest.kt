@@ -118,6 +118,17 @@ class UserPreferencesTest {
         assertEquals("Normal Name", prefs.friendList.first().displayName)
     }
 
+    @Test
+    fun `knownPlayer display name containing separator is stored and retrieved correctly`() {
+        // \u001F in the display name must not corrupt userId or lastSeen parsing
+        prefs.touchKnownPlayer("uid-1", "A\u001FB")
+        val known = prefs.knownPlayers
+        assertEquals(1, known.size)
+        assertEquals("uid-1", known.first().userId)
+        assertEquals("A\u001FB", known.first().displayName)
+        assertTrue(known.first().lastSeen > 0L)
+    }
+
     // ── knownPlayers ─────────────────────────────────────────────────────────
 
     @Test
