@@ -45,9 +45,14 @@ fun PlayerCard(
         else  -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (hasBg) 0.60f else 1f)
     }
 
+    val contentColor = if (hasBg || hasCardBg) Color.White else Color.Unspecified
+
     Box(modifier = modifier.fillMaxWidth()) {
         Card(
-            colors   = CardDefaults.cardColors(containerColor = containerColor),
+            colors   = CardDefaults.cardColors(
+                containerColor = containerColor,
+                contentColor   = contentColor,
+            ),
             modifier = Modifier.fillMaxWidth(),
         ) {
             Box {
@@ -199,6 +204,7 @@ private fun NumericStatRow(
     isDead  : Boolean,
     onAdjust: (Int) -> Unit,
 ) {
+    val labelColor = LocalContentColor.current.copy(alpha = 0.75f)
     Row(
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -207,8 +213,7 @@ private fun NumericStatRow(
         Text(
             text     = label,
             style    = MaterialTheme.typography.labelMedium,
-            color    = if (isDead) MaterialTheme.colorScheme.error
-                       else MaterialTheme.colorScheme.onSurfaceVariant,
+            color    = if (isDead) MaterialTheme.colorScheme.error else labelColor,
             modifier = Modifier.widthIn(min = 72.dp),
         )
         Row(
@@ -253,7 +258,8 @@ private fun ToggleStatRow(
     isMe    : Boolean,
     onToggle: () -> Unit,
 ) {
-    val active = value > 0u
+    val active     = value > 0u
+    val labelColor = LocalContentColor.current.copy(alpha = 0.75f)
     Row(
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -262,7 +268,7 @@ private fun ToggleStatRow(
         Text(
             text     = label,
             style    = MaterialTheme.typography.labelMedium,
-            color    = MaterialTheme.colorScheme.onSurfaceVariant,
+            color    = labelColor,
             modifier = Modifier.widthIn(min = 72.dp),
         )
         if (isMe) {
@@ -292,6 +298,7 @@ private fun RingStageRow(
     isMe    : Boolean,
     onAdjust: (Int) -> Unit,
 ) {
+    val labelColor = LocalContentColor.current.copy(alpha = 0.75f)
     Row(
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -300,7 +307,7 @@ private fun RingStageRow(
         Text(
             text     = label,
             style    = MaterialTheme.typography.labelMedium,
-            color    = MaterialTheme.colorScheme.onSurfaceVariant,
+            color    = labelColor,
             modifier = Modifier.widthIn(min = 72.dp),
         )
         Row(
