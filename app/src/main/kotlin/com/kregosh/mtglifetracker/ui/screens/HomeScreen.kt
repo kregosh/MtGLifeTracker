@@ -1,17 +1,22 @@
 package com.kregosh.mtglifetracker.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Login
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
@@ -21,9 +26,11 @@ import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(vm: SessionViewModel) {
-    val loading by vm.homeLoading.collectAsState()
-    val error   by vm.homeError.collectAsState()
-    val hasBg   = LocalHasBackground.current
+    val loading        by vm.homeLoading.collectAsState()
+    val error          by vm.homeError.collectAsState()
+    val hasBg          = LocalHasBackground.current
+    val friendList     by vm.friendList.collectAsState()
+    val friendPresence by vm.friendPresence.collectAsState()
 
     var codeInput by remember { mutableStateOf("") }
 
@@ -46,11 +53,12 @@ fun HomeScreen(vm: SessionViewModel) {
         },
     ) { padding ->
         Column(
-            modifier            = Modifier
+            modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 24.dp),
-            verticalArrangement = Arrangement.Center,
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
@@ -58,7 +66,7 @@ fun HomeScreen(vm: SessionViewModel) {
                 style = MaterialTheme.typography.headlineSmall,
             )
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(8.dp))
 
             Button(
                 onClick  = vm::createSession,
@@ -69,8 +77,6 @@ fun HomeScreen(vm: SessionViewModel) {
                 Spacer(Modifier.width(8.dp))
                 Text("Create new session")
             }
-
-            Spacer(Modifier.height(16.dp))
 
             OutlinedTextField(
                 value          = codeInput,
@@ -88,8 +94,6 @@ fun HomeScreen(vm: SessionViewModel) {
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            Spacer(Modifier.height(8.dp))
-
             OutlinedButton(
                 onClick  = { if (codeInput.isNotBlank()) vm.joinByCode(codeInput) },
                 enabled  = codeInput.isNotBlank() && !loading,
@@ -100,8 +104,75 @@ fun HomeScreen(vm: SessionViewModel) {
                 Text("Join session")
             }
 
+            // ── Friends online ────────────────────────────────────────────────
+            if (friendList.isNotEmpty()) {
+                HorizontalDivider()
+                Text(
+                    text  = "FRIENDS",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.align(Alignment.Start),
+                )
+                Column(
+                    modifier            = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    friendList.forEach { friend ->
+                        val sessionId = friendPresence[friend.userId]
+                        Row(
+                            modifier              = Modifier.fillMaxWidth(),
+                            verticalAlignment     = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Row(
+                                verticalAlignment     = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier              = Modifier.weight(1f),
+                            ) {
+                                Icon(
+                                    imageVector        = Icons.Default.Star,
+                                    contentDescription = null,
+                                    modifier           = Modifier.size(14.dp),
+                                    tint               = if (sessionId != null)
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Text(
+                                    text      = friend.displayName,
+                                    style     = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (sessionId != null) FontWeight.SemiBold else FontWeight.Normal,
+                                )
+                                if (sessionId != null) {
+                                    Text(
+                                        text  = "• in session",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            }
+                            if (sessionId != null) {
+                                FilledTonalButton(
+                                    onClick  = { vm.joinFriendSession(sessionId) },
+                                    enabled  = !loading,
+                                    modifier = Modifier.height(32.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                                ) {
+                                    Icon(
+                                        Icons.Default.Login,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp),
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Join", style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             if (loading) {
-                Spacer(Modifier.height(16.dp))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -112,7 +183,6 @@ fun HomeScreen(vm: SessionViewModel) {
             }
 
             error?.let { msg ->
-                Spacer(Modifier.height(16.dp))
                 Card(
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer,

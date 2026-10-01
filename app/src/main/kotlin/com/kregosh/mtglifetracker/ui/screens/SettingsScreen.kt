@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.kregosh.mtglifetracker.R
+import com.kregosh.mtglifetracker.data.Friend
 import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
 import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
 
@@ -234,6 +235,28 @@ fun SettingsScreen(vm: SessionViewModel) {
             val friendPresence by vm.friendPresence.collectAsState()
             val friendIds      = friendList.map { it.userId }.toSet()
 
+            var unfriendTarget by remember { mutableStateOf<Friend?>(null) }
+
+            unfriendTarget?.let { target ->
+                AlertDialog(
+                    onDismissRequest = { unfriendTarget = null },
+                    title = { Text("Remove friend") },
+                    text  = { Text("Remove ${target.displayName} from your friends list?") },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                vm.removeFriend(target.userId)
+                                unfriendTarget = null
+                            },
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        ) { Text("Remove") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { unfriendTarget = null }) { Text("Cancel") }
+                    },
+                )
+            }
+
             if (friendList.isNotEmpty()) {
                 SettingsSection(title = "Friends") {
                     Text(
@@ -278,7 +301,7 @@ fun SettingsScreen(vm: SessionViewModel) {
                                         }
                                     }
                                     IconButton(
-                                        onClick  = { vm.removeFriend(friend.userId) },
+                                        onClick  = { unfriendTarget = friend },
                                         modifier = Modifier.size(36.dp),
                                     ) {
                                         Icon(
