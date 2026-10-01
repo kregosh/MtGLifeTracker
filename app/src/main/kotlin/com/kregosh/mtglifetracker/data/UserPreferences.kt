@@ -3,6 +3,9 @@ package com.kregosh.mtglifetracker.data
 import android.content.Context
 import java.util.UUID
 
+private const val SEP = "\u001F"
+private const val MAX_KNOWN = 10
+
 class UserPreferences(context: Context) : UserPrefs {
 
     private val prefs = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
@@ -64,15 +67,64 @@ class UserPreferences(context: Context) : UserPrefs {
         get() = prefs.getInt(KEY_TIMER_LIMIT_MINUTES, 60).toUInt()
         set(value) { prefs.edit().putInt(KEY_TIMER_LIMIT_MINUTES, value.toInt()).apply() }
 
-    override var knownPlayers: Map<String, String>
-        get() = prefs.getStringSet(KEY_KNOWN_PLAYERS, emptySet())
-                    ?.mapNotNull { entry ->
-                        val idx = entry.indexOf('\u001F')
-                        if (idx < 0) null else entry.substring(0, idx) to entry.substring(idx + 1)
-                    }?.toMap() ?: emptyMap()
-        set(value) {
-            val encoded = value.entries.map { (id, name) -> "$id\u001F$name" }.toSet()
-            prefs.edit().putStringSet(KEY_KNOWN_PLAYERS, encoded).apply()
+    // ── Known players ─────────────────────────────────────────────────────
+    // Stored as StringSet; each entry: "$userId$SEP$displayName$SEP$lastSeenMillis"
+
+    override val knownPlayers: List<KnownPlayer>
+        get() = parseKnownSet(prefs.getStringSet(KEY_KNOWN_PLAYERS, emptySet()))
+
+    override fun touchKnownPlayer(userId: String, displayName: String) {
+        val now     = System.currentTimeMillis()
+        val current = parseKnownSet(prefs.getStringSet(KEY_KNOWN_PLAYERS, emptySet()))
+            .filter { it.userId != userId }         // remove stale entry for this user
+        val updated = (current + KnownPlayer(userId, displayName, now))
+            .sortedByDescending { it.lastSeen }     // newest first
+            .take(MAX_KNOWN)                        // cap at 10
+        prefs.edit().putStringSet(KEY_KNOWN_PLAYERS, updated.toEncodedSet()).apply()
+    }
+
+    override fun forgetKnownPlayer(userId: String) {
+        val updated = parseKnownSet(prefs.getStringSet(KEY_KNOWN_PLAYERS, emptySet()))
+            .filter { it.userId != userId }
+        prefs.edit().putStringSet(KEY_KNOWN_PLAYERS, updated.toEncodedSet()).apply()
+    }
+
+    // ── Friends ───────────────────────────────────────────────────────────
+    // Stored as StringSet; each entry: "$userId$SEP$displayName"
+
+    override val friendList: List<Friend>
+        get() = parseFriendSet(prefs.getStringSet(KEY_FRIEND_LIST, emptySet()))
+            .sortedBy { it.displayName }
+
+    override fun addFriend(userId: String, displayName: String) {
+        val current = parseFriendSet(prefs.getStringSet(KEY_FRIEND_LIST, emptySet()))
+            .filter { it.userId != userId }         // idempotent: replace if already present
+        val updated = current + Friend(userId, displayName)
+        prefs.edit().putStringSet(KEY_FRIEND_LIST, updated.map { "${it.userId}$SEP${it.displayName}" }.toSet()).apply()
+    }
+
+    override fun removeFriend(userId: String) {
+        val updated = parseFriendSet(prefs.getStringSet(KEY_FRIEND_LIST, emptySet()))
+            .filter { it.userId != userId }
+        prefs.edit().putStringSet(KEY_FRIEND_LIST, updated.map { "${it.userId}$SEP${it.displayName}" }.toSet()).apply()
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────
+
+    private fun parseKnownSet(set: Set<String>?): List<KnownPlayer> =
+        set.orEmpty().mapNotNull { entry ->
+            val parts = entry.split(SEP)
+            if (parts.size < 3) null
+            else KnownPlayer(parts[0], parts[1], parts[2].toLongOrNull() ?: 0L)
+        }
+
+    private fun List<KnownPlayer>.toEncodedSet(): Set<String> =
+        map { "${it.userId}$SEP${it.displayName}$SEP${it.lastSeen}" }.toSet()
+
+    private fun parseFriendSet(set: Set<String>?): List<Friend> =
+        set.orEmpty().mapNotNull { entry ->
+            val idx = entry.indexOf(SEP)
+            if (idx < 0) null else Friend(entry.substring(0, idx), entry.substring(idx + 1))
         }
 
     companion object {
@@ -89,5 +141,6 @@ class UserPreferences(context: Context) : UserPrefs {
         private const val KEY_TIMER_COUNTDOWN       = "timer_countdown"
         private const val KEY_TIMER_LIMIT_MINUTES   = "timer_limit_minutes"
         private const val KEY_KNOWN_PLAYERS         = "known_players"
+        private const val KEY_FRIEND_LIST           = "friend_list"
     }
 }

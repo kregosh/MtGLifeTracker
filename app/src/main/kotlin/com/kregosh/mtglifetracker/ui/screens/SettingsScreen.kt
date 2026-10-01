@@ -11,6 +11,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.PersonRemove
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -224,18 +227,21 @@ fun SettingsScreen(vm: SessionViewModel) {
                 }
             }
 
-            // ── Known players ─────────────────────────────────────────────────
+            // ── Friends ───────────────────────────────────────────────────────
+            val friendList   by vm.friendList.collectAsState()
             val knownPlayers by vm.knownPlayers.collectAsState()
-            if (knownPlayers.isNotEmpty()) {
-                SettingsSection(title = "Known Players") {
+            val friendIds    = friendList.map { it.userId }.toSet()
+
+            if (friendList.isNotEmpty()) {
+                SettingsSection(title = "Friends") {
                     Text(
-                        "Players you've shared a session with",
+                        "Saved to this device",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(8.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        knownPlayers.entries.sortedBy { it.value }.forEach { (uid, name) ->
+                        friendList.forEach { friend ->
                             Row(
                                 modifier              = Modifier.fillMaxWidth(),
                                 verticalAlignment     = Alignment.CenterVertically,
@@ -244,26 +250,87 @@ fun SettingsScreen(vm: SessionViewModel) {
                                 Row(
                                     verticalAlignment     = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier.weight(1f),
+                                    modifier              = Modifier.weight(1f),
+                                ) {
+                                    Icon(
+                                        imageVector        = Icons.Default.Star,
+                                        contentDescription = null,
+                                        modifier           = Modifier.size(16.dp),
+                                        tint               = MaterialTheme.colorScheme.primary,
+                                    )
+                                    Text(friend.displayName, style = MaterialTheme.typography.bodyMedium)
+                                }
+                                IconButton(
+                                    onClick  = { vm.removeFriend(friend.userId) },
+                                    modifier = Modifier.size(36.dp),
+                                ) {
+                                    Icon(
+                                        imageVector        = Icons.Default.PersonRemove,
+                                        contentDescription = "Remove ${friend.displayName}",
+                                        modifier           = Modifier.size(18.dp),
+                                        tint               = MaterialTheme.colorScheme.error,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Known players ─────────────────────────────────────────────────
+            if (knownPlayers.isNotEmpty()) {
+                SettingsSection(title = "Recently Played With") {
+                    Text(
+                        "Up to 10 most recent — oldest dropped automatically",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        knownPlayers.forEach { player ->
+                            Row(
+                                modifier              = Modifier.fillMaxWidth(),
+                                verticalAlignment     = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Row(
+                                    verticalAlignment     = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier              = Modifier.weight(1f),
                                 ) {
                                     Icon(
                                         imageVector        = Icons.Default.People,
                                         contentDescription = null,
                                         modifier           = Modifier.size(16.dp),
-                                        tint               = MaterialTheme.colorScheme.primary,
-                                    )
-                                    Text(name, style = MaterialTheme.typography.bodyMedium)
-                                }
-                                IconButton(
-                                    onClick  = { vm.forgetPlayer(uid) },
-                                    modifier = Modifier.size(32.dp),
-                                ) {
-                                    Icon(
-                                        imageVector        = Icons.Default.Close,
-                                        contentDescription = "Forget $name",
-                                        modifier           = Modifier.size(16.dp),
                                         tint               = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
+                                    Text(player.displayName, style = MaterialTheme.typography.bodyMedium)
+                                }
+                                Row {
+                                    if (player.userId !in friendIds) {
+                                        IconButton(
+                                            onClick  = { vm.addFriend(player.userId, player.displayName) },
+                                            modifier = Modifier.size(36.dp),
+                                        ) {
+                                            Icon(
+                                                imageVector        = Icons.Default.PersonAdd,
+                                                contentDescription = "Add ${player.displayName} as friend",
+                                                modifier           = Modifier.size(18.dp),
+                                                tint               = MaterialTheme.colorScheme.primary,
+                                            )
+                                        }
+                                    }
+                                    IconButton(
+                                        onClick  = { vm.forgetPlayer(player.userId) },
+                                        modifier = Modifier.size(36.dp),
+                                    ) {
+                                        Icon(
+                                            imageVector        = Icons.Default.Close,
+                                            contentDescription = "Forget ${player.displayName}",
+                                            modifier           = Modifier.size(18.dp),
+                                            tint               = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
                                 }
                             }
                         }

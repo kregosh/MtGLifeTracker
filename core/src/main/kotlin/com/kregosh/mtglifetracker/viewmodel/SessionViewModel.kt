@@ -2,6 +2,8 @@ package com.kregosh.mtglifetracker.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kregosh.mtglifetracker.data.Friend
+import com.kregosh.mtglifetracker.data.KnownPlayer
 import com.kregosh.mtglifetracker.data.UserPrefs
 import com.kregosh.mtglifetracker.network.SessionApi
 import com.kregosh.mtglifetracker.network.SessionConnection
@@ -191,11 +193,24 @@ class SessionViewModel(
     val commanderDefaultEnabled: Boolean get() = prefs.commanderDefaultEnabled
 
     private val _knownPlayers = MutableStateFlow(prefs.knownPlayers)
-    val knownPlayers: StateFlow<Map<String, String>> = _knownPlayers.asStateFlow()
+    val knownPlayers: StateFlow<List<KnownPlayer>> = _knownPlayers.asStateFlow()
+
+    private val _friendList = MutableStateFlow(prefs.friendList)
+    val friendList: StateFlow<List<Friend>> = _friendList.asStateFlow()
 
     fun forgetPlayer(userId: String) {
-        prefs.knownPlayers = prefs.knownPlayers - userId
+        prefs.forgetKnownPlayer(userId)
         _knownPlayers.value = prefs.knownPlayers
+    }
+
+    fun addFriend(userId: String, displayName: String) {
+        prefs.addFriend(userId, displayName)
+        _friendList.value = prefs.friendList
+    }
+
+    fun removeFriend(userId: String) {
+        prefs.removeFriend(userId)
+        _friendList.value = prefs.friendList
     }
 
     fun setStartLife(v: UInt)          { prefs.startLife = v;                _startLife.value = v }
@@ -354,13 +369,21 @@ class SessionViewModel(
                                 )
                             }
                             val myId = _sessionUi.value.myUserId
-                            val newEntries = msg.users
+                            var knownDirty  = false
+                            var friendDirty = false
+                            val friendIds   = prefs.friendList.map { it.userId }.toSet()
+                            msg.users
                                 .filter { it.id != myId && it.displayName.isNotBlank() }
-                                .associate { it.id to it.displayName }
-                            if (newEntries.isNotEmpty()) {
-                                prefs.knownPlayers = prefs.knownPlayers + newEntries
-                                _knownPlayers.value = prefs.knownPlayers
-                            }
+                                .forEach { user ->
+                                    prefs.touchKnownPlayer(user.id, user.displayName)
+                                    knownDirty = true
+                                    if (user.id in friendIds) {
+                                        prefs.addFriend(user.id, user.displayName)
+                                        friendDirty = true
+                                    }
+                                }
+                            if (knownDirty)  _knownPlayers.value = prefs.knownPlayers
+                            if (friendDirty) _friendList.value   = prefs.friendList
                         }
                         is ServerMessage.Joined -> _sessionUi.update {
                             it.copy(sessionCode = msg.sessionCode)
