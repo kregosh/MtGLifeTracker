@@ -59,7 +59,7 @@ fun HomeScreen(vm: SessionViewModel) {
             friendIds      = friendIds,
             friendPresence = friendPresence,
             currentSessionId = null,
-            onJoinSession  = vm::joinFriendSession,
+            onJoinSession  = { sessionId, watch -> vm.joinFriendSession(sessionId, watch) },
             onRemoveFriend = vm::removeFriend,
             onAddFriend    = { uid, name -> vm.addFriend(uid, name) },
             onForgetPlayer = vm::forgetPlayer,

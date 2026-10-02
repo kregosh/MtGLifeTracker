@@ -19,6 +19,7 @@ object SessionSchema {
     fun presencePath(userId: String)   = "presence/$userId"
     fun seatPath(userId: String)       = "users/$userId"
     fun seatStatPath(name: String)     = "stats/$name"
+    fun observerPath(userId: String)   = "observers/$userId"
     const val MONARCH                  = "monarch"
 
     /** Seat field holding a stat, relative to the seat. */
@@ -44,6 +45,8 @@ object SessionSchema {
             users       = users,
             globalStats = session["globalStats"].asUIntMap(),
             monarch     = session["monarch"] as? String,
+            observers   = session["observers"].asMap().orEmpty()
+                .mapNotNull { (id, name) -> (name as? String)?.let { id to it } }.toMap(),
             hostUserId  = session["hostUserId"] as? String,
             settings    = parseSettings(session["settings"]),
             game        = session["game"].asLong() ?: 0L,

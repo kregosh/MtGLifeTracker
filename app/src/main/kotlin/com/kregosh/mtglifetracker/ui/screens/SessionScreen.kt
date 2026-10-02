@@ -122,6 +122,7 @@ private fun SessionContent(
     var showHistory      by remember { mutableStateOf(false) }
     var showGameRules    by remember { mutableStateOf(false) }
     var showNewGame      by remember { mutableStateOf(false) }
+    var showWatchDialog  by remember { mutableStateOf(false) }
     var showMenu         by remember { mutableStateOf(false) }
     var removeTarget     by remember { mutableStateOf<UserState?>(null) }
 
@@ -179,6 +180,20 @@ private fun SessionContent(
         )
     }
 
+    if (showWatchDialog) {
+        AlertDialog(
+            onDismissRequest = { showWatchDialog = false },
+            title = { Text(stringResource(R.string.watch_title)) },
+            text  = { Text(stringResource(R.string.watch_text)) },
+            confirmButton = {
+                TextButton(onClick = { showWatchDialog = false; vm.watchInstead() }) { Text(stringResource(R.string.session_watch)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showWatchDialog = false }) { Text(stringResource(R.string.action_cancel)) }
+            },
+        )
+    }
+
     removeTarget?.let { target ->
         AlertDialog(
             onDismissRequest = { removeTarget = null },
@@ -232,7 +247,7 @@ private fun SessionContent(
             friendIds    = friendIds,
             friendPresence   = friendPresence,
             currentSessionId = (screen as? Screen.Session)?.sessionId,
-            onJoinSession    = vm::joinFriendSession,
+            onJoinSession    = { sessionId, watch -> vm.joinFriendSession(sessionId, watch) },
             onRemoveFriend    = vm::removeFriend,
             onAddFriend       = { uid, name -> vm.addFriend(uid, name) },
             onForgetPlayer    = vm::forgetPlayer,
@@ -298,8 +313,10 @@ private fun SessionContent(
                             Icon(Icons.Default.QrCode2, contentDescription = stringResource(R.string.session_invite))
                         }
                     }
-                    IconButton(onClick = { showHistory = true }) {
-                        Icon(Icons.Default.History, contentDescription = stringResource(R.string.session_life_history))
+                    if (!ui.observing) {
+                        IconButton(onClick = { showHistory = true }) {
+                            Icon(Icons.Default.History, contentDescription = stringResource(R.string.session_life_history))
+                        }
                     }
                     Box {
                         IconButton(onClick = { showMenu = true }) {
@@ -311,6 +328,21 @@ private fun SessionContent(
                                 leadingIcon = { Icon(Icons.Default.Tune, contentDescription = null) },
                                 onClick     = { showMenu = false; showGameRules = true },
                             )
+                            if (ui.observing) {
+                                DropdownMenuItem(
+                                    text        = { Text(stringResource(
+                                        if (ui.hasFreeSeat) R.string.session_play else R.string.session_play_full)) },
+                                    leadingIcon = { Icon(Icons.Default.PersonAdd, contentDescription = null) },
+                                    enabled     = ui.hasFreeSeat,
+                                    onClick     = { showMenu = false; vm.playInstead() },
+                                )
+                            } else {
+                                DropdownMenuItem(
+                                    text        = { Text(stringResource(R.string.session_watch)) },
+                                    leadingIcon = { Icon(Icons.Default.Visibility, contentDescription = null) },
+                                    onClick     = { showMenu = false; showWatchDialog = true },
+                                )
+                            }
                             if (ui.isHost) {
                                 DropdownMenuItem(
                                     text        = { Text(stringResource(R.string.session_new_game)) },
@@ -330,11 +362,13 @@ private fun SessionContent(
         },
         snackbarHost = { SnackbarHost(snackbarHost) },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { showStatPicker = true },
-                icon    = { Icon(Icons.Default.Add, contentDescription = null) },
-                text    = { Text(stringResource(R.string.session_stats)) },
-            )
+            if (!ui.observing) {
+                ExtendedFloatingActionButton(
+                    onClick = { showStatPicker = true },
+                    icon    = { Icon(Icons.Default.Add, contentDescription = null) },
+                    text    = { Text(stringResource(R.string.session_stats)) },
+                )
+            }
         },
     ) { padding ->
         // Radial gradient emanating from the sun/moon icon in the Day/Night banner.
@@ -382,6 +416,8 @@ private fun SessionContent(
                     onReset      = vm::resetTimer,
                 )
             }
+
+            WatchersRow(ui)
 
             Spacer(Modifier.height(8.dp))
 
@@ -469,6 +505,30 @@ private fun DayNightBanner(isDaytime: Boolean, onToggle: () -> Unit) {
                 Text(nextLabel, style = MaterialTheme.typography.labelSmall)
             }
         }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Observers: who is watching, and a note when that's you
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun WatchersRow(ui: SessionUiState) {
+    val others = ui.observers.filterKeys { it != ui.myUserId }.values.sorted()
+    if (!ui.observing && others.isEmpty()) return
+    val text = when {
+        ui.observing && others.isEmpty() -> stringResource(R.string.watching_you)
+        ui.observing                     -> stringResource(R.string.watching_you_and, others.joinToString())
+        else                             -> stringResource(R.string.watching_others, others.joinToString())
+    }
+    Row(
+        modifier              = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
+        verticalAlignment     = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(18.dp),
+             tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

@@ -13,6 +13,8 @@ interface UserPrefs {
     var timerCountDown          : Boolean
     var timerLimitMinutes       : UInt
     var lastSessionId           : String?
+    /** Whether the player was watching [lastSessionId] rather than playing. */
+    var lastSessionObserving    : Boolean
 
     // ── Known players (auto-populated, LRU, max 10) ───────────────────────
     // Ordered newest-first by last-seen time.

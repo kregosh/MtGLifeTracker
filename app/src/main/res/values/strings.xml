@@ -26,6 +26,7 @@
     <string name="error_session_not_found">No session with that code. Check the code and try again.</string>
     <string name="error_session_full">This session is full (%1$d players).</string>
     <string name="error_removed">You are no longer in that session.</string>
+    <string name="error_session_ended">The session you were watching has ended.</string>
     <string name="error_create_failed">Couldn\'t create a session: %1$s</string>
     <string name="error_join_failed">Couldn\'t join the session: %1$s</string>
     <string name="error_unknown">unknown error</string>
@@ -91,6 +92,17 @@
     <string name="session_more">More</string>
     <string name="session_game_rules">Game rules</string>
     <string name="session_new_game">New game</string>
+    <string name="session_watch">Watch instead</string>
+    <string name="session_play">Join as a player</string>
+    <string name="session_play_full">Join as a player (game full)</string>
+    <string name="watch_title">Watch instead of playing?</string>
+    <string name="watch_text">You give up your seat, including your life total and counters, and keep watching. You can join again later while there is a free seat.</string>
+    <string name="watching_you">You are watching</string>
+    <string name="watching_you_and">You are watching, with %1$s</string>
+    <string name="watching_others">Watching: %1$s</string>
+    <string name="friend_join_title">Join %1$s</string>
+    <string name="friend_join_play">Play</string>
+    <string name="friend_join_watch">Watch</string>
     <string name="session_stats">Stats</string>
     <string name="session_waiting">Waiting for players to join…</string>
     <string name="change_snackbar">%1$s %2$s %3$s</string>

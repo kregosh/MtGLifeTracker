@@ -17,6 +17,8 @@ sealed interface ServerMessage {
         val globalStats : Map<String, UInt>     = emptyMap(),
         /** The player who is the monarch; null while nobody is (or the mechanic isn't in play). */
         val monarch     : String?               = null,
+        /** People watching without a seat, by ID, with their display names. */
+        val observers   : Map<String, String>   = emptyMap(),
         val hostUserId  : String?               = null,
         val settings    : SessionSettings?      = null,
         /** Bumped by the host to start a new game in the same session. */
@@ -24,6 +26,9 @@ sealed interface ServerMessage {
     ) : ServerMessage
 
     data class Error(val message: String) : ServerMessage
+
+    /** The session no longer exists: everyone left, or it was cleaned up. */
+    data object SessionGone : ServerMessage
 
     /** Received when someone in the session sends us a friend request. */
     data class FriendRequest(

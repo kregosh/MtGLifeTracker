@@ -77,6 +77,10 @@ class UserPreferences(
             }.apply()
         }
 
+    override var lastSessionObserving: Boolean
+        get() = prefs.getBoolean(KEY_LAST_SESSION_OBSERVING, false)
+        set(value) { prefs.edit().putBoolean(KEY_LAST_SESSION_OBSERVING, value).apply() }
+
     // ── Known players ─────────────────────────────────────────────────────
     // Stored as StringSet; each entry: "$userId$SEP$displayName$SEP$lastSeenMillis"
 
@@ -156,6 +160,7 @@ class UserPreferences(
         private const val KEY_TIMER_COUNTDOWN       = "timer_countdown"
         private const val KEY_TIMER_LIMIT_MINUTES   = "timer_limit_minutes"
         private const val KEY_LAST_SESSION_ID       = "last_session_id"
+        private const val KEY_LAST_SESSION_OBSERVING = "last_session_observing"
         private const val KEY_KNOWN_PLAYERS         = "known_players"
         private const val KEY_FRIEND_LIST           = "friend_list"
     }

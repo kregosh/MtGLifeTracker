@@ -76,4 +76,15 @@ class SeatRulesTest {
         val users = listOf(seat("me"), seat("ghost", online = false), seat("bob"))
         assertNull(SeatRules.ghostsToClearAfterLeaving(users, "me"))
     }
+
+    @Test
+    fun `someone still watching keeps the session`() {
+        val users = listOf(seat("me"), seat("ghost", online = false))
+        assertNull(SeatRules.ghostsToClearAfterLeaving(users, "me", othersWatching = true))
+    }
+
+    @Test
+    fun `the last observer out of a session without players closes it`() {
+        assertEquals(emptyList(), SeatRules.ghostsToClearAfterLeaving(emptyList(), "me"))
+    }
 }

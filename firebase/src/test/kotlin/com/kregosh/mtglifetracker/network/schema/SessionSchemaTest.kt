@@ -32,6 +32,7 @@ class SessionSchemaTest {
         ),
         "globalStats"     to mapOf("daynight" to 1L),
         "monarch"         to "bob",
+        "observers"       to mapOf("sam" to "Sam", "bad" to 3L),
     )
 
     @Test
@@ -46,6 +47,7 @@ class SessionSchemaTest {
             assertEquals(SessionSettings(40u, 21u, 10u, 4), settings)
             assertEquals(mapOf("daynight" to 1u), globalStats)
             assertEquals("bob", monarch)
+            assertEquals(mapOf("sam" to "Sam"), observers)
             assertEquals(
                 listOf(
                     UserState(
