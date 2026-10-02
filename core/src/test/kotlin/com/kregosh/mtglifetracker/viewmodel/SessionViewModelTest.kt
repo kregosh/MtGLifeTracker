@@ -1933,6 +1933,17 @@ class SessionViewModelTest {
         vm.setBackgroundImage("android.resource://pkg/drawable/bg_arcane_storm")
         advanceUntilIdle()
         assertTrue(vm.isStormPreset.value)
+        assertFalse(vm.isManaOrbsPreset.value)
+    }
+
+    @Test
+    fun `the mana orbs preset is recognised by name`() = runTest {
+        val vm = makeVm()
+        assertFalse(vm.isManaOrbsPreset.value)
+        vm.setBackgroundImage("android.resource://pkg/drawable/bg_mana_orbs")
+        advanceUntilIdle()
+        assertTrue(vm.isManaOrbsPreset.value)
+        assertFalse(vm.isStormPreset.value)
     }
 
     @Test

@@ -12,17 +12,20 @@ class UserPreferences(
 
     private val prefs = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
 
+    // New installs start on the Mana Orbs preset.
+    private val defaultBackground = "android.resource://${context.packageName}/drawable/bg_mana_orbs"
+
     override var displayName: String
         get() = prefs.getString(KEY_DISPLAY_NAME, "") ?: ""
         set(value) { prefs.edit().putString(KEY_DISPLAY_NAME, value).apply() }
 
+    // Unset means the default background; turning the background off is stored as an
+    // empty string, so it isn't mistaken for "never chosen".
     override var backgroundImageUri: String?
         get() = prefs.getString(KEY_BACKGROUND_IMAGE, null)
-        set(value) {
-            prefs.edit().apply {
-                if (value != null) putString(KEY_BACKGROUND_IMAGE, value) else remove(KEY_BACKGROUND_IMAGE)
-            }.apply()
-        }
+            ?.let { it.ifEmpty { null } }
+            ?: defaultBackground.takeUnless { prefs.contains(KEY_BACKGROUND_IMAGE) }
+        set(value) { prefs.edit().putString(KEY_BACKGROUND_IMAGE, value ?: "").apply() }
 
     override var cardBackgroundImageUri: String?
         get() = prefs.getString(KEY_CARD_BACKGROUND_IMAGE, null)
@@ -49,7 +52,7 @@ class UserPreferences(
         get() {
             val stored = prefs.getString(KEY_COLOR_SCHEME, null)
             return AppColorScheme.entries.firstOrNull { it.name.equals(stored, ignoreCase = true) }
-                ?: AppColorScheme.DARK
+                ?: AppColorScheme.SYSTEM
         }
         set(value) { prefs.edit().putString(KEY_COLOR_SCHEME, value.name.lowercase()).apply() }
 

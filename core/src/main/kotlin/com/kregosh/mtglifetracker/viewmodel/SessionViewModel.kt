@@ -164,6 +164,9 @@ class SessionViewModel(
     val isStormPreset: StateFlow<Boolean> = _backgroundImageUri
         .map { it?.contains("bg_arcane_storm") == true }
         .stateIn(viewModelScope, SharingStarted.Eagerly, prefs.backgroundImageUri?.contains("bg_arcane_storm") == true)
+    val isManaOrbsPreset: StateFlow<Boolean> = _backgroundImageUri
+        .map { it?.contains("bg_mana_orbs") == true }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, prefs.backgroundImageUri?.contains("bg_mana_orbs") == true)
 
     private val _cardBackgroundImageUri = MutableStateFlow(prefs.cardBackgroundImageUri)
     val cardBackgroundImageUri: StateFlow<String?> = _cardBackgroundImageUri.asStateFlow()

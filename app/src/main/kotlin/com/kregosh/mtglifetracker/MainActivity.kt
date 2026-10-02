@@ -5,6 +5,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
@@ -26,6 +27,7 @@ import com.kregosh.mtglifetracker.network.FirebaseSessionApi
 import com.kregosh.mtglifetracker.network.FirebaseSessionConnection
 import com.kregosh.mtglifetracker.shared.parseInviteCode
 import com.kregosh.mtglifetracker.ui.components.LightningOverlay
+import com.kregosh.mtglifetracker.ui.components.ManaSparkOverlay
 import com.kregosh.mtglifetracker.ui.screens.HomeScreen
 import com.kregosh.mtglifetracker.ui.screens.SessionScreen
 import com.kregosh.mtglifetracker.ui.screens.SettingsScreen
@@ -65,6 +67,7 @@ class MainActivity : ComponentActivity() {
             val bgUriString     by vm.backgroundImageUri.collectAsState()
             val cardBgUriString by vm.cardBackgroundImageUri.collectAsState()
             val isStormPreset   by vm.isStormPreset.collectAsState()
+            val isManaOrbs      by vm.isManaOrbsPreset.collectAsState()
             val colorSchemePref by vm.colorScheme.collectAsState()
             val context         = LocalContext.current
 
@@ -122,6 +125,21 @@ class MainActivity : ComponentActivity() {
 
                         if (isStormPreset) {
                             LightningOverlay()
+                        }
+
+                        // Presets resolve their night image by the app's theme, so the sparks follow it too.
+                        val darkBackground = when (colorSchemePref) {
+                            AppColorScheme.DARK   -> true
+                            AppColorScheme.LIGHT  -> false
+                            AppColorScheme.SYSTEM -> isSystemInDarkTheme()
+                        }
+                        val orbsBitmap = bgBitmap
+                        if (isManaOrbs && orbsBitmap != null) {
+                            ManaSparkOverlay(
+                                imageWidth  = orbsBitmap.width,
+                                imageHeight = orbsBitmap.height,
+                                dark        = darkBackground,
+                            )
                         }
 
                         when (screen) {

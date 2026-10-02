@@ -18,7 +18,7 @@ val LocalCardBackground = compositionLocalOf<ImageBitmap?> { null }
 
 @Composable
 fun MtGLifeTrackerTheme(
-    colorScheme: AppColorScheme = AppColorScheme.DARK,
+    colorScheme: AppColorScheme = AppColorScheme.SYSTEM,
     content: @Composable () -> Unit,
 ) {
     val colors = when (colorScheme) {
