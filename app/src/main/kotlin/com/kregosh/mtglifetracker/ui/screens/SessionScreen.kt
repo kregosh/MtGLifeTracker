@@ -51,7 +51,10 @@ import com.kregosh.mtglifetracker.viewmodel.RESERVED_STAT_NAMES
 import com.kregosh.mtglifetracker.viewmodel.Screen
 import com.kregosh.mtglifetracker.viewmodel.SessionUiState
 import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
+import com.kregosh.mtglifetracker.viewmodel.Change
+import com.kregosh.mtglifetracker.viewmodel.GlobalChange
 import com.kregosh.mtglifetracker.viewmodel.StatChange
+import com.kregosh.mtglifetracker.viewmodel.StatToggled
 import com.kregosh.mtglifetracker.viewmodel.isValidStatName
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -762,7 +765,7 @@ private fun AddCustomStatDialog(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HistorySheet(
-    history  : List<StatChange>,
+    history  : List<Change>,
     users    : List<UserState>,
     statDefs : Map<String, StatType>,
     onUndo   : () -> Unit,
@@ -797,31 +800,63 @@ private fun HistorySheet(
             }
             LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 items(history, key = { it.id }) { change ->
+                    val line = describe(change, users, statDefs)
                     Row(
                         modifier              = Modifier.fillMaxWidth(),
                         verticalAlignment     = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Text(
-                            changeLabel(change.stat, users),
+                            line.label,
                             style    = MaterialTheme.typography.bodyLarge,
                             modifier = Modifier.weight(1f),
                         )
-                        Text(
-                            change.delta.signed(),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = if (change.delta < 0) MaterialTheme.colorScheme.error
-                                    else MaterialTheme.colorScheme.primary,
-                        )
-                        Text(
-                            stringResource(R.string.history_value_after, valueText(change, statDefs)),
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
+                        line.delta?.let { delta ->
+                            Text(
+                                delta.signed(),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = if (delta < 0) MaterialTheme.colorScheme.error
+                                        else MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                        Text(line.result, style = MaterialTheme.typography.bodyLarge)
                     }
                 }
             }
         }
     }
+}
+
+/** A change as shown in the history: what changed, by how much (counters only), and the result. */
+private data class ChangeLine(val label: String, val delta: Int?, val result: String)
+
+@Composable
+private fun describe(change: Change, users: List<UserState>, statDefs: Map<String, StatType>): ChangeLine =
+    when (change) {
+        is StatChange   -> ChangeLine(
+            label  = changeLabel(change.stat, users),
+            delta  = change.delta,
+            result = stringResource(R.string.history_value_after, valueText(change, statDefs)),
+        )
+        is StatToggled  -> ChangeLine(
+            label  = statLabel(change.stat),
+            delta  = null,
+            result = stringResource(if (change.enabled) R.string.history_turned_on else R.string.history_turned_off),
+        )
+        is GlobalChange -> ChangeLine(
+            label  = stringResource(R.string.stats_day_night),
+            delta  = null,
+            result = if (change.before == null) stringResource(R.string.history_turned_on)
+                     else stringResource(R.string.history_value_after,
+                              stringResource(if (change.after == 0u) R.string.day else R.string.night)),
+        )
+    }
+
+@Composable
+private fun changeText(change: Change, users: List<UserState>, statDefs: Map<String, StatType>): String {
+    val line = describe(change, users, statDefs)
+    return if (line.delta != null) stringResource(R.string.change_snackbar, line.label, line.delta.signed(), line.result)
+           else                    stringResource(R.string.change_snackbar_plain, line.label, line.result)
 }
 
 /** Which counter a change was made to: life, commander damage from someone, or a stat by name. */
@@ -846,10 +881,6 @@ private fun valueText(change: StatChange, statDefs: Map<String, StatType>): Stri
         else                     -> stringResource(R.string.history_toggle_off)
     }
 }
-
-@Composable
-private fun changeText(change: StatChange, users: List<UserState>, statDefs: Map<String, StatType>): String =
-    stringResource(R.string.change_snackbar, changeLabel(change.stat, users), change.delta.signed(), valueText(change, statDefs))
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared game rules (host edits, everyone else can look)

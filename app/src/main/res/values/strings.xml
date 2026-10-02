@@ -93,7 +93,8 @@
     <string name="session_new_game">New game</string>
     <string name="session_stats">Stats</string>
     <string name="session_waiting">Waiting for players to join…</string>
-    <string name="change_snackbar">%1$s %2$s → %3$s</string>
+    <string name="change_snackbar">%1$s %2$s %3$s</string>
+    <string name="change_snackbar_plain">%1$s %2$s</string>
     <string name="action_undo">Undo</string>
     <string name="new_game_title">Start a new game?</string>
     <string name="new_game_text">Everyone goes back to %1$d life and all stats are cleared. Players stay in the session.</string>
@@ -136,6 +137,8 @@
     <string name="history_empty">No changes yet this game</string>
     <string name="history_value_after">→ %1$s</string>
     <string name="history_toggle_on">on</string>
+    <string name="history_turned_on">turned on</string>
+    <string name="history_turned_off">turned off</string>
     <string name="history_toggle_off">off</string>
     <string name="history_unknown_player">?</string>
     <string name="stat_life">Life</string>

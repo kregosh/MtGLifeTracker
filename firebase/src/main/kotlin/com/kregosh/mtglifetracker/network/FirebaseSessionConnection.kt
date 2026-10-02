@@ -125,14 +125,14 @@ class FirebaseSessionConnection(
 
     override fun removeCustomStat(name: String) {
         sessionRef.child("customStatNames/$name").removeValue()
-        sessionRef.child("users").get().addOnSuccessListener { snapshot ->
-            val updates = SessionSchema.clearStatFromSeats(snapshot.children.mapNotNull { it.key }, name)
-            if (updates.isNotEmpty()) sessionRef.updateChildren(updates)
-        }
     }
 
     override fun setGlobal(stat: String, value: UInt) {
         sessionRef.child("globalStats/$stat").setValue(value.toLong())
+    }
+
+    override fun removeGlobal(stat: String) {
+        sessionRef.child("globalStats/$stat").removeValue()
     }
 
     override fun setConceded(conceded: Boolean) {

@@ -89,16 +89,25 @@ data class SessionUiState(
 }
 
 /** Dead at 0 life, or at the threshold of commander damage from any single commander, or of poison. */
+// Counters that are turned off keep their values (so turning them back on restores them) but don't count.
 fun UserState.isDead(state: SessionUiState): Boolean =
     life == 0u
-        || (commanderDamage.values.maxOrNull() ?: 0u) >= state.settings.commanderDeathThreshold
-        || (customStats[POISON_STAT] ?: 0u) >= state.settings.infectDeathThreshold
+        || (COMMANDER_STAT in state.statDefs &&
+            (commanderDamage.values.maxOrNull() ?: 0u) >= state.settings.commanderDeathThreshold)
+        || (POISON_STAT in state.statDefs &&
+            (customStats[POISON_STAT] ?: 0u) >= state.settings.infectDeathThreshold)
 
-/**
- * One committed change to one of the local player's stats (life, a counter, commander
- * damage from an opponent). The history lists them newest first.
- */
-data class StatChange(val id: Long, val stat: String, val delta: Int, val valueAfter: UInt)
+/** Something the local player did that can be undone. The history lists them newest first. */
+sealed interface Change { val id: Long }
+
+/** A committed change to one of the player's stats: life, a counter, commander damage from an opponent. */
+data class StatChange(override val id: Long, val stat: String, val delta: Int, val valueAfter: UInt) : Change
+
+/** A counter turned on ([enabled]) or off for the session. */
+data class StatToggled(override val id: Long, val stat: String, val type: StatType, val enabled: Boolean) : Change
+
+/** A session-wide value (Day/Night) set to [after]; [before] is null when it was turned on. */
+data class GlobalChange(override val id: Long, val stat: String, val before: UInt?, val after: UInt) : Change
 
 private const val MAX_HISTORY = 50
 
@@ -223,8 +232,13 @@ class SessionViewModel(
 
     // ── change history / undo ─────────────────────────────────────────
 
-    private val _history = MutableStateFlow<List<StatChange>>(emptyList())
-    val history: StateFlow<List<StatChange>> = _history.asStateFlow()
+    private val _history = MutableStateFlow<List<Change>>(emptyList())
+    /** The changes that can be undone right now, newest first. */
+    val history: StateFlow<List<Change>> = _history.asStateFlow()
+
+    // Everything recorded this game, including changes hidden while their counter is
+    // turned off or someone else has changed the same thing since.
+    private var changes = emptyList<Change>()
 
     private var nextChangeId = 0L
     // Per stat: the part of the pending delta that comes from undo and must not be recorded again.
@@ -440,9 +454,38 @@ class SessionViewModel(
     fun undoLastChange() {
         connection ?: return
         val last = _history.value.firstOrNull() ?: return
-        _history.update { it.drop(1) }
-        unrecordedDeltas[last.stat] = (unrecordedDeltas[last.stat] ?: 0) - last.delta
-        queueDelta(last.stat, -last.delta)
+        changes = changes - last
+        publishHistory()
+        when (last) {
+            is StatChange   -> {
+                unrecordedDeltas[last.stat] = (unrecordedDeltas[last.stat] ?: 0) - last.delta
+                queueDelta(last.stat, -last.delta)
+            }
+            is StatToggled  ->
+                if (last.enabled) connection?.removeCustomStat(last.stat)
+                else              connection?.addCustomStat(last.stat, last.type)
+            is GlobalChange ->
+                if (last.before == null) connection?.removeGlobal(last.stat)
+                else                     connection?.setGlobal(last.stat, last.before)
+        }
+    }
+
+    private fun record(change: (id: Long) -> Change) {
+        changes = (listOf(change(nextChangeId++)) + changes).take(MAX_HISTORY)
+        publishHistory()
+    }
+
+    private fun publishHistory() {
+        val ui = _sessionUi.value
+        _history.value = changes.filter { it.isUndoable(ui) }
+    }
+
+    // A change is offered for undo while undoing it still means something: its counter is
+    // on, and nobody has turned the counter on or off, or flipped Day/Night, since.
+    private fun Change.isUndoable(ui: SessionUiState): Boolean = when (this) {
+        is StatChange   -> isTracked(stat, ui.statDefs)
+        is StatToggled  -> (stat in ui.statDefs) == enabled
+        is GlobalChange -> ui.globalStats[stat] == after
     }
 
     // Rapid taps are coalesced into one network write per stat.
@@ -472,11 +515,9 @@ class SessionViewModel(
             (after.toLong() - before.toLong()).toInt()
         }
         if (delta == 0) return
-        val change = StatChange(nextChangeId++, stat, delta, after)
-        _history.update { (listOf(change) + it).take(MAX_HISTORY) }
+        record { id -> StatChange(id, stat, delta, after) }
     }
 
-    // A stat that was removed from the session can no longer be undone.
     private fun isTracked(stat: String, statDefs: Map<String, StatType>): Boolean =
         when (val target = statTarget(stat)) {
             StatTarget.Life               -> true
@@ -505,12 +546,27 @@ class SessionViewModel(
     fun addCustomStat(name: String, type: StatType = StatType.NUMERIC) {
         val trimmed = name.trim()
         if (!isValidStatName(trimmed)) return
-        connection?.addCustomStat(trimmed, type)
+        val conn = connection ?: return
+        if (trimmed in _sessionUi.value.statDefs) return
+        conn.addCustomStat(trimmed, type)
+        record { id -> StatToggled(id, trimmed, type, enabled = true) }
     }
 
-    fun removeCustomStat(name: String) = connection?.removeCustomStat(name)
+    /** Hides the counter for everyone; its values stay, so turning it back on restores them. */
+    fun removeCustomStat(name: String) {
+        val conn = connection ?: return
+        val type = _sessionUi.value.statDefs[name] ?: return
+        conn.removeCustomStat(name)
+        record { id -> StatToggled(id, name, type, enabled = false) }
+    }
 
-    fun setGlobal(stat: String, value: UInt) = connection?.setGlobal(stat, value)
+    fun setGlobal(stat: String, value: UInt) {
+        val conn   = connection ?: return
+        val before = _sessionUi.value.globalStats[stat]
+        if (before == value) return
+        conn.setGlobal(stat, value)
+        record { id -> GlobalChange(id, stat, before, value) }
+    }
 
     fun concede() {
         val myId = _sessionUi.value.myUserId
@@ -621,9 +677,7 @@ class SessionViewModel(
                             }
                             if (msg.game > _sessionUi.value.game) {
                                 resetTimer()
-                                _history.value = emptyList()
-                            } else {
-                                _history.update { it.filter { c -> isTracked(c.stat, msg.statDefs) } }
+                                changes = emptyList()
                             }
                             serverUsers = msg.users
                             _sessionUi.update {
@@ -637,6 +691,7 @@ class SessionViewModel(
                                     game        = msg.game,
                                 )
                             }
+                            publishHistory()
                             rememberPlayers(msg.users)
                         }
                         is ServerMessage.Error  -> _sessionUi.update { it.copy(error = msg.message) }
@@ -681,6 +736,7 @@ class SessionViewModel(
         lastRoster  = emptyMap()
         hadSeat     = false
         sentFriendRequests.clear()
+        changes = emptyList()
         _history.value = emptyList()
         unrecordedDeltas.clear()
         _pendingFriendRequests.value = emptyList()
