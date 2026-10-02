@@ -12,8 +12,10 @@ interface SessionConnection {
     fun connect()
     fun adjust(stat: String, delta: Int)
     fun addCustomStat(name: String, type: StatType = StatType.NUMERIC)
+    /** Turns a counter off for everyone. Players' values are kept. */
     fun removeCustomStat(name: String)
     fun setGlobal(stat: String, value: UInt)
+    fun removeGlobal(stat: String)
     fun setConceded(conceded: Boolean)
     fun setDisplayName(name: String)
 

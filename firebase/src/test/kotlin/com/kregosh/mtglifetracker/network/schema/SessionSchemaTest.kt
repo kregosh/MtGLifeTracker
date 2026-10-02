@@ -155,10 +155,6 @@ class SessionSchemaTest {
     @Test
     fun `cleanup writes target the right paths`() {
         assertEquals(mapOf("users/a" to null, "users/b" to null), SessionSchema.clearSeats(listOf("a", "b")))
-        assertEquals(
-            mapOf("users/a/customStats/gold" to null, "users/b/customStats/gold" to null),
-            SessionSchema.clearStatFromSeats(listOf("a", "b"), "gold"),
-        )
         assertEquals("sessions/s1", SessionSchema.sessionPath("s1"))
         assertEquals("sessionCodes/ABC", SessionSchema.codePath("ABC"))
         assertEquals("presence/u1", SessionSchema.presencePath("u1"))

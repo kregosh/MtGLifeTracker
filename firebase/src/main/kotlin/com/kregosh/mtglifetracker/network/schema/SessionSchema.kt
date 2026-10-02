@@ -117,10 +117,6 @@ object SessionSchema {
 
     /** Writes that clear [userIds]' seats in one multi-path update. */
     fun clearSeats(userIds: List<String>): Map<String, Any?> = userIds.associate { seatPath(it) to null }
-
-    /** Writes that remove [stat] from every seat in one multi-path update. */
-    fun clearStatFromSeats(userIds: Collection<String>, stat: String): Map<String, Any?> =
-        userIds.associate { "${seatPath(it)}/${statField(StatTarget.Custom(stat))}" to null }
 }
 
 // Firebase returns maps whose keys are all small integers as lists, and numbers as Long or Double.

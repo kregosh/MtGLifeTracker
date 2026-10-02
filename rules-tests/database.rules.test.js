@@ -147,6 +147,14 @@ describe('stat names (#57)', () => {
   test('stat values on a seat follow the same naming rule', async () => {
     await assertFails(alice().ref(`sessions/${SID}/users/${ALICE}/customStats/gold!`).set(1));
   });
+
+  test('any player can turn a counter and Day/Night off again (undo)', async () => {
+    await assertSucceeds(def('gold').set('NUMERIC'));
+    await assertSucceeds(def('gold').remove());
+    const dayNight = alice().ref(`sessions/${SID}/globalStats/daynight`);
+    await assertSucceeds(dayNight.set(0));
+    await assertSucceeds(dayNight.remove());
+  });
 });
 
 describe('session codes (#58, #59)', () => {

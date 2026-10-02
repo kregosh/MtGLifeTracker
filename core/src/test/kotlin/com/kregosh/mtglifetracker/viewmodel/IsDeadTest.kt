@@ -1,6 +1,9 @@
 package com.kregosh.mtglifetracker.viewmodel
 
+import com.kregosh.mtglifetracker.shared.COMMANDER_STAT
+import com.kregosh.mtglifetracker.shared.POISON_STAT
 import com.kregosh.mtglifetracker.shared.SessionSettings
+import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.shared.UserState
 import kotlin.test.Test
 import kotlin.test.assertFalse
@@ -10,6 +13,7 @@ class IsDeadTest {
 
     private val defaultUi = SessionUiState(
         settings = SessionSettings(commanderDeathThreshold = 21u, infectDeathThreshold = 10u),
+        statDefs = mapOf(COMMANDER_STAT to StatType.NUMERIC, POISON_STAT to StatType.NUMERIC),
     )
 
     private fun user(
