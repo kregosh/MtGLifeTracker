@@ -46,7 +46,7 @@ class SessionViewModelTest {
     @BeforeTest
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        every { prefs.userId }      returns "test-user-id"
+        coEvery { api.signIn() }    returns "test-user-id"
         every { prefs.displayName } returns "Test Player"
         every { prefs.backgroundImageUri }      returns null
         every { prefs.cardBackgroundImageUri }  returns null
@@ -921,6 +921,46 @@ class SessionViewModelTest {
 
         verify(exactly = 1) { prefs.touchKnownPlayer("other-id", "Alice") }
         verify(exactly = 1) { prefs.touchKnownPlayer("other-id", "Alicia") }
+    }
+
+    // ── player identity comes from the backend sign-in ───────────────────────
+
+    @Test
+    fun `the signed-in player ID is used for the session and as host`() = runTest {
+        coEvery { api.signIn() } returns "auth-uid-42"
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        coVerify { api.createSession("auth-uid-42", any()) }
+        verify { connectionFactory("sid-1", "auth-uid-42", any(), any()) }
+        assertEquals("auth-uid-42", vm.sessionUi.value.myUserId)
+    }
+
+    @Test
+    fun `sign-in happens once and is reused`() = runTest {
+        coEvery { api.getSessionByCode(any()) } returns SessionInfoResponse("sid-2", "ABCDEFGH", 0)
+        coEvery { api.getSessionById(any()) } returns SessionInfoResponse("sid-3", "ABCDEFGH", 0)
+        val vm = makeVm()
+        vm.joinByCode("ABCDEFGH")
+        advanceUntilIdle()
+        vm.joinFriendSession("sid-3")
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { api.signIn() }
+    }
+
+    @Test
+    fun `a failed sign-in is reported and nothing is created`() = runTest {
+        coEvery { api.signIn() } throws RuntimeException("offline")
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+
+        assertEquals(HomeError.CreateFailed("offline"), vm.homeError.value)
+        coVerify(exactly = 0) { api.createSession(any(), any()) }
+        assertEquals(Screen.Home, vm.screen.value)
     }
 
     // ── resume after restart ─────────────────────────────────────────────────

@@ -41,7 +41,6 @@ before touching the database.
 ### Data model
 
 ```
-userAuth/<playerId>            auth uid that owns this player ID (claimed once)
 presence/<playerId>            session the player is currently in
 sessionCodes/<CODE>            session ID for an 8-character invite code
 sessions/<sessionId>/
@@ -54,10 +53,11 @@ sessions/<sessionId>/
     friendRequests/<to>/<from>, friendAccepted/<to>/<from>
 ```
 
-A player ID is a UUID stored on the device. The first anonymous sign-in to use
-it claims it under `userAuth/`, and the security rules only let that sign-in
-write the player's seat, presence and friend requests. The host's actions
-(rules, new game, removing players) are checked against `hostUserId`.
+A player ID is the device's anonymous **Firebase Auth uid**, so the security
+rules check ownership directly (`$userId == auth.uid`): only you can write your
+seat, presence and friend requests. The host's actions (rules, new game,
+removing players) are checked against `hostUserId`. The uid survives app
+restarts and is lost when the app's data is cleared; backups don't copy it.
 
 ### Session flow
 

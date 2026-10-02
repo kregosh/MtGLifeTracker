@@ -9,7 +9,6 @@ import org.robolectric.annotation.Config
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -28,23 +27,6 @@ class UserPreferencesTest {
             .edit().clear().commit()
         fakeTime.set(0)
         prefs = UserPreferences(app, clock = { fakeTime.incrementAndGet() })
-    }
-
-    // ── userId ───────────────────────────────────────────────────────────────
-
-    @Test
-    fun `userId is generated on first access and stable thereafter`() {
-        val id1 = prefs.userId
-        val id2 = prefs.userId
-        assertEquals(id1, id2)
-        assertTrue(id1.isNotBlank())
-    }
-
-    @Test
-    fun `two separate instances share the same userId`() {
-        val app = ApplicationProvider.getApplicationContext<Application>()
-        val other = UserPreferences(app)
-        assertEquals(prefs.userId, other.userId)
     }
 
     // ── lastSessionId ────────────────────────────────────────────────────────
@@ -278,16 +260,4 @@ class UserPreferencesTest {
         assertEquals("Alice", other.friendList.first().displayName)
     }
 
-    @Test
-    fun `userId of two fresh instances is different`() {
-        // Clear prefs so the second instance generates a new ID
-        val app = ApplicationProvider.getApplicationContext<Application>()
-        app.getSharedPreferences("user_prefs", android.content.Context.MODE_PRIVATE)
-            .edit().clear().commit()
-        val fresh = UserPreferences(app)
-        // Both created from a clean slate in separate test runs — within a single test
-        // we can only verify the ID is non-blank; stability is covered by another test.
-        assertTrue(fresh.userId.isNotBlank())
-        assertNotEquals("", fresh.userId)
-    }
 }

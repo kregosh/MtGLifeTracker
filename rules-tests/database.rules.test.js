@@ -6,8 +6,10 @@ import {
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
 
-const ALICE = '11111111-1111-4111-8111-111111111111';
-const BOB   = '22222222-2222-4222-8222-222222222222';
+// Player IDs are the anonymous-auth uids themselves.
+const ALICE    = 'aliceUid0000000000000000001';
+const BOB      = 'bobUid000000000000000000002';
+const STRANGER = 'strangerUid0000000000000003';
 const SID   = 'session-1';
 const DAY   = 24 * 60 * 60 * 1000;
 
@@ -25,7 +27,6 @@ after(() => env.cleanup());
 beforeEach(async () => {
   await env.clearDatabase();
   await env.withSecurityRulesDisabled(ctx => ctx.database().ref().set({
-    userAuth: { [ALICE]: 'auth-alice', [BOB]: 'auth-bob' },
     sessionCodes: { ABCDEFGH: SID },
     sessions: {
       [SID]: {
@@ -43,9 +44,9 @@ beforeEach(async () => {
   }));
 });
 
-const alice    = () => env.authenticatedContext('auth-alice').database();
-const bob      = () => env.authenticatedContext('auth-bob').database();
-const stranger = () => env.authenticatedContext('auth-stranger').database();
+const alice    = () => env.authenticatedContext(ALICE).database();
+const bob      = () => env.authenticatedContext(BOB).database();
+const stranger = () => env.authenticatedContext(STRANGER).database();
 const anon     = () => env.unauthenticatedContext().database();
 const seed     = data => env.withSecurityRulesDisabled(ctx => ctx.database().ref().update(data));
 
@@ -68,31 +69,13 @@ describe('reading (#61)', () => {
   });
 });
 
-describe('player identity (#55)', () => {
-  const NEW = '33333333-3333-4333-8333-333333333333';
-
-  test('a sign-in can claim a free player ID for itself', async () => {
-    await assertSucceeds(stranger().ref(`userAuth/${NEW}`).set('auth-stranger'));
+describe('player identity (#55, #60)', () => {
+  test('nobody can create a seat under someone else\'s ID', async () => {
+    await assertFails(stranger().ref(`sessions/${SID}/users/someoneElse`).set({ displayName: 'X', life: 20 }));
   });
 
-  test('a sign-in cannot claim an ID for someone else', async () => {
-    await assertFails(stranger().ref(`userAuth/${NEW}`).set('auth-alice'));
-  });
-
-  test('re-claiming your own ID is a harmless no-op', async () => {
-    await assertSucceeds(alice().ref(`userAuth/${ALICE}`).set('auth-alice'));
-  });
-
-  test('a claimed ID cannot be released', async () => {
-    await assertFails(alice().ref(`userAuth/${ALICE}`).remove());
-  });
-
-  test('a claimed ID cannot be taken over', async () => {
-    await assertFails(stranger().ref(`userAuth/${ALICE}`).set('auth-stranger'));
-  });
-
-  test('player IDs must be UUIDs', async () => {
-    await assertFails(stranger().ref('userAuth/not-a-uuid').set('auth-stranger'));
+  test('the old userAuth mapping is gone', async () => {
+    await assertFails(stranger().ref(`userAuth/${STRANGER}`).set(STRANGER));
   });
 });
 
@@ -126,10 +109,8 @@ describe('player seats (#55)', () => {
   });
 
   test('a fresh seat needs a name and a life total', async () => {
-    const NEW = '33333333-3333-4333-8333-333333333333';
-    await seed({ [`userAuth/${NEW}`]: 'auth-stranger' });
-    await assertFails(stranger().ref(`${seat(NEW)}/online`).set(false));
-    await assertSucceeds(stranger().ref(seat(NEW)).set({ displayName: 'Carol', life: 40, online: true }));
+    await assertFails(stranger().ref(`${seat(STRANGER)}/online`).set(false));
+    await assertSucceeds(stranger().ref(seat(STRANGER)).set({ displayName: 'Carol', life: 40, online: true }));
   });
 
   test('unknown fields and oversized values are rejected', async () => {
@@ -283,8 +264,8 @@ describe('commander damage (#40)', () => {
     await assertFails(bob().ref(dmg(BOB)).set(0));
   });
 
-  test('sources must be player IDs', async () => {
-    await assertFails(alice().ref(dmg('everyone')).set(7));
+  test('sources must look like player IDs', async () => {
+    await assertFails(alice().ref(dmg('not an id!')).set(7));
   });
 });
 

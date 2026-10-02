@@ -1,7 +1,6 @@
 package com.kregosh.mtglifetracker.network
 
 import com.google.android.gms.tasks.Tasks
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
 import com.kregosh.mtglifetracker.shared.LIFE_STAT
 import com.kregosh.mtglifetracker.shared.ServerMessage
@@ -51,10 +50,6 @@ class FirebaseSessionConnection(
     private val onlineRef = myUserRef.child("online")
 
     override fun connect() {
-        // Must be the first write: every other rule checks this mapping.
-        FirebaseAuth.getInstance().currentUser?.uid?.let { uid ->
-            db.getReference("userAuth/$userId").setValue(uid)
-        }
         claimSeat()
 
         // ── Connection state ──────────────────────────────────────────────

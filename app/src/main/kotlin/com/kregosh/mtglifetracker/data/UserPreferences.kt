@@ -1,7 +1,6 @@
 package com.kregosh.mtglifetracker.data
 
 import android.content.Context
-import java.util.UUID
 
 private const val SEP = "\u001F"
 private const val MAX_KNOWN = 10
@@ -12,11 +11,6 @@ class UserPreferences(
 ) : UserPrefs {
 
     private val prefs = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
-
-    override val userId: String
-        get() = prefs.getString(KEY_USER_ID, null) ?: UUID.randomUUID().toString().also { id ->
-            prefs.edit().putString(KEY_USER_ID, id).apply()
-        }
 
     override var displayName: String
         get() = prefs.getString(KEY_DISPLAY_NAME, "") ?: ""
@@ -150,7 +144,6 @@ class UserPreferences(
         }
 
     companion object {
-        private const val KEY_USER_ID               = "user_id"
         private const val KEY_DISPLAY_NAME          = "display_name"
         private const val KEY_BACKGROUND_IMAGE      = "background_image_uri"
         private const val KEY_CARD_BACKGROUND_IMAGE = "card_background_image_uri"
