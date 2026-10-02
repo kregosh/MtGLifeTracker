@@ -217,8 +217,8 @@ class UserPreferencesTest {
     }
 
     @Test
-    fun `colorScheme defaults to dark`() {
-        assertEquals(AppColorScheme.DARK, prefs.colorScheme)
+    fun `colorScheme defaults to following the system`() {
+        assertEquals(AppColorScheme.SYSTEM, prefs.colorScheme)
     }
 
     @Test
@@ -236,19 +236,28 @@ class UserPreferencesTest {
         raw.edit().putString("color_scheme", "light").commit()
         assertEquals(AppColorScheme.LIGHT, prefs.colorScheme)
         raw.edit().putString("color_scheme", "something-else").commit()
-        assertEquals(AppColorScheme.DARK, prefs.colorScheme)
+        assertEquals(AppColorScheme.SYSTEM, prefs.colorScheme)
     }
 
     @Test
-    fun `backgroundImageUri defaults to null`() {
-        assertNull(prefs.backgroundImageUri)
+    fun `backgroundImageUri defaults to the mana orbs preset`() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        assertEquals("android.resource://${app.packageName}/drawable/bg_mana_orbs", prefs.backgroundImageUri)
     }
 
     @Test
-    fun `backgroundImageUri can be cleared by setting null`() {
+    fun `backgroundImageUri round-trips`() {
+        prefs.backgroundImageUri = "content://some/image"
+        assertEquals("content://some/image", prefs.backgroundImageUri)
+    }
+
+    @Test
+    fun `turning the background off sticks instead of bringing the default back`() {
         prefs.backgroundImageUri = "content://some/image"
         prefs.backgroundImageUri = null
         assertNull(prefs.backgroundImageUri)
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        assertNull(UserPreferences(app).backgroundImageUri)
     }
 
     @Test
