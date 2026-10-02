@@ -31,6 +31,8 @@ compose-ui-tooling-preview  = { group = "androidx.compose.ui",        name = "ui
 compose-ui-tooling          = { group = "androidx.compose.ui",        name = "ui-tooling" }
 compose-material3           = { group = "androidx.compose.material3", name = "material3" }
 compose-icons-extended      = { group = "androidx.compose.material",  name = "material-icons-extended" }
+compose-ui-test-junit4      = { group = "androidx.compose.ui",        name = "ui-test-junit4" }
+compose-ui-test-manifest    = { group = "androidx.compose.ui",        name = "ui-test-manifest" }
 
 # ── Invite QR codes ──────────────────────────────────────────────────
 zxing-core = { module = "com.google.zxing:core", version = "3.5.3" }
