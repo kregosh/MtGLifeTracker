@@ -1,16 +1,6 @@
 {
   "rules": {
-    // ── Player identity ──────────────────────────────────────────────────
-    // The app identifies players by a UUID kept in device prefs. The first
-    // anonymous sign-in to use a UUID claims it here; every other rule checks
-    // ownership through this mapping.
-    "userAuth": {
-      "$userId": {
-        ".read":     "auth != null",
-        ".write":    "auth != null && newData.val() == auth.uid && (!data.exists() || data.val() == auth.uid)",
-        ".validate": "$userId.matches(/^[0-9a-f-]{36}$/)"
-      }
-    },
+    // Player IDs are anonymous-auth uids, so ownership is simply $userId == auth.uid.
 
     // ── Session code lookup ──────────────────────────────────────────────
     "sessionCodes": {
@@ -37,13 +27,13 @@
         // ── Host and shared game rules ─────────────────────────────────
         // The creator becomes host. Only the host changes the rules or starts
         // a new game; each player then resets their own seat.
-        "hostUserId": { ".validate": "newData.isString() && !data.exists() && root.child('userAuth').child(newData.val()).val() == auth.uid" },
+        "hostUserId": { ".validate": "newData.isString() && !data.exists() && newData.val() == auth.uid" },
         "game": {
-          ".write":    "auth != null && root.child('userAuth').child(root.child('sessions').child($sessionId).child('hostUserId').val()).val() == auth.uid",
+          ".write":    "auth != null && root.child('sessions').child($sessionId).child('hostUserId').val() == auth.uid",
           ".validate": "newData.isNumber() && (!data.exists() || newData.val() > data.val())"
         },
         "settings": {
-          ".write":    "auth != null && root.child('userAuth').child(root.child('sessions').child($sessionId).child('hostUserId').val()).val() == auth.uid",
+          ".write":    "auth != null && root.child('sessions').child($sessionId).child('hostUserId').val() == auth.uid",
           ".validate": "newData.hasChildren(['startLife', 'commanderDeathThreshold', 'infectDeathThreshold', 'maxPlayers'])",
           "startLife":               { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 1000" },
           "commanderDeathThreshold": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 100" },
@@ -57,7 +47,7 @@
           "$userId": {
             // The owner writes their own seat. The host may remove anyone, and any
             // player may clear the seat of someone offline (ghosts left behind by a killed app).
-            ".write": "auth != null && (root.child('userAuth').child($userId).val() == auth.uid || (!newData.exists() && (data.child('online').val() == false || root.child('userAuth').child(root.child('sessions').child($sessionId).child('hostUserId').val()).val() == auth.uid)))",
+            ".write": "auth != null && ($userId == auth.uid || (!newData.exists() && (data.child('online').val() == false || root.child('sessions').child($sessionId).child('hostUserId').val() == auth.uid)))",
             ".validate": "newData.hasChildren(['displayName', 'life'])",
 
             "displayName": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 64" },
@@ -67,7 +57,7 @@
             "game":        { ".validate": "newData.isNumber() && newData.val() >= 0" },
             "commanderDamage": {
               "$fromUserId": {
-                ".validate": "$fromUserId.matches(/^[0-9a-f-]{36}$/) && newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000"
+                ".validate": "$fromUserId.matches(/^[A-Za-z0-9_-]{1,128}$/) && newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000"
               }
             },
             "customStats": {
@@ -100,7 +90,7 @@
         "friendRequests": {
           "$toUserId": {
             "$fromUserId": {
-              ".write": "auth != null && ((newData.exists() && root.child('userAuth').child($fromUserId).val() == auth.uid) || (!newData.exists() && root.child('userAuth').child($toUserId).val() == auth.uid))",
+              ".write": "auth != null && ((newData.exists() && $fromUserId == auth.uid) || (!newData.exists() && $toUserId == auth.uid))",
               ".validate": "newData.hasChildren(['displayName']) && newData.child('displayName').isString() && newData.child('displayName').val().length > 0 && newData.child('displayName').val().length <= 64"
             }
           }
@@ -111,7 +101,7 @@
         "friendAccepted": {
           "$toUserId": {
             "$fromUserId": {
-              ".write": "auth != null && ((newData.exists() && root.child('userAuth').child($fromUserId).val() == auth.uid) || (!newData.exists() && root.child('userAuth').child($toUserId).val() == auth.uid))",
+              ".write": "auth != null && ((newData.exists() && $fromUserId == auth.uid) || (!newData.exists() && $toUserId == auth.uid))",
               ".validate": "newData.hasChildren(['displayName']) && newData.child('displayName').isString() && newData.child('displayName').val().length > 0 && newData.child('displayName').val().length <= 64"
             }
           }
@@ -125,7 +115,7 @@
     "presence": {
       "$userId": {
         ".read":     "auth != null",
-        ".write":    "auth != null && root.child('userAuth').child($userId).val() == auth.uid",
+        ".write":    "auth != null && $userId == auth.uid",
         ".validate": "newData.isString()"
       }
     },

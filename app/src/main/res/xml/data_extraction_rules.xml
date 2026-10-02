@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    The player ID in shared preferences identifies this device in every session.
-    Copying it to another phone would make two devices act as the same player.
+    Shared preferences hold the friends list and Firebase's anonymous sign-in, whose uid
+    is the player ID. Copying it to another phone would make two devices act as one player.
 -->
 <data-extraction-rules>
     <cloud-backup>

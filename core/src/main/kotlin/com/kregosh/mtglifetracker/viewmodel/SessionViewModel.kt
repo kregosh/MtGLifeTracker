@@ -345,13 +345,21 @@ class SessionViewModel(
         infectDeathThreshold    = prefs.infectDeathThreshold,
     )
 
+    private var myUserId: String? = null
+
+    private suspend fun signedInUserId(): String =
+        myUserId ?: api.signIn().also { myUserId = it }
+
     fun createSession() {
         viewModelScope.launch {
             _homeLoading.value = true
             _homeError.value   = null
             val settings = defaultSettings()
-            runCatching { api.createSession(prefs.userId, settings) }
-                .onSuccess { resp -> joinSession(resp.sessionId, resp.sessionCode, settings) }
+            runCatching {
+                val me = signedInUserId()
+                me to api.createSession(me, settings)
+            }
+                .onSuccess { (me, resp) -> joinSession(me, resp.sessionId, resp.sessionCode, settings) }
                 .onFailure { _homeError.value = HomeError.CreateFailed(it.message) }
             _homeLoading.value = false
         }
@@ -361,8 +369,8 @@ class SessionViewModel(
         viewModelScope.launch {
             _homeLoading.value = true
             _homeError.value   = null
-            runCatching { api.getSessionByCode(code.trim().uppercase()) }
-                .onSuccess { info -> joinIfRoom(info) }
+            runCatching { signedInUserId() to api.getSessionByCode(code.trim().uppercase()) }
+                .onSuccess { (me, info) -> joinIfRoom(me, info) }
                 .onFailure { _homeError.value = joinError(it) }
             _homeLoading.value = false
         }
@@ -372,8 +380,8 @@ class SessionViewModel(
         viewModelScope.launch {
             _homeLoading.value = true
             _homeError.value   = null
-            runCatching { api.getSessionById(sessionId) }
-                .onSuccess { info -> joinIfRoom(info) }
+            runCatching { signedInUserId() to api.getSessionById(sessionId) }
+                .onSuccess { (me, info) -> joinIfRoom(me, info) }
                 .onFailure { _homeError.value = joinError(it) }
             _homeLoading.value = false
         }
@@ -389,8 +397,8 @@ class SessionViewModel(
         if (_screen.value !is Screen.Home) return
         viewModelScope.launch {
             _homeLoading.value = true
-            runCatching { api.getSessionById(sessionId) }
-                .onSuccess { info -> if (!joinIfRoom(info, quiet = true)) prefs.lastSessionId = null }
+            runCatching { signedInUserId() to api.getSessionById(sessionId) }
+                .onSuccess { (me, info) -> if (!joinIfRoom(me, info, quiet = true)) prefs.lastSessionId = null }
                 .onFailure { prefs.lastSessionId = null }
             _homeLoading.value = false
         }
@@ -399,13 +407,13 @@ class SessionViewModel(
     private fun joinError(e: Throwable): HomeError =
         if (e is SessionNotFoundException) HomeError.SessionNotFound else HomeError.JoinFailed(e.message)
 
-    private fun joinIfRoom(info: SessionInfoResponse, quiet: Boolean = false): Boolean {
+    private fun joinIfRoom(me: String, info: SessionInfoResponse, quiet: Boolean = false): Boolean {
         val max = info.settings?.maxPlayers ?: 0
-        if (max > 0 && prefs.userId !in info.userIds && info.userIds.size >= max) {
+        if (max > 0 && me !in info.userIds && info.userIds.size >= max) {
             if (!quiet) _homeError.value = HomeError.SessionFull(max)
             return false
         }
-        joinSession(info.sessionId, info.sessionCode, info.settings)
+        joinSession(me, info.sessionId, info.sessionCode, info.settings)
         return true
     }
 
@@ -546,13 +554,12 @@ class SessionViewModel(
         if (friendDirty) _friendList.value = prefs.friendList
     }
 
-    private fun joinSession(sessionId: String, sessionCode: String, settings: SessionSettings?) {
+    private fun joinSession(myId: String, sessionId: String, sessionCode: String, settings: SessionSettings?) {
         val current = _screen.value
         if (current is Screen.Session && current.sessionId == sessionId) return
 
         tearDownConnection()
 
-        val myId = prefs.userId
         val name = prefs.displayName.ifBlank { "Player" }
 
         val rules = settings ?: defaultSettings()

@@ -32,12 +32,14 @@ class FirebaseSessionApi : SessionApi {
     private val db   get() = FirebaseDatabase.getInstance()
     private val auth get() = FirebaseAuth.getInstance()
 
-    // Ensure an anonymous Firebase Auth session exists before any DB write.
-    // If already signed in this is a no-op; it uses the existing credential.
-    private suspend fun ensureSignedIn() {
-        if (auth.currentUser == null) {
-            withTimeout(TIMEOUT_MS) { auth.signInAnonymously().await() }
-        }
+    // The anonymous auth uid is the player ID, so the rules can check ownership
+    // directly. It persists across restarts until the app's data is cleared.
+    override suspend fun signIn(): String = ensureSignedIn()
+
+    private suspend fun ensureSignedIn(): String {
+        auth.currentUser?.let { return it.uid }
+        val result = withTimeout(TIMEOUT_MS) { auth.signInAnonymously().await() }
+        return result.user?.uid ?: throw Exception("Anonymous sign-in returned no user")
     }
 
     override suspend fun createSession(hostUserId: String, settings: SessionSettings): CreateSessionResponse {
@@ -45,8 +47,6 @@ class FirebaseSessionApi : SessionApi {
         val sessionId = UUID.randomUUID().toString()
 
         return withTimeout(TIMEOUT_MS) {
-            // The rules check that the host ID belongs to this sign-in.
-            db.getReference("userAuth/$hostUserId").setValue(auth.currentUser?.uid).await()
             repeat(CODE_ATTEMPTS) {
                 val code = (1..CODE_LENGTH).map { CODE_CHARS.random() }.joinToString("")
                 if (claimCode(code, sessionId)) {

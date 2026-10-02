@@ -9,6 +9,12 @@ import kotlinx.coroutines.flow.Flow
 class SessionNotFoundException(message: String) : Exception(message)
 
 interface SessionApi {
+    /**
+     * Signs in (or reuses the current sign-in) and returns the player ID the backend
+     * knows this device by. Friends, seats and presence are all keyed by it.
+     */
+    suspend fun signIn(): String
+
     suspend fun createSession(hostUserId: String, settings: SessionSettings): CreateSessionResponse
     suspend fun getSessionByCode(code: String): SessionInfoResponse
     suspend fun getSessionById(sessionId: String): SessionInfoResponse
