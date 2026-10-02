@@ -15,14 +15,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import com.kregosh.mtglifetracker.R
 import com.kregosh.mtglifetracker.ui.components.FriendsSheet
+import com.kregosh.mtglifetracker.ui.message
 import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
-import com.kregosh.mtglifetracker.viewmodel.HomeError
 import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -150,7 +151,7 @@ fun HomeScreen(vm: SessionViewModel) {
             }
 
             error?.let { err ->
-                val msg = homeErrorText(err)
+                val msg = err.message(LocalContext.current.resources)
                 Card(
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer,
@@ -169,14 +170,3 @@ fun HomeScreen(vm: SessionViewModel) {
     }
 }
 
-@Composable
-private fun homeErrorText(error: HomeError): String {
-    val unknown = stringResource(R.string.error_unknown)
-    return when (error) {
-        HomeError.SessionNotFound    -> stringResource(R.string.error_session_not_found)
-        HomeError.RemovedFromSession -> stringResource(R.string.error_removed)
-        is HomeError.SessionFull     -> stringResource(R.string.error_session_full, error.maxPlayers)
-        is HomeError.CreateFailed    -> stringResource(R.string.error_create_failed, error.detail ?: unknown)
-        is HomeError.JoinFailed      -> stringResource(R.string.error_join_failed, error.detail ?: unknown)
-    }
-}

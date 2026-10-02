@@ -32,6 +32,7 @@ import com.kregosh.mtglifetracker.ui.screens.SettingsScreen
 import com.kregosh.mtglifetracker.ui.theme.LocalCardBackground
 import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
 import com.kregosh.mtglifetracker.ui.theme.MtGLifeTrackerTheme
+import com.kregosh.mtglifetracker.ui.theme.migratedPresetUri
 import com.kregosh.mtglifetracker.viewmodel.Screen
 import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
 import kotlinx.coroutines.Dispatchers
@@ -137,13 +138,11 @@ class MainActivity : ComponentActivity() {
     // Presets used to be saved by numeric resource ID, which never matched the
     // name-based storm check and isn't stable across builds.
     private fun migrateLegacyPresetUri() {
-        val uri = vm.backgroundImageUri.value ?: return
-        val prefix = "android.resource://$packageName/"
-        val byId = mapOf(
-            "$prefix${R.drawable.bg_arcane_storm}" to "${prefix}drawable/bg_arcane_storm",
-            "$prefix${R.drawable.bg_mana_orbs}"    to "${prefix}drawable/bg_mana_orbs",
+        val legacyIds = mapOf(
+            R.drawable.bg_arcane_storm to "bg_arcane_storm",
+            R.drawable.bg_mana_orbs    to "bg_mana_orbs",
         )
-        byId[uri]?.let(vm::setBackgroundImage)
+        migratedPresetUri(vm.backgroundImageUri.value, packageName, legacyIds)?.let(vm::setBackgroundImage)
     }
 
     override fun onNewIntent(intent: Intent) {
