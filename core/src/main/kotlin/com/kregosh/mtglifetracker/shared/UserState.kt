@@ -9,4 +9,6 @@ data class UserState(
     val online          : Boolean           = true,
     /** Commander damage taken, keyed by the user ID of the opponent who dealt it. */
     val commanderDamage : Map<String, UInt> = emptyMap(),
+    /** The game (see [ServerMessage.State.game]) this seat's stats belong to. */
+    val game            : Long              = 0,
 )

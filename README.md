@@ -27,8 +27,10 @@ Interactive HTML mock of the app screens:
 ```
 MtGLifeTracker/
 ├── core/         Android library, no Firebase: SessionViewModel, data model,
-│                 SessionApi / SessionConnection interfaces, UserPrefs interface
-├── firebase/     Firebase implementations of SessionApi and SessionConnection
+│                 game rules (domain/), and the SessionApi / SessionConnection /
+│                 CodeRegistry / UserPrefs interfaces a backend implements
+├── firebase/     Firebase adapter: SessionSchema (pure mapping to the database
+│                 layout) plus thin FirebaseSessionApi / FirebaseSessionConnection
 ├── app/          Jetpack Compose UI, SharedPreferences-backed UserPrefs
 ├── rules-tests/  Emulator tests for database.rules.json
 └── docs/join/    Invite landing page served by GitHub Pages
@@ -37,6 +39,12 @@ MtGLifeTracker/
 The app talks directly to **Firebase Realtime Database**; there is no server of
 our own. Every client signs in anonymously with **Firebase Authentication**
 before touching the database.
+
+Business rules don't depend on Firebase: code allocation (`SessionCodes`), seat
+handling on join, new games and leaving (`SeatRules`), and stat routing live in
+core and are unit-tested there. Switching backends means implementing
+`SessionApi`, `SessionConnection` and `CodeRegistry` and a schema like
+`SessionSchema`; the view model and the rules stay as they are.
 
 ### Data model
 

@@ -35,6 +35,21 @@ private const val COMMANDER_DAMAGE_PREFIX = "commander:"
 /** Stat key for commander damage dealt by [fromUserId]'s commander. */
 fun commanderDamageStat(fromUserId: String): String = "$COMMANDER_DAMAGE_PREFIX$fromUserId"
 
+/** Where a stat key's value lives on a player's seat. */
+sealed interface StatTarget {
+    data object Life : StatTarget
+    data class CommanderDamage(val fromUserId: String) : StatTarget
+    data class Custom(val name: String) : StatTarget
+}
+
+fun statTarget(stat: String): StatTarget {
+    if (stat == LIFE_STAT) return StatTarget.Life
+    return commanderDamageSource(stat)?.let(StatTarget::CommanderDamage) ?: StatTarget.Custom(stat)
+}
+
+/** Counters never go below zero. */
+fun applyDelta(current: Long?, delta: Int): Long = ((current ?: 0L) + delta).coerceAtLeast(0L)
+
 /** The opponent a commander-damage stat key refers to, or null for any other stat. */
 fun commanderDamageSource(stat: String): String? =
     if (stat.startsWith(COMMANDER_DAMAGE_PREFIX)) stat.removePrefix(COMMANDER_DAMAGE_PREFIX) else null
