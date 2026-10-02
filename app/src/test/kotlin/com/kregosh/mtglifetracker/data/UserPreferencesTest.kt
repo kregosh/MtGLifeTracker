@@ -260,4 +260,46 @@ class UserPreferencesTest {
         assertEquals("Alice", other.friendList.first().displayName)
     }
 
+    // ── remaining settings ───────────────────────────────────────────────────
+
+    @Test
+    fun `cardBackgroundImageUri round-trips and clears`() {
+        assertNull(prefs.cardBackgroundImageUri)
+        prefs.cardBackgroundImageUri = "content://card"
+        assertEquals("content://card", prefs.cardBackgroundImageUri)
+        prefs.cardBackgroundImageUri = null
+        assertNull(prefs.cardBackgroundImageUri)
+    }
+
+    @Test
+    fun `damage thresholds round-trip`() {
+        prefs.commanderDeathThreshold = 15u
+        prefs.infectDeathThreshold = 7u
+        assertEquals(15u, prefs.commanderDeathThreshold)
+        assertEquals(7u, prefs.infectDeathThreshold)
+    }
+
+    @Test
+    fun `commanderDefaultEnabled defaults to off and round-trips`() {
+        assertEquals(false, prefs.commanderDefaultEnabled)
+        prefs.commanderDefaultEnabled = true
+        assertEquals(true, prefs.commanderDefaultEnabled)
+    }
+
+    @Test
+    fun `timer settings default to a visible 60-minute stopwatch`() {
+        assertEquals(true, prefs.timerVisible)
+        assertEquals(false, prefs.timerCountDown)
+        assertEquals(60u, prefs.timerLimitMinutes)
+    }
+
+    @Test
+    fun `timer settings round-trip`() {
+        prefs.timerVisible = false
+        prefs.timerCountDown = true
+        prefs.timerLimitMinutes = 45u
+        assertEquals(false, prefs.timerVisible)
+        assertEquals(true, prefs.timerCountDown)
+        assertEquals(45u, prefs.timerLimitMinutes)
+    }
 }

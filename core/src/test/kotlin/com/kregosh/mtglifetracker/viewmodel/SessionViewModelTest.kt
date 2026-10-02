@@ -18,6 +18,9 @@ import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.shared.UserState
 import com.kregosh.mtglifetracker.viewmodel.RESERVED_STAT_NAMES
 import io.mockk.*
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -1595,5 +1598,191 @@ class SessionViewModelTest {
 
         assertTrue(vm.lifeHistory.value.isEmpty())
         assertEquals(1L, vm.sessionUi.value.game)
+    }
+
+    // ── settings and navigation ──────────────────────────────────────────────
+
+    @Test
+    fun `settings returns to the screen it was opened from`() = runTest {
+        val vm = inSession()
+        vm.openSettings()
+        assertEquals(Screen.Settings, vm.screen.value)
+        vm.closeSettings()
+        assertEquals(Screen.Session("sid-1"), vm.screen.value)
+    }
+
+    @Test
+    fun `settings opened from home returns home`() {
+        val vm = makeVm()
+        vm.openSettings()
+        vm.closeSettings()
+        assertEquals(Screen.Home, vm.screen.value)
+    }
+
+    @Test
+    fun `game rule defaults persist and update their flows`() {
+        val vm = makeVm()
+        vm.setStartLife(40u)
+        vm.setCommanderThreshold(15u)
+        vm.setInfectThreshold(7u)
+        vm.setCommanderDefaultEnabled(true)
+
+        verify { prefs.startLife = 40u }
+        verify { prefs.commanderDeathThreshold = 15u }
+        verify { prefs.infectDeathThreshold = 7u }
+        verify { prefs.commanderDefaultEnabled = true }
+        assertEquals(40u, vm.startLife.value)
+        assertEquals(15u, vm.commanderThreshold.value)
+        assertEquals(7u, vm.infectThreshold.value)
+        every { prefs.commanderDefaultEnabled } returns true
+        assertTrue(vm.commanderDefaultEnabled)
+    }
+
+    @Test
+    fun `appearance settings persist and update their flows`() {
+        val vm = makeVm()
+        vm.setColorScheme(AppColorScheme.LIGHT)
+        vm.setCardBackgroundImage("content://card")
+
+        verify { prefs.colorScheme = AppColorScheme.LIGHT }
+        verify { prefs.cardBackgroundImageUri = "content://card" }
+        assertEquals(AppColorScheme.LIGHT, vm.colorScheme.value)
+        assertEquals("content://card", vm.cardBackgroundImageUri.value)
+    }
+
+    @Test
+    fun `the storm preset is recognised by name`() = runTest {
+        val vm = makeVm()
+        assertFalse(vm.isStormPreset.value)
+        vm.setBackgroundImage("android.resource://pkg/drawable/bg_arcane_storm")
+        advanceUntilIdle()
+        assertTrue(vm.isStormPreset.value)
+    }
+
+    @Test
+    fun `new sessions start with the saved game rules`() = runTest {
+        every { prefs.startLife }               returns 30u
+        every { prefs.commanderDeathThreshold } returns 15u
+        every { prefs.infectDeathThreshold }    returns 7u
+        val vm = inSession()
+        assertEquals(SessionSettings(30u, 15u, 7u, 0), vm.sessionUi.value.settings)
+    }
+
+    // ── closing the app keeps the seat (resume, #42) ─────────────────────────
+
+    @Test
+    fun `clearing the view model marks the player offline instead of removing them`() = runTest {
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
+        val store = ViewModelStore()
+        val vm = ViewModelProvider(store, object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T = makeVm() as T
+        })[SessionViewModel::class.java]
+        vm.createSession()
+        advanceUntilIdle()
+
+        store.clear()
+
+        verify { ws.close(false) }
+        verify(exactly = 0) { ws.close(true) }
+        verify(exactly = 0) { prefs.lastSessionId = null }
+        verify { api.close() }
+    }
+
+    // ── guards ────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `session actions without a session do nothing`() = runTest {
+        val vm = makeVm()
+        vm.sendFriendRequest("bob")
+        vm.undoLastLifeChange()
+        vm.startNewGame()
+        vm.removePlayer("bob")
+        vm.updateSessionSettings(SessionSettings())
+        advanceUntilIdle()
+
+        verify(exactly = 0) { connectionFactory(any(), any(), any(), any()) }
+        assertTrue(vm.lifeHistory.value.isEmpty())
+    }
+
+    @Test
+    fun `undo with an empty history does nothing`() = runTest {
+        val vm = inSession()
+        vm.undoLastLifeChange()
+        advanceUntilIdle()
+        verify(exactly = 0) { ws.adjust(any(), any()) }
+    }
+
+    @Test
+    fun `taps that cancel out send nothing and record nothing`() = runTest {
+        val vm = inSession()
+        vm.adjust("life", -1)
+        vm.adjust("life", 1)
+        advanceUntilIdle()
+
+        verify(exactly = 0) { ws.adjust(any(), any()) }
+        assertTrue(vm.lifeHistory.value.isEmpty())
+    }
+
+    @Test
+    fun `sessions without a host give nobody host controls`() = runTest {
+        val vm = inSession(hostUserId = null)
+        assertFalse(vm.sessionUi.value.isHost)
+        vm.startNewGame()
+        verify(exactly = 0) { ws.startNewGame() }
+    }
+
+    @Test
+    fun `joining the session you are already in is a no-op`() = runTest {
+        coEvery { api.getSessionById("sid-1") } returns SessionInfoResponse("sid-1", "CODE01", 1)
+        val vm = inSession()
+        vm.joinFriendSession("sid-1")
+        advanceUntilIdle()
+
+        verify(exactly = 1) { connectionFactory(any(), any(), any(), any()) }
+        verify(exactly = 0) { ws.close(any()) }
+    }
+
+    @Test
+    fun `a blank display name joins as Player`() = runTest {
+        every { prefs.displayName } returns ""
+        inSession()
+        verify { connectionFactory("sid-1", any(), "Player", any()) }
+    }
+
+    @Test
+    fun `resume is skipped when already in a session`() = runTest {
+        val vm = inSession()
+        every { prefs.lastSessionId } returns "other"
+        vm.resumeLastSession()
+        advanceUntilIdle()
+        coVerify(exactly = 0) { api.getSessionById(any()) }
+    }
+
+    @Test
+    fun `resuming into a session that filled up forgets it quietly`() = runTest {
+        every { prefs.lastSessionId } returns "sid-full"
+        coEvery { api.getSessionById("sid-full") } returns
+            SessionInfoResponse("sid-full", "CODE01", 2, SessionSettings(maxPlayers = 2), setOf("a", "b"))
+        val vm = makeVm()
+        vm.resumeLastSession()
+        advanceUntilIdle()
+
+        assertEquals(Screen.Home, vm.screen.value)
+        assertNull(vm.homeError.value)
+        verify { prefs.lastSessionId = null }
+    }
+
+    @Test
+    fun `a friend request is only remembered when it was actually sent`() = runTest {
+        val vm = makeVm()
+        vm.sendFriendRequest("bob")   // no session: nothing sent
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
+        vm.createSession()
+        advanceUntilIdle()
+        serverMessages.emit(ServerMessage.FriendAccepted("bob", "Bob"))
+        advanceUntilIdle()
+
+        verify(exactly = 0) { prefs.addFriend("bob", any()) }
     }
 }

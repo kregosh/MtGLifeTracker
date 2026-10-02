@@ -34,6 +34,8 @@ import com.kregosh.mtglifetracker.shared.SessionSettings
 import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.shared.UserState
 import com.kregosh.mtglifetracker.ui.components.FriendsSheet
+import com.kregosh.mtglifetracker.ui.signed
+import com.kregosh.mtglifetracker.ui.toTimerString
 import com.kregosh.mtglifetracker.ui.components.InviteDialog
 import com.kregosh.mtglifetracker.ui.components.PlayerCard
 import com.kregosh.mtglifetracker.ui.components.statLabel
@@ -509,13 +511,6 @@ private fun GameTimerRow(
     }
 }
 
-private fun Duration.toTimerString(): String {
-    val total = inWholeSeconds
-    val h = total / 3600
-    val m = (total % 3600) / 60
-    val s = total % 60
-    return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%02d:%02d".format(m, s)
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Connection state banner
@@ -754,7 +749,6 @@ private fun AddCustomStatDialog(
 // Life history
 // ─────────────────────────────────────────────────────────────────────────────
 
-private fun Int.signed(): String = if (this > 0) "+$this" else "−${-this}"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
