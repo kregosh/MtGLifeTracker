@@ -1,5 +1,6 @@
 package com.kregosh.mtglifetracker.domain
 
+import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.shared.UserState
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -48,6 +49,14 @@ class SeatRulesTest {
     fun `a new-game seat keeps only the name`() {
         val fresh = SeatRules.newGameSeat("me", "Alice", startLife = 30u, game = 4)
         assertEquals(UserState(id = "me", displayName = "Alice", life = 30u, online = true, game = 4), fresh)
+    }
+
+    @Test
+    fun `a new game keeps the counters the player tracks, with fresh values`() {
+        val stats = mapOf("poison" to StatType.NUMERIC)
+        val fresh = SeatRules.newGameSeat("me", "Alice", startLife = 30u, game = 4, stats = stats)
+        assertEquals(stats, fresh.stats)
+        assertTrue(fresh.customStats.isEmpty())
     }
 
     @Test

@@ -13,7 +13,6 @@ class IsDeadTest {
 
     private val defaultUi = SessionUiState(
         settings = SessionSettings(commanderDeathThreshold = 21u, infectDeathThreshold = 10u),
-        statDefs = mapOf(COMMANDER_STAT to StatType.NUMERIC, POISON_STAT to StatType.NUMERIC),
     )
 
     private fun user(
@@ -22,6 +21,7 @@ class IsDeadTest {
         poisonDamage    : UInt = 0u,
     ) = UserState(
         id          = "u1",
+        stats       = mapOf(COMMANDER_STAT to StatType.NUMERIC, POISON_STAT to StatType.NUMERIC),
         displayName = "Alice",
         life        = life,
         customStats     = if (poisonDamage > 0u) mapOf("poison" to poisonDamage) else emptyMap(),

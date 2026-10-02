@@ -53,6 +53,7 @@ import com.kregosh.mtglifetracker.viewmodel.SessionUiState
 import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
 import com.kregosh.mtglifetracker.viewmodel.Change
 import com.kregosh.mtglifetracker.viewmodel.GlobalChange
+import com.kregosh.mtglifetracker.viewmodel.MonarchChange
 import com.kregosh.mtglifetracker.viewmodel.StatChange
 import com.kregosh.mtglifetracker.viewmodel.StatToggled
 import com.kregosh.mtglifetracker.viewmodel.isValidStatName
@@ -129,7 +130,7 @@ private fun SessionContent(
     val snackbarHost = remember { SnackbarHostState() }
     var announcedUpTo by remember { mutableLongStateOf(-1L) }
     val latestChange = history.firstOrNull()
-    val latestText   = latestChange?.let { changeText(it, ui.users, ui.statDefs) }
+    val latestText   = latestChange?.let { changeText(it, ui.users, ui.myStats) }
 
     // Offer undo once per new change; undoing exposes older entries, which were already offered.
     LaunchedEffect(latestChange?.id) {
@@ -149,7 +150,7 @@ private fun SessionContent(
         HistorySheet(
             history   = history,
             users     = ui.users,
-            statDefs  = ui.statDefs,
+            statDefs  = ui.myStats,
             onUndo    = vm::undoLastChange,
             onDismiss = { showHistory = false },
         )
@@ -246,6 +247,7 @@ private fun SessionContent(
             onAddCustom = { showStatPicker = false; showCustomDialog = true },
             onRemove    = { name -> vm.removeCustomStat(name) },
             onEnableDayNight = { vm.setGlobal(DAY_NIGHT_GLOBAL, 0u) ; showStatPicker = false },
+            onSetMonarch     = { id -> vm.setMonarch(id); showStatPicker = false },
             onDismiss   = { showStatPicker = false },
         )
     }
@@ -404,6 +406,7 @@ private fun SessionContent(
                             isFriend    = user.id in friendIds,
                             onAddFriend = if (!isMe) { { vm.sendFriendRequest(user.id) } } else null,
                             onRemove    = if (ui.isHost && !isMe) { { removeTarget = user } } else null,
+                            onTakeMonarch = if (isMe) { { vm.setMonarch(user.id) } } else null,
                             playerIndex = index,
                         )
                     }
@@ -562,10 +565,12 @@ private fun StatPickerSheet(
     onAddCustom      : () -> Unit,
     onRemove         : (name: String) -> Unit,
     onEnableDayNight : () -> Unit,
+    onSetMonarch     : (userId: String?) -> Unit,
     onDismiss        : () -> Unit,
 ) {
-    val statDefs        = ui.statDefs
+    val statDefs        = ui.myStats
     val dayNightEnabled = DAY_NIGHT_GLOBAL in ui.globalStats
+    val monarchName     = ui.monarch?.let { id -> ui.users.find { it.id == id }?.displayName }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -608,6 +613,20 @@ private fun StatPickerSheet(
                 active    = dayNightEnabled,
                 onClick   = { if (!dayNightEnabled) onEnableDayNight() },
             )
+            if (ui.monarch != null) {
+                ActiveStatRow(
+                    label     = stringResource(R.string.stat_monarch),
+                    typeLabel = stringResource(R.string.stats_monarch_held_by, monarchName ?: stringResource(R.string.history_unknown_player)),
+                    onRemove  = { onSetMonarch(null) },
+                )
+            } else {
+                PickerRow(
+                    label     = stringResource(R.string.stat_monarch),
+                    typeLabel = stringResource(R.string.stats_monarch_hint),
+                    active    = false,
+                    onClick   = { onSetMonarch(ui.myUserId) },
+                )
+            }
 
             Spacer(Modifier.height(8.dp))
             HorizontalDivider()
@@ -842,6 +861,14 @@ private fun describe(change: Change, users: List<UserState>, statDefs: Map<Strin
             label  = statLabel(change.stat),
             delta  = null,
             result = stringResource(if (change.enabled) R.string.history_turned_on else R.string.history_turned_off),
+        )
+        is MonarchChange -> ChangeLine(
+            label  = stringResource(R.string.stat_monarch),
+            delta  = null,
+            result = change.after?.let { id ->
+                stringResource(R.string.history_value_after,
+                    users.find { it.id == id }?.displayName ?: stringResource(R.string.history_unknown_player))
+            } ?: stringResource(R.string.history_turned_off),
         )
         is GlobalChange -> ChangeLine(
             label  = stringResource(R.string.stats_day_night),

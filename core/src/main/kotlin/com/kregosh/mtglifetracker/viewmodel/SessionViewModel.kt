@@ -77,8 +77,8 @@ data class SessionUiState(
     val sessionCode : String                = "",
     val myUserId    : String                = "",
     val users       : List<UserState>       = emptyList(),
-    val statDefs    : Map<String, StatType> = emptyMap(),
     val globalStats : Map<String, UInt>     = emptyMap(),
+    val monarch     : String?               = null,
     val connectionState     : ConnectionState               = ConnectionState.Connecting,
     val error       : String?               = null,
     val settings    : SessionSettings       = SessionSettings(),
@@ -86,15 +86,22 @@ data class SessionUiState(
     val game        : Long                  = 0,
 ) {
     val isHost: Boolean get() = hostUserId != null && hostUserId == myUserId
+
+    /** The local player's seat. */
+    val me: UserState? get() = users.find { it.id == myUserId }
+
+    /** The counters the local player tracks. */
+    val myStats: Map<String, StatType> get() = me?.stats.orEmpty()
 }
 
 /** Dead at 0 life, or at the threshold of commander damage from any single commander, or of poison. */
-// Counters that are turned off keep their values (so turning them back on restores them) but don't count.
+// Only counters the player tracks count; turned-off ones keep their values (so turning
+// them back on restores them) but are ignored.
 fun UserState.isDead(state: SessionUiState): Boolean =
     life == 0u
-        || (COMMANDER_STAT in state.statDefs &&
+        || (COMMANDER_STAT in stats &&
             (commanderDamage.values.maxOrNull() ?: 0u) >= state.settings.commanderDeathThreshold)
-        || (POISON_STAT in state.statDefs &&
+        || (POISON_STAT in stats &&
             (customStats[POISON_STAT] ?: 0u) >= state.settings.infectDeathThreshold)
 
 /** Something the local player did that can be undone. The history lists them newest first. */
@@ -103,11 +110,14 @@ sealed interface Change { val id: Long }
 /** A committed change to one of the player's stats: life, a counter, commander damage from an opponent. */
 data class StatChange(override val id: Long, val stat: String, val delta: Int, val valueAfter: UInt) : Change
 
-/** A counter turned on ([enabled]) or off for the session. */
+/** A counter turned on ([enabled]) or off for the local player. */
 data class StatToggled(override val id: Long, val stat: String, val type: StatType, val enabled: Boolean) : Change
 
 /** A session-wide value (Day/Night) set to [after]; [before] is null when it was turned on. */
 data class GlobalChange(override val id: Long, val stat: String, val before: UInt?, val after: UInt) : Change
+
+/** The monarch passed from [before] to [after]; null means nobody (the monarch not in play). */
+data class MonarchChange(override val id: Long, val before: String?, val after: String?) : Change
 
 private const val MAX_HISTORY = 50
 
@@ -467,6 +477,7 @@ class SessionViewModel(
             is GlobalChange ->
                 if (last.before == null) connection?.removeGlobal(last.stat)
                 else                     connection?.setGlobal(last.stat, last.before)
+            is MonarchChange -> connection?.setMonarch(last.before)
         }
     }
 
@@ -481,11 +492,12 @@ class SessionViewModel(
     }
 
     // A change is offered for undo while undoing it still means something: its counter is
-    // on, and nobody has turned the counter on or off, or flipped Day/Night, since.
+    // on, and nobody has since flipped Day/Night or passed the monarch on.
     private fun Change.isUndoable(ui: SessionUiState): Boolean = when (this) {
-        is StatChange   -> isTracked(stat, ui.statDefs)
-        is StatToggled  -> (stat in ui.statDefs) == enabled
-        is GlobalChange -> ui.globalStats[stat] == after
+        is StatChange    -> isTracked(stat, ui.myStats)
+        is StatToggled   -> (stat in ui.myStats) == enabled
+        is GlobalChange  -> ui.globalStats[stat] == after
+        is MonarchChange -> ui.monarch == after
     }
 
     // Rapid taps are coalesced into one network write per stat.
@@ -533,8 +545,12 @@ class SessionViewModel(
     }
 
     fun startNewGame() {
-        if (!_sessionUi.value.isHost) return
-        connection?.startNewGame()
+        val ui = _sessionUi.value
+        if (!ui.isHost) return
+        val conn = connection ?: return
+        conn.startNewGame()
+        // A new game starts without a monarch.
+        if (ui.monarch != null) conn.setMonarch(null)
     }
 
     fun removePlayer(userId: String) {
@@ -547,15 +563,15 @@ class SessionViewModel(
         val trimmed = name.trim()
         if (!isValidStatName(trimmed)) return
         val conn = connection ?: return
-        if (trimmed in _sessionUi.value.statDefs) return
+        if (trimmed in _sessionUi.value.myStats) return
         conn.addCustomStat(trimmed, type)
         record { id -> StatToggled(id, trimmed, type, enabled = true) }
     }
 
-    /** Hides the counter for everyone; its values stay, so turning it back on restores them. */
+    /** Hides the counter on the local player's card; its value stays, so turning it back on restores it. */
     fun removeCustomStat(name: String) {
         val conn = connection ?: return
-        val type = _sessionUi.value.statDefs[name] ?: return
+        val type = _sessionUi.value.myStats[name] ?: return
         conn.removeCustomStat(name)
         record { id -> StatToggled(id, name, type, enabled = false) }
     }
@@ -566,6 +582,15 @@ class SessionViewModel(
         if (before == value) return
         conn.setGlobal(stat, value)
         record { id -> GlobalChange(id, stat, before, value) }
+    }
+
+    /** Makes [userId] the monarch, or takes the monarch out of the game with null. */
+    fun setMonarch(userId: String?) {
+        val conn   = connection ?: return
+        val before = _sessionUi.value.monarch
+        if (before == userId) return
+        conn.setMonarch(userId)
+        record { id -> MonarchChange(id, before, userId) }
     }
 
     fun concede() {
@@ -684,8 +709,8 @@ class SessionViewModel(
                                 it.copy(
                                     users       = applyPendingDeltas(msg.users),
                                     error       = null,
-                                    statDefs    = msg.statDefs,
                                     globalStats = msg.globalStats,
+                                    monarch     = msg.monarch,
                                     settings    = msg.settings ?: it.settings,
                                     hostUserId  = msg.hostUserId,
                                     game        = msg.game,
@@ -693,6 +718,7 @@ class SessionViewModel(
                             }
                             publishHistory()
                             rememberPlayers(msg.users)
+                            addDefaultStats(conn, msg.users.find { it.id == myId })
                         }
                         is ServerMessage.Error  -> _sessionUi.update { it.copy(error = msg.message) }
                         is ServerMessage.FriendRequest -> {
@@ -713,9 +739,17 @@ class SessionViewModel(
             }
         }
 
+        defaultStatsAdded = false
         conn.connect()
+    }
 
-        if (prefs.commanderDefaultEnabled) {
+    private var defaultStatsAdded = false
+
+    // Counters go on the seat, so the default ones are added once the seat exists.
+    private fun addDefaultStats(conn: SessionConnection, mySeat: UserState?) {
+        if (defaultStatsAdded || mySeat == null) return
+        defaultStatsAdded = true
+        if (prefs.commanderDefaultEnabled && COMMANDER_STAT !in mySeat.stats) {
             conn.addCustomStat(COMMANDER_STAT, StatType.NUMERIC)
         }
     }

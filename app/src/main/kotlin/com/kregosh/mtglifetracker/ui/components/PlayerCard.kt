@@ -187,6 +187,7 @@ fun PlayerCard(
     isFriend    : Boolean        = false,
     onAddFriend : (() -> Unit)?  = null,
     onRemove    : (() -> Unit)?  = null,
+    onTakeMonarch : (() -> Unit)? = null,
     playerIndex : Int            = 0,
     modifier    : Modifier       = Modifier,
 ) {
@@ -344,13 +345,24 @@ fun PlayerCard(
                         }
                     }
 
-                    // Custom stats
-                    if (sessionUi.statDefs.isNotEmpty()) {
+                    // The monarch shows on the holder's card; while it's in play, your own card can take it.
+                    val isMonarch   = sessionUi.monarch == user.id
+                    val showMonarch = isMonarch || (isMe && sessionUi.monarch != null)
+
+                    // The counters this player tracks
+                    if (user.stats.isNotEmpty() || showMonarch) {
                         Spacer(Modifier.height(8.dp))
                         HorizontalDivider(color = PARCHMENT_SEPIA.copy(alpha = 0.35f))
                         Spacer(Modifier.height(8.dp))
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            sessionUi.statDefs.forEach { (name, type) ->
+                            if (showMonarch) {
+                                MonarchRow(
+                                    isMonarch = isMonarch,
+                                    isMe      = isMe,
+                                    onTake    = { onTakeMonarch?.invoke() },
+                                )
+                            }
+                            user.stats.forEach { (name, type) ->
                                 val value = user.customStats[name] ?: 0u
                                 when {
                                     name == COMMANDER_STAT -> sessionUi.users
@@ -496,6 +508,40 @@ private fun ToggleStatRow(
                 onClick  = {},
                 enabled  = active,
                 label    = { Text(stringResource(if (active) R.string.stat_active else R.string.stat_inactive_other), style = MaterialTheme.typography.labelSmall) },
+            )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Monarch row: a crown on the holder's card, and a way to take it on your own
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun MonarchRow(isMonarch: Boolean, isMe: Boolean, onTake: () -> Unit) {
+    Row(
+        verticalAlignment     = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier              = Modifier.fillMaxWidth(),
+    ) {
+        Text(
+            text     = "👑 " + stringResource(R.string.player_monarch),
+            style    = MaterialTheme.typography.labelMedium,
+            color    = if (isMonarch) PARCHMENT_INK else PARCHMENT_SEPIA,
+            fontWeight = if (isMonarch) FontWeight.Bold else FontWeight.Normal,
+            modifier = Modifier.widthIn(min = 72.dp),
+        )
+        if (isMe && !isMonarch) {
+            FilterChip(
+                selected = false,
+                onClick  = onTake,
+                label    = { Text(stringResource(R.string.player_take_monarch), style = MaterialTheme.typography.labelSmall) },
+            )
+        } else if (isMe) {
+            FilterChip(
+                selected = true,
+                onClick  = {},
+                label    = { Text(stringResource(R.string.stat_active), style = MaterialTheme.typography.labelSmall) },
             )
         }
     }

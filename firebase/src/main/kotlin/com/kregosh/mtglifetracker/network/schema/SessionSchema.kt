@@ -18,6 +18,8 @@ object SessionSchema {
     fun codePath(code: String)         = "sessionCodes/$code"
     fun presencePath(userId: String)   = "presence/$userId"
     fun seatPath(userId: String)       = "users/$userId"
+    fun seatStatPath(name: String)     = "stats/$name"
+    const val MONARCH                  = "monarch"
 
     /** Seat field holding a stat, relative to the seat. */
     fun statField(target: StatTarget): String = when (target) {
@@ -38,12 +40,10 @@ object SessionSchema {
         val users = session["users"].asMap().orEmpty().mapNotNull { (id, seat) ->
             seat.asMap()?.let { parseSeat(id, it, defaultLife) }
         }
-        val statDefs = session["customStatNames"].asMap().orEmpty()
-            .mapValues { (_, type) -> parseStatType(type as? String) }
         val state = ServerMessage.State(
             users       = users,
-            statDefs    = statDefs,
             globalStats = session["globalStats"].asUIntMap(),
+            monarch     = session["monarch"] as? String,
             hostUserId  = session["hostUserId"] as? String,
             settings    = parseSettings(session["settings"]),
             game        = session["game"].asLong() ?: 0L,
@@ -71,6 +71,7 @@ object SessionSchema {
         conceded        = seat["conceded"] as? Boolean ?: false,
         online          = seat["online"] as? Boolean ?: true,
         commanderDamage = seat["commanderDamage"].asUIntMap(),
+        stats           = seat["stats"].asMap().orEmpty().mapValues { (_, type) -> parseStatType(type as? String) },
         game            = seat["game"].asLong() ?: 0L,
     )
 
@@ -113,6 +114,7 @@ object SessionSchema {
         if (seat.conceded) put("conceded", true)
         if (seat.customStats.isNotEmpty()) put("customStats", seat.customStats.mapValues { it.value.toLong() })
         if (seat.commanderDamage.isNotEmpty()) put("commanderDamage", seat.commanderDamage.mapValues { it.value.toLong() })
+        if (seat.stats.isNotEmpty()) put("stats", seat.stats.mapValues { it.value.name })
     }
 
     /** Writes that clear [userIds]' seats in one multi-path update. */

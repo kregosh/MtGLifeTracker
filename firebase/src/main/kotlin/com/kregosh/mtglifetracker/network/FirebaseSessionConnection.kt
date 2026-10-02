@@ -90,7 +90,8 @@ class FirebaseSessionConnection(
         if (SeatRules.needsReset(mySeat, state.game, resetForGame)) {
             resetForGame = state.game
             val life = state.settings?.startLife ?: startLife
-            myUserRef.setValue(SessionSchema.seatToMap(SeatRules.newGameSeat(userId, displayName, life, state.game)))
+            myUserRef.setValue(SessionSchema.seatToMap(
+                SeatRules.newGameSeat(userId, displayName, life, state.game, stats = mySeat?.stats.orEmpty())))
         }
         emit(state)
     }
@@ -120,11 +121,16 @@ class FirebaseSessionConnection(
     }
 
     override fun addCustomStat(name: String, type: StatType) {
-        sessionRef.child("customStatNames/$name").setValue(type.name)
+        myUserRef.child(SessionSchema.seatStatPath(name)).setValue(type.name)
     }
 
     override fun removeCustomStat(name: String) {
-        sessionRef.child("customStatNames/$name").removeValue()
+        myUserRef.child(SessionSchema.seatStatPath(name)).removeValue()
+    }
+
+    override fun setMonarch(userId: String?) {
+        val ref = sessionRef.child(SessionSchema.MONARCH)
+        if (userId == null) ref.removeValue() else ref.setValue(userId)
     }
 
     override fun setGlobal(stat: String, value: UInt) {

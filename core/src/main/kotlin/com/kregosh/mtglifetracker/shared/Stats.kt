@@ -12,7 +12,6 @@ enum class PredefinedStat(val id: String, val type: StatType) {
     STORM     ("storm",      StatType.NUMERIC),
     TAX       ("tax",        StatType.NUMERIC),
     RING      ("ring",       StatType.RING_STAGE),
-    MONARCH   ("monarch",    StatType.TOGGLE),
     INITIATIVE("initiative", StatType.TOGGLE),
     BLESSING  ("blessing",   StatType.TOGGLE);
 
@@ -25,7 +24,10 @@ const val LIFE_STAT      = "life"
 val COMMANDER_STAT       = PredefinedStat.COMMANDER.id
 val POISON_STAT          = PredefinedStat.POISON.id
 
-/** Session-wide toggle stored in globalStats rather than per player. */
+/**
+ * Session-wide toggle stored in globalStats rather than per player. The monarch is
+ * session-wide too, but names a player (see [ServerMessage.State.monarch]).
+ */
 const val DAY_NIGHT_GLOBAL = "daynight"
 
 // Commander damage is tracked per opponent. The ':' can't appear in a custom stat

@@ -1,5 +1,6 @@
 package com.kregosh.mtglifetracker.domain
 
+import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.shared.UserState
 
 /** How a player's seat in a session is created, reset and cleaned up. */
@@ -15,9 +16,10 @@ object SeatRules {
     fun needsReset(mySeat: UserState?, sessionGame: Long, lastResetGame: Long): Boolean =
         mySeat != null && sessionGame > mySeat.game && sessionGame > lastResetGame
 
-    /** A seat as it looks at the start of [game]: name kept, everything else fresh. */
-    fun newGameSeat(myId: String, displayName: String, startLife: UInt, game: Long): UserState =
-        UserState(id = myId, displayName = displayName, life = startLife, online = true, game = game)
+    /** A seat as it looks at the start of [game]: name and chosen counters kept, values fresh. */
+    fun newGameSeat(myId: String, displayName: String, startLife: UInt, game: Long,
+                    stats: Map<String, StatType> = emptyMap()): UserState =
+        UserState(id = myId, displayName = displayName, life = startLife, online = true, game = game, stats = stats)
 
     /**
      * After [myId] leaves: the seats of offline players to clear before the session is
