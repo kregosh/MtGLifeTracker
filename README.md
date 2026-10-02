@@ -6,7 +6,7 @@ counters, and sees everyone else's update in real time.
 
 ## Features
 
-- Life totals with optimistic updates, plus an undo snackbar and a per-game history
+- Life totals with optimistic updates, plus undo and a per-game history covering every counter
 - Per-player counters: commander damage (tracked per opposing commander), poison,
   energy, experience, storm, commander tax, the Ring, monarch, initiative,
   city's blessing, and custom counters

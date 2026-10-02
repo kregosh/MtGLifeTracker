@@ -12,6 +12,7 @@ import io.mockk.coVerify
 import com.kregosh.mtglifetracker.shared.CreateSessionResponse
 import com.kregosh.mtglifetracker.shared.ServerMessage
 import com.kregosh.mtglifetracker.shared.SessionInfoResponse
+import com.kregosh.mtglifetracker.shared.COMMANDER_STAT
 import com.kregosh.mtglifetracker.shared.SessionSettings
 import com.kregosh.mtglifetracker.shared.commanderDamageStat
 import com.kregosh.mtglifetracker.shared.StatType
@@ -1541,18 +1542,93 @@ class SessionViewModelTest {
         vm.adjust("life", -1)
         advanceUntilIdle()
 
-        val history = vm.lifeHistory.value
+        val history = vm.history.value
         assertEquals(1, history.size)
         assertEquals(-3, history.single().delta)
-        assertEquals(17u, history.single().lifeAfter)
+        assertEquals(17u, history.single().valueAfter)
+    }
+
+    private suspend fun TestScope.inSessionWithStats(): SessionViewModel {
+        val vm = inSession()
+        serverMessages.emit(ServerMessage.State(
+            users    = listOf(UserState("test-user-id", "Test Player", life = 20u), UserState("bob", "Bob")),
+            statDefs = mapOf("poison" to StatType.NUMERIC, "monarch" to StatType.TOGGLE, COMMANDER_STAT to StatType.NUMERIC),
+        ))
+        advanceUntilIdle()
+        return vm
     }
 
     @Test
-    fun `other stats are not recorded in the life history`() = runTest {
-        val vm = inSession()
+    fun `counter changes are recorded and undoable`() = runTest {
+        val vm = inSessionWithStats()
+        vm.adjust("poison", 1)
         vm.adjust("poison", 1)
         advanceUntilIdle()
-        assertTrue(vm.lifeHistory.value.isEmpty())
+
+        assertEquals(listOf(StatChange(0, "poison", 2, 2u)), vm.history.value)
+        vm.undoLastChange()
+        assertEquals(0u, vm.sessionUi.value.users.first().customStats["poison"])
+        advanceUntilIdle()
+        verify { ws.adjust("poison", 2) }
+        verify { ws.adjust("poison", -2) }
+    }
+
+    @Test
+    fun `toggles and commander damage are recorded too`() = runTest {
+        val vm = inSessionWithStats()
+        vm.adjust("monarch", 1)
+        advanceUntilIdle()
+        vm.adjust(commanderDamageStat("bob"), 4)
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(commanderDamageStat("bob") to 4, "monarch" to 1),
+            vm.history.value.map { it.stat to it.delta },
+        )
+        vm.undoLastChange()
+        advanceUntilIdle()
+        verify { ws.adjust(commanderDamageStat("bob"), -4) }
+    }
+
+    @Test
+    fun `changes to different stats are undone newest first`() = runTest {
+        val vm = inSessionWithStats()
+        vm.adjust("life", -3)
+        advanceUntilIdle()
+        vm.adjust("poison", 2)
+        advanceUntilIdle()
+
+        vm.undoLastChange()
+        advanceUntilIdle()
+        verify { ws.adjust("poison", -2) }
+        verify(exactly = 0) { ws.adjust("life", 3) }
+        assertEquals(listOf("life"), vm.history.value.map { it.stat })
+    }
+
+    @Test
+    fun `a change stopped at zero records only what really changed`() = runTest {
+        val vm = inSession(users = listOf(UserState("test-user-id", "Test Player", life = 2u)))
+        vm.adjust("life", -5)
+        advanceUntilIdle()
+
+        assertEquals(-2, vm.history.value.single().delta)
+        assertEquals(0u, vm.history.value.single().valueAfter)
+    }
+
+    @Test
+    fun `removing a stat drops its changes from the history`() = runTest {
+        val vm = inSessionWithStats()
+        vm.adjust("poison", 1)
+        vm.adjust("life", -1)
+        advanceUntilIdle()
+
+        serverMessages.emit(ServerMessage.State(
+            users    = listOf(UserState("test-user-id", "Test Player", life = 19u, customStats = mapOf("poison" to 1u))),
+            statDefs = mapOf("monarch" to StatType.TOGGLE),
+        ))
+        advanceUntilIdle()
+
+        assertEquals(listOf("life"), vm.history.value.map { it.stat })
     }
 
     @Test
@@ -1563,13 +1639,13 @@ class SessionViewModelTest {
         serverMessages.emit(ServerMessage.State(listOf(UserState("test-user-id", "Test Player", life = 15u))))
         advanceUntilIdle()
 
-        vm.undoLastLifeChange()
+        vm.undoLastChange()
         assertEquals(20u, vm.sessionUi.value.users.single().life)
         advanceUntilIdle()
 
         verify { ws.adjust("life", -5) }
         verify { ws.adjust("life", 5) }
-        assertTrue(vm.lifeHistory.value.isEmpty())
+        assertTrue(vm.history.value.isEmpty())
     }
 
     @Test
@@ -1578,12 +1654,12 @@ class SessionViewModelTest {
         vm.adjust("life", -5)
         advanceUntilIdle()
 
-        vm.undoLastLifeChange()
+        vm.undoLastChange()
         vm.adjust("life", -2)
         advanceUntilIdle()
 
         verify { ws.adjust("life", 3) }
-        assertEquals(listOf(-2), vm.lifeHistory.value.map { it.delta })
+        assertEquals(listOf(-2), vm.history.value.map { it.delta })
     }
 
     @Test
@@ -1591,12 +1667,12 @@ class SessionViewModelTest {
         val vm = inSession()
         vm.adjust("life", -5)
         advanceUntilIdle()
-        assertEquals(1, vm.lifeHistory.value.size)
+        assertEquals(1, vm.history.value.size)
 
         serverMessages.emit(ServerMessage.State(listOf(UserState("test-user-id", "Test Player")), game = 1))
         advanceUntilIdle()
 
-        assertTrue(vm.lifeHistory.value.isEmpty())
+        assertTrue(vm.history.value.isEmpty())
         assertEquals(1L, vm.sessionUi.value.game)
     }
 
@@ -1695,20 +1771,20 @@ class SessionViewModelTest {
     fun `session actions without a session do nothing`() = runTest {
         val vm = makeVm()
         vm.sendFriendRequest("bob")
-        vm.undoLastLifeChange()
+        vm.undoLastChange()
         vm.startNewGame()
         vm.removePlayer("bob")
         vm.updateSessionSettings(SessionSettings())
         advanceUntilIdle()
 
         verify(exactly = 0) { connectionFactory(any(), any(), any(), any()) }
-        assertTrue(vm.lifeHistory.value.isEmpty())
+        assertTrue(vm.history.value.isEmpty())
     }
 
     @Test
     fun `undo with an empty history does nothing`() = runTest {
         val vm = inSession()
-        vm.undoLastLifeChange()
+        vm.undoLastChange()
         advanceUntilIdle()
         verify(exactly = 0) { ws.adjust(any(), any()) }
     }
@@ -1721,7 +1797,7 @@ class SessionViewModelTest {
         advanceUntilIdle()
 
         verify(exactly = 0) { ws.adjust(any(), any()) }
-        assertTrue(vm.lifeHistory.value.isEmpty())
+        assertTrue(vm.history.value.isEmpty())
     }
 
     @Test

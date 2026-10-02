@@ -18,7 +18,9 @@ import com.kregosh.mtglifetracker.shared.SessionInfoResponse
 import com.kregosh.mtglifetracker.shared.SessionSettings
 import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.shared.UserState
+import com.kregosh.mtglifetracker.shared.StatTarget
 import com.kregosh.mtglifetracker.shared.commanderDamageSource
+import com.kregosh.mtglifetracker.shared.statTarget
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -92,10 +94,20 @@ fun UserState.isDead(state: SessionUiState): Boolean =
         || (commanderDamage.values.maxOrNull() ?: 0u) >= state.settings.commanderDeathThreshold
         || (customStats[POISON_STAT] ?: 0u) >= state.settings.infectDeathThreshold
 
-/** One committed change to the local player's life total, newest first in the history. */
-data class LifeChange(val id: Long, val delta: Int, val lifeAfter: UInt)
+/**
+ * One committed change to one of the local player's stats (life, a counter, commander
+ * damage from an opponent). The history lists them newest first.
+ */
+data class StatChange(val id: Long, val stat: String, val delta: Int, val valueAfter: UInt)
 
-private const val MAX_LIFE_HISTORY = 50
+private const val MAX_HISTORY = 50
+
+/** The value of [stat] on this seat. */
+fun UserState.valueOf(stat: String): UInt = when (val target = statTarget(stat)) {
+    StatTarget.Life               -> life
+    is StatTarget.CommanderDamage -> commanderDamage[target.fromUserId] ?: 0u
+    is StatTarget.Custom          -> customStats[target.name] ?: 0u
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ViewModel
@@ -209,14 +221,14 @@ class SessionViewModel(
     private var lastRoster    = emptyMap<String, String>()
     private var hadSeat       = false
 
-    // ── life history / undo ───────────────────────────────────────────
+    // ── change history / undo ─────────────────────────────────────────
 
-    private val _lifeHistory = MutableStateFlow<List<LifeChange>>(emptyList())
-    val lifeHistory: StateFlow<List<LifeChange>> = _lifeHistory.asStateFlow()
+    private val _history = MutableStateFlow<List<StatChange>>(emptyList())
+    val history: StateFlow<List<StatChange>> = _history.asStateFlow()
 
-    private var nextLifeChangeId = 0L
-    // Part of the pending life delta that comes from undo and must not be recorded again.
-    private var unrecordedLifeDelta = 0
+    private var nextChangeId = 0L
+    // Per stat: the part of the pending delta that comes from undo and must not be recorded again.
+    private val unrecordedDeltas = mutableMapOf<String, Int>()
     private val pendingDeltas = mutableMapOf<String, Int>()
     private val debounceJobs  = mutableMapOf<String, Job>()
 
@@ -424,13 +436,13 @@ class SessionViewModel(
         queueDelta(stat, delta)
     }
 
-    /** Reverts the most recent recorded change to the local player's life. */
-    fun undoLastLifeChange() {
+    /** Reverts the most recent recorded change to any of the local player's stats. */
+    fun undoLastChange() {
         connection ?: return
-        val last = _lifeHistory.value.firstOrNull() ?: return
-        _lifeHistory.update { it.drop(1) }
-        unrecordedLifeDelta -= last.delta
-        queueDelta(LIFE_STAT, -last.delta)
+        val last = _history.value.firstOrNull() ?: return
+        _history.update { it.drop(1) }
+        unrecordedDeltas[last.stat] = (unrecordedDeltas[last.stat] ?: 0) - last.delta
+        queueDelta(last.stat, -last.delta)
     }
 
     // Rapid taps are coalesced into one network write per stat.
@@ -442,18 +454,35 @@ class SessionViewModel(
             delay(400)
             val accumulated = pendingDeltas.remove(stat) ?: return@launch
             debounceJobs.remove(stat)
-            if (stat == LIFE_STAT) recordLifeChange(accumulated - unrecordedLifeDelta)
-            if (stat == LIFE_STAT) unrecordedLifeDelta = 0
+            val undone = unrecordedDeltas.remove(stat) ?: 0
+            recordChange(stat, taps = accumulated - undone, mixedWithUndo = undone != 0)
             if (accumulated != 0) connection?.adjust(stat, accumulated)
         }
     }
 
-    private fun recordLifeChange(delta: Int) {
+    // Only the player's own taps are recorded, never an undo. Counters stop at zero, so
+    // when nothing else is pending the change recorded is what really applied
+    // (1 life minus 3 taps is −1).
+    private fun recordChange(stat: String, taps: Int, mixedWithUndo: Boolean) {
+        if (taps == 0) return
+        val myId  = _sessionUi.value.myUserId
+        val after = _sessionUi.value.users.find { it.id == myId }?.valueOf(stat) ?: return
+        val delta = if (mixedWithUndo) taps else {
+            val before = serverUsers.find { it.id == myId }?.valueOf(stat) ?: return
+            (after.toLong() - before.toLong()).toInt()
+        }
         if (delta == 0) return
-        val me = _sessionUi.value.users.find { it.id == _sessionUi.value.myUserId } ?: return
-        val change = LifeChange(nextLifeChangeId++, delta, me.life)
-        _lifeHistory.update { (listOf(change) + it).take(MAX_LIFE_HISTORY) }
+        val change = StatChange(nextChangeId++, stat, delta, after)
+        _history.update { (listOf(change) + it).take(MAX_HISTORY) }
     }
+
+    // A stat that was removed from the session can no longer be undone.
+    private fun isTracked(stat: String, statDefs: Map<String, StatType>): Boolean =
+        when (val target = statTarget(stat)) {
+            StatTarget.Life               -> true
+            is StatTarget.CommanderDamage -> COMMANDER_STAT in statDefs
+            is StatTarget.Custom          -> target.name in statDefs
+        }
 
     // ── host controls ─────────────────────────────────────────────────
 
@@ -592,7 +621,9 @@ class SessionViewModel(
                             }
                             if (msg.game > _sessionUi.value.game) {
                                 resetTimer()
-                                _lifeHistory.value = emptyList()
+                                _history.value = emptyList()
+                            } else {
+                                _history.update { it.filter { c -> isTracked(c.stat, msg.statDefs) } }
                             }
                             serverUsers = msg.users
                             _sessionUi.update {
@@ -650,8 +681,8 @@ class SessionViewModel(
         lastRoster  = emptyMap()
         hadSeat     = false
         sentFriendRequests.clear()
-        _lifeHistory.value  = emptyList()
-        unrecordedLifeDelta = 0
+        _history.value = emptyList()
+        unrecordedDeltas.clear()
         _pendingFriendRequests.value = emptyList()
         collectorJob?.cancel()
         collectorJob = null

@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -31,23 +32,26 @@ import com.kregosh.mtglifetracker.network.ConnectionState
 import com.kregosh.mtglifetracker.shared.DAY_NIGHT_GLOBAL
 import com.kregosh.mtglifetracker.shared.PredefinedStat
 import com.kregosh.mtglifetracker.shared.SessionSettings
+import com.kregosh.mtglifetracker.shared.StatTarget
 import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.shared.UserState
+import com.kregosh.mtglifetracker.shared.statTarget
 import com.kregosh.mtglifetracker.ui.components.FriendsSheet
 import com.kregosh.mtglifetracker.ui.signed
 import com.kregosh.mtglifetracker.ui.toTimerString
 import com.kregosh.mtglifetracker.ui.components.InviteDialog
 import com.kregosh.mtglifetracker.ui.components.PlayerCard
 import com.kregosh.mtglifetracker.ui.components.statLabel
+import com.kregosh.mtglifetracker.ui.components.statShortLabel
 import com.kregosh.mtglifetracker.ui.components.statTypeLabel
 import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
 import com.kregosh.mtglifetracker.viewmodel.FriendRequestInfo
-import com.kregosh.mtglifetracker.viewmodel.LifeChange
 import com.kregosh.mtglifetracker.viewmodel.MAX_STAT_NAME_LENGTH
 import com.kregosh.mtglifetracker.viewmodel.RESERVED_STAT_NAMES
 import com.kregosh.mtglifetracker.viewmodel.Screen
 import com.kregosh.mtglifetracker.viewmodel.SessionUiState
 import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
+import com.kregosh.mtglifetracker.viewmodel.StatChange
 import com.kregosh.mtglifetracker.viewmodel.isValidStatName
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -117,29 +121,33 @@ private fun SessionContent(
     var showMenu         by remember { mutableStateOf(false) }
     var removeTarget     by remember { mutableStateOf<UserState?>(null) }
 
-    val lifeHistory  by vm.lifeHistory.collectAsState()
+    val history      by vm.history.collectAsState()
     val resources    = LocalContext.current.resources
     val snackbarHost = remember { SnackbarHostState() }
     var announcedUpTo by remember { mutableLongStateOf(-1L) }
-    val latestChange = lifeHistory.firstOrNull()
+    val latestChange = history.firstOrNull()
+    val latestText   = latestChange?.let { changeText(it, ui.users, ui.statDefs) }
 
     // Offer undo once per new change; undoing exposes older entries, which were already offered.
     LaunchedEffect(latestChange?.id) {
         val change = latestChange ?: return@LaunchedEffect
+        val text   = latestText ?: return@LaunchedEffect
         if (change.id <= announcedUpTo) return@LaunchedEffect
         announcedUpTo = change.id
         val result = snackbarHost.showSnackbar(
-            message     = resources.getString(R.string.life_change_snackbar, change.delta.signed(), change.lifeAfter.toInt()),
+            message     = text,
             actionLabel = resources.getString(R.string.action_undo),
             duration    = SnackbarDuration.Short,
         )
-        if (result == SnackbarResult.ActionPerformed) vm.undoLastLifeChange()
+        if (result == SnackbarResult.ActionPerformed) vm.undoLastChange()
     }
 
     if (showHistory) {
-        LifeHistorySheet(
-            history   = lifeHistory,
-            onUndo    = vm::undoLastLifeChange,
+        HistorySheet(
+            history   = history,
+            users     = ui.users,
+            statDefs  = ui.statDefs,
+            onUndo    = vm::undoLastChange,
             onDismiss = { showHistory = false },
         )
     }
@@ -476,8 +484,9 @@ private fun GameTimerRow(
     val urgent     = countDown && display < 1.minutes &&
                      (running || elapsed > Duration.ZERO)
     val hasStarted = elapsed > Duration.ZERO || running
-    val tint       = if (urgent) MaterialTheme.colorScheme.error
-                     else        MaterialTheme.colorScheme.onSurfaceVariant
+    val isLight    = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val idleTint   = if (isLight) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant
+    val tint       = if (urgent) MaterialTheme.colorScheme.error else idleTint
 
     Row(
         modifier              = Modifier
@@ -505,7 +514,7 @@ private fun GameTimerRow(
         if (hasStarted) {
             IconButton(onClick = onReset, modifier = Modifier.size(36.dp)) {
                 Icon(Icons.Default.Replay, contentDescription = stringResource(R.string.timer_reset),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    tint = idleTint)
             }
         }
     }
@@ -752,8 +761,10 @@ private fun AddCustomStatDialog(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun LifeHistorySheet(
-    history  : List<LifeChange>,
+private fun HistorySheet(
+    history  : List<StatChange>,
+    users    : List<UserState>,
+    statDefs : Map<String, StatType>,
     onUndo   : () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -788,21 +799,57 @@ private fun LifeHistorySheet(
                 items(history, key = { it.id }) { change ->
                     Row(
                         modifier              = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment     = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
+                        Text(
+                            changeLabel(change.stat, users),
+                            style    = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.weight(1f),
+                        )
                         Text(
                             change.delta.signed(),
                             style = MaterialTheme.typography.bodyLarge,
                             color = if (change.delta < 0) MaterialTheme.colorScheme.error
                                     else MaterialTheme.colorScheme.primary,
                         )
-                        Text(stringResource(R.string.history_life_after, change.lifeAfter.toInt()), style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            stringResource(R.string.history_value_after, valueText(change, statDefs)),
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
                     }
                 }
             }
         }
     }
 }
+
+/** Which counter a change was made to: life, commander damage from someone, or a stat by name. */
+@Composable
+private fun changeLabel(stat: String, users: List<UserState>): String = when (val target = statTarget(stat)) {
+    StatTarget.Life               -> stringResource(R.string.stat_life)
+    is StatTarget.CommanderDamage -> stringResource(
+        R.string.commander_damage_from,
+        users.find { it.id == target.fromUserId }?.displayName ?: stringResource(R.string.history_unknown_player),
+    )
+    is StatTarget.Custom          -> statShortLabel(target.name)
+}
+
+/** Toggles read as on/off; everything else as its number. */
+@Composable
+private fun valueText(change: StatChange, statDefs: Map<String, StatType>): String {
+    val target = statTarget(change.stat)
+    val toggle = target is StatTarget.Custom && statDefs[target.name] == StatType.TOGGLE
+    return when {
+        !toggle                  -> change.valueAfter.toString()
+        change.valueAfter > 0u   -> stringResource(R.string.history_toggle_on)
+        else                     -> stringResource(R.string.history_toggle_off)
+    }
+}
+
+@Composable
+private fun changeText(change: StatChange, users: List<UserState>, statDefs: Map<String, StatType>): String =
+    stringResource(R.string.change_snackbar, changeLabel(change.stat, users), change.delta.signed(), valueText(change, statDefs))
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared game rules (host edits, everyone else can look)
