@@ -28,4 +28,20 @@ class StatsTest {
         assertNull(commanderDamageSource(COMMANDER_STAT))
         assertTrue(!isValidStatName(key))
     }
+
+    @Test
+    fun `stat keys route to life, per-opponent commander damage or custom counters`() {
+        assertEquals(StatTarget.Life, statTarget(LIFE_STAT))
+        assertEquals(StatTarget.CommanderDamage("bob"), statTarget(commanderDamageStat("bob")))
+        assertEquals(StatTarget.Custom("poison"), statTarget("poison"))
+        assertEquals(StatTarget.Custom(COMMANDER_STAT), statTarget(COMMANDER_STAT))
+    }
+
+    @Test
+    fun `counters never go below zero`() {
+        assertEquals(5L, applyDelta(3L, 2))
+        assertEquals(0L, applyDelta(3L, -5))
+        assertEquals(2L, applyDelta(null, 2))
+        assertEquals(0L, applyDelta(null, -1))
+    }
 }
