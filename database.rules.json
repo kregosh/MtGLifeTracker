@@ -75,6 +75,14 @@
           }
         },
 
+        // ── Observers: people watching without a seat, by their own uid ──
+        "observers": {
+          "$userId": {
+            ".write": "auth != null && $userId == auth.uid",
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 64"
+          }
+        },
+
         // ── Monarch: any player can pass it to someone seated, or end it ──
         "monarch": {
           ".write": "auth != null",

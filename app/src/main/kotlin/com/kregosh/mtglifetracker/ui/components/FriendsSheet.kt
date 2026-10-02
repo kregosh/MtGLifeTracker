@@ -21,7 +21,7 @@ fun FriendsSheet(
     friendIds       : Set<String>,
     friendPresence  : Map<String, String?>,
     currentSessionId: String?,
-    onJoinSession   : (sessionId: String) -> Unit,
+    onJoinSession   : (sessionId: String, watch: Boolean) -> Unit,
     onRemoveFriend  : (String) -> Unit,
     onAddFriend     : (String, String) -> Unit,
     onForgetPlayer  : (String) -> Unit,
@@ -59,7 +59,7 @@ fun FriendsSheet(
                         friends          = friendList,
                         friendPresence   = friendPresence,
                         currentSessionId = currentSessionId,
-                        onJoinSession    = { sessionId -> onDismiss(); onJoinSession(sessionId) },
+                        onJoinSession    = { sessionId, watch -> onDismiss(); onJoinSession(sessionId, watch) },
                         onRemoveFriend   = onRemoveFriend,
                         modifier         = listModifier,
                     )

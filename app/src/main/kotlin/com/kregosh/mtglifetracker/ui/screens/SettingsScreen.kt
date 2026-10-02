@@ -255,7 +255,7 @@ fun SettingsScreen(vm: SessionViewModel) {
                         friends          = friendList,
                         friendPresence   = friendPresence,
                         currentSessionId = null,
-                        onJoinSession    = vm::joinFriendSession,
+                        onJoinSession    = { sessionId, watch -> vm.joinFriendSession(sessionId, watch) },
                         onRemoveFriend   = vm::removeFriend,
                     )
                 }

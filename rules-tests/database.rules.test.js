@@ -165,6 +165,37 @@ describe('stat names (#57) and per-player counters (#29)', () => {
   });
 });
 
+describe('observers (#6)', () => {
+  const watcher = (db, uid) => db.ref(`sessions/${SID}/observers/${uid}`);
+
+  test('anyone signed in can start and stop watching under their own uid', async () => {
+    await assertSucceeds(watcher(stranger(), STRANGER).set('Sam'));
+    await assertSucceeds(watcher(stranger(), STRANGER).remove());
+  });
+
+  test('nobody can add or remove someone else as an observer', async () => {
+    await seed({ [`sessions/${SID}/observers/${STRANGER}`]: 'Sam' });
+    await assertFails(watcher(alice(), STRANGER).remove());
+    await assertFails(watcher(alice(), BOB).set('Bob'));
+  });
+
+  test('observer names follow the display name limits', async () => {
+    await assertFails(watcher(stranger(), STRANGER).set(''));
+    await assertFails(watcher(stranger(), STRANGER).set('x'.repeat(65)));
+    await assertFails(watcher(stranger(), STRANGER).set(3));
+  });
+
+  test('an observer can never be made the monarch', async () => {
+    await seed({ [`sessions/${SID}/observers/${STRANGER}`]: 'Sam' });
+    await assertFails(alice().ref(`sessions/${SID}/monarch`).set(STRANGER));
+  });
+
+  test('a session with only observers left can be deleted', async () => {
+    await seed({ [`sessions/${SID}/users`]: null, [`sessions/${SID}/observers/${STRANGER}`]: 'Sam' });
+    await assertSucceeds(stranger().ref(`sessions/${SID}`).remove());
+  });
+});
+
 describe('monarch (#29)', () => {
   const monarch = db => db.ref(`sessions/${SID}/monarch`);
 

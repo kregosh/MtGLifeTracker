@@ -29,11 +29,30 @@ fun FriendsList(
     friends         : List<Friend>,
     friendPresence  : Map<String, String?>,
     currentSessionId: String?,
-    onJoinSession   : (sessionId: String) -> Unit,
+    onJoinSession   : (sessionId: String, watch: Boolean) -> Unit,
     onRemoveFriend  : (userId: String) -> Unit,
     modifier        : Modifier = Modifier,
 ) {
     var unfriendTarget by remember { mutableStateOf<Friend?>(null) }
+    var joinTarget     by remember { mutableStateOf<Pair<Friend, String>?>(null) }
+
+    // Watching is only offered here: you only watch games your friends are in.
+    joinTarget?.let { (friend, sessionId) ->
+        AlertDialog(
+            onDismissRequest = { joinTarget = null },
+            title = { Text(stringResource(R.string.friend_join_title, friend.displayName)) },
+            confirmButton = {
+                TextButton(onClick = { joinTarget = null; onJoinSession(sessionId, false) }) {
+                    Text(stringResource(R.string.friend_join_play))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { joinTarget = null; onJoinSession(sessionId, true) }) {
+                    Text(stringResource(R.string.friend_join_watch))
+                }
+            },
+        )
+    }
 
     unfriendTarget?.let { target ->
         AlertDialog(
@@ -70,7 +89,7 @@ fun FriendsList(
                         icon        = Icons.AutoMirrored.Filled.Login,
                         description = stringResource(R.string.friend_join, friend.displayName),
                         tint        = MaterialTheme.colorScheme.primary,
-                        onClick     = { onJoinSession(sessionId) },
+                        onClick     = { joinTarget = friend to sessionId },
                     )
                 }
                 RowAction(

@@ -65,6 +65,8 @@ sealed interface HomeError {
     data object SessionNotFound : HomeError
     data class SessionFull(val maxPlayers: Int) : HomeError
     data object RemovedFromSession : HomeError
+    /** The session we were watching closed. */
+    data object SessionEnded : HomeError
     data class CreateFailed(val detail: String?) : HomeError
     data class JoinFailed(val detail: String?) : HomeError
 }
@@ -79,6 +81,9 @@ data class SessionUiState(
     val users       : List<UserState>       = emptyList(),
     val globalStats : Map<String, UInt>     = emptyMap(),
     val monarch     : String?               = null,
+    /** Watching without a seat: everything is read-only. */
+    val observing   : Boolean               = false,
+    val observers   : Map<String, String>   = emptyMap(),
     val connectionState     : ConnectionState               = ConnectionState.Connecting,
     val error       : String?               = null,
     val settings    : SessionSettings       = SessionSettings(),
@@ -92,6 +97,9 @@ data class SessionUiState(
 
     /** The counters the local player tracks. */
     val myStats: Map<String, StatType> get() = me?.stats.orEmpty()
+
+    /** Whether there is a free seat for an observer to take. */
+    val hasFreeSeat: Boolean get() = settings.maxPlayers <= 0 || users.size < settings.maxPlayers
 }
 
 /** Dead at 0 life, or at the threshold of commander damage from any single commander, or of poison. */
@@ -412,12 +420,13 @@ class SessionViewModel(
         }
     }
 
-    fun joinFriendSession(sessionId: String) {
+    /** Joins a friend's session, to play or with [watch] only to watch. */
+    fun joinFriendSession(sessionId: String, watch: Boolean = false) {
         viewModelScope.launch {
             _homeLoading.value = true
             _homeError.value   = null
             runCatching { signedInUserId() to api.getSessionById(sessionId) }
-                .onSuccess { (me, info) -> joinIfRoom(me, info) }
+                .onSuccess { (me, info) -> joinIfRoom(me, info, watch = watch) }
                 .onFailure { _homeError.value = joinError(it) }
             _homeLoading.value = false
         }
@@ -431,10 +440,11 @@ class SessionViewModel(
     fun resumeLastSession() {
         val sessionId = prefs.lastSessionId ?: return
         if (_screen.value !is Screen.Home) return
+        val watch = prefs.lastSessionObserving
         viewModelScope.launch {
             _homeLoading.value = true
             runCatching { signedInUserId() to api.getSessionById(sessionId) }
-                .onSuccess { (me, info) -> if (!joinIfRoom(me, info, quiet = true)) prefs.lastSessionId = null }
+                .onSuccess { (me, info) -> if (!joinIfRoom(me, info, quiet = true, watch = watch)) prefs.lastSessionId = null }
                 .onFailure { prefs.lastSessionId = null }
             _homeLoading.value = false
         }
@@ -443,26 +453,30 @@ class SessionViewModel(
     private fun joinError(e: Throwable): HomeError =
         if (e is SessionNotFoundException) HomeError.SessionNotFound else HomeError.JoinFailed(e.message)
 
-    private fun joinIfRoom(me: String, info: SessionInfoResponse, quiet: Boolean = false): Boolean {
+    // Watching never takes a seat, so a full session can always be watched.
+    private fun joinIfRoom(me: String, info: SessionInfoResponse, quiet: Boolean = false, watch: Boolean = false): Boolean {
         val max = info.settings?.maxPlayers ?: 0
-        if (max > 0 && me !in info.userIds && info.userIds.size >= max) {
+        if (!watch && max > 0 && me !in info.userIds && info.userIds.size >= max) {
             if (!quiet) _homeError.value = HomeError.SessionFull(max)
             return false
         }
-        joinSession(me, info.sessionId, info.sessionCode, info.settings)
+        joinSession(me, info.sessionId, info.sessionCode, info.settings, watch)
         return true
     }
 
     // ── session screen actions ───────────────────────────────────────
 
+    // Observers watch: none of the game actions apply to them.
+    private val playing: Boolean get() = connection != null && !_sessionUi.value.observing
+
     fun adjust(stat: String, delta: Int) {
-        connection ?: return
+        if (!playing) return
         queueDelta(stat, delta)
     }
 
     /** Reverts the most recent recorded change to any of the local player's stats. */
     fun undoLastChange() {
-        connection ?: return
+        if (!playing) return
         val last = _history.value.firstOrNull() ?: return
         changes = changes - last
         publishHistory()
@@ -561,7 +575,7 @@ class SessionViewModel(
 
     fun addCustomStat(name: String, type: StatType = StatType.NUMERIC) {
         val trimmed = name.trim()
-        if (!isValidStatName(trimmed)) return
+        if (!isValidStatName(trimmed) || !playing) return
         val conn = connection ?: return
         if (trimmed in _sessionUi.value.myStats) return
         conn.addCustomStat(trimmed, type)
@@ -570,6 +584,7 @@ class SessionViewModel(
 
     /** Hides the counter on the local player's card; its value stays, so turning it back on restores it. */
     fun removeCustomStat(name: String) {
+        if (!playing) return
         val conn = connection ?: return
         val type = _sessionUi.value.myStats[name] ?: return
         conn.removeCustomStat(name)
@@ -577,6 +592,7 @@ class SessionViewModel(
     }
 
     fun setGlobal(stat: String, value: UInt) {
+        if (!playing) return
         val conn   = connection ?: return
         val before = _sessionUi.value.globalStats[stat]
         if (before == value) return
@@ -586,6 +602,7 @@ class SessionViewModel(
 
     /** Makes [userId] the monarch, or takes the monarch out of the game with null. */
     fun setMonarch(userId: String?) {
+        if (!playing) return
         val conn   = connection ?: return
         val before = _sessionUi.value.monarch
         if (before == userId) return
@@ -594,6 +611,7 @@ class SessionViewModel(
     }
 
     fun concede() {
+        if (!playing) return
         val myId = _sessionUi.value.myUserId
         serverUsers = serverUsers.map { if (it.id == myId) it.copy(conceded = true) else it }
         _sessionUi.update { it.copy(users = applyPendingDeltas(serverUsers)) }
@@ -601,6 +619,7 @@ class SessionViewModel(
     }
 
     fun unconcede() {
+        if (!playing) return
         val myId = _sessionUi.value.myUserId
         serverUsers = serverUsers.map { if (it.id == myId) it.copy(conceded = false) else it }
         _sessionUi.update { it.copy(users = applyPendingDeltas(serverUsers)) }
@@ -610,6 +629,34 @@ class SessionViewModel(
     fun toggleGlobal(stat: String) {
         val current = _sessionUi.value.globalStats[stat] ?: 0u
         setGlobal(stat, if (current == 0u) 1u else 0u)
+    }
+
+    /** Gives up the seat and keeps watching. Unsent taps are sent first. */
+    fun watchInstead() {
+        if (!playing) return
+        val conn = connection ?: return
+        debounceJobs.values.forEach { it.cancel() }
+        debounceJobs.clear()
+        pendingDeltas.forEach { (stat, delta) -> if (delta != 0) conn.adjust(stat, delta) }
+        pendingDeltas.clear()
+        unrecordedDeltas.clear()
+        hadSeat = false
+        changes = emptyList()
+        _sessionUi.update { it.copy(observing = true) }
+        publishHistory()
+        prefs.lastSessionObserving = true
+        conn.setObserving(true)
+    }
+
+    /** Takes a seat again after watching, if there is one free. */
+    fun playInstead() {
+        val ui   = _sessionUi.value
+        val conn = connection ?: return
+        if (!ui.observing || !ui.hasFreeSeat) return
+        _sessionUi.update { it.copy(observing = false) }
+        prefs.lastSessionObserving = false
+        defaultStatsAdded = false
+        conn.setObserving(false)
     }
 
     fun leaveSession() {
@@ -664,7 +711,7 @@ class SessionViewModel(
         if (friendDirty) _friendList.value = prefs.friendList
     }
 
-    private fun joinSession(myId: String, sessionId: String, sessionCode: String, settings: SessionSettings?) {
+    private fun joinSession(myId: String, sessionId: String, sessionCode: String, settings: SessionSettings?, watch: Boolean = false) {
         val current = _screen.value
         if (current is Screen.Session && current.sessionId == sessionId) return
 
@@ -677,9 +724,11 @@ class SessionViewModel(
             sessionCode = sessionCode,
             myUserId    = myId,
             settings    = rules,
+            observing   = watch,
         )
         _screen.value = Screen.Session(sessionId)
         prefs.lastSessionId = sessionId
+        prefs.lastSessionObserving = watch
 
         val conn = connectionFactory(sessionId, myId, name, rules.startLife)
         connection = conn
@@ -696,7 +745,7 @@ class SessionViewModel(
                         is ServerMessage.State  -> {
                             if (msg.users.any { it.id == myId }) {
                                 hadSeat = true
-                            } else if (hadSeat) {
+                            } else if (hadSeat && !_sessionUi.value.observing) {
                                 removedFromSession()
                                 return@collect
                             }
@@ -711,6 +760,7 @@ class SessionViewModel(
                                     error       = null,
                                     globalStats = msg.globalStats,
                                     monarch     = msg.monarch,
+                                    observers   = msg.observers,
                                     settings    = msg.settings ?: it.settings,
                                     hostUserId  = msg.hostUserId,
                                     game        = msg.game,
@@ -721,6 +771,10 @@ class SessionViewModel(
                             addDefaultStats(conn, msg.users.find { it.id == myId })
                         }
                         is ServerMessage.Error  -> _sessionUi.update { it.copy(error = msg.message) }
+                        is ServerMessage.SessionGone -> when {
+                            _sessionUi.value.observing -> leftSession(HomeError.SessionEnded)
+                            hadSeat                    -> removedFromSession()
+                        }
                         is ServerMessage.FriendRequest -> {
                             _pendingFriendRequests.update {
                                 if (it.any { r -> r.fromUserId == msg.fromUserId }) it
@@ -740,7 +794,7 @@ class SessionViewModel(
         }
 
         defaultStatsAdded = false
-        conn.connect()
+        conn.connect(asObserver = watch)
     }
 
     private var defaultStatsAdded = false
@@ -755,11 +809,13 @@ class SessionViewModel(
     }
 
     // Our seat disappeared: the host removed us, or the game ended while we were offline.
-    private fun removedFromSession() {
+    private fun removedFromSession() = leftSession(HomeError.RemovedFromSession)
+
+    private fun leftSession(reason: HomeError) {
         prefs.lastSessionId = null
         tearDownConnection(removePlayer = false)
         _screen.value    = Screen.Home
-        _homeError.value = HomeError.RemovedFromSession
+        _homeError.value = reason
     }
 
     private fun tearDownConnection(removePlayer: Boolean = true) {

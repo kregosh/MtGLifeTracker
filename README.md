@@ -16,7 +16,8 @@ counters, and sees everyone else's update in real time.
 - Host controls: shared game rules (starting life, damage limits, player cap),
   new game in the same session, removing players
 - Invites by code, QR code or a shareable https link
-- Friends: send requests in a session, see when friends are in a game and join them
+- Friends: send requests in a session, see when friends are in a game and join them to play
+  or just to watch; switch between playing and watching from the session menu
 - Resumes the last session after the app is restarted
 
 ## UI Mockup
@@ -61,6 +62,7 @@ sessions/<sessionId>/
                                stats/<stat>: NUMERIC | TOGGLE | RING_STAGE (the counters they track)
     globalStats/<stat>         session-wide values (Day/Night)
     monarch                    player ID of the monarch
+    observers/<playerId>       display names of people watching without a seat
     friendRequests/<to>/<from>, friendAccepted/<to>/<from>
 ```
 

@@ -9,6 +9,7 @@ internal fun HomeError.message(res: Resources): String {
     return when (this) {
         HomeError.SessionNotFound    -> res.getString(R.string.error_session_not_found)
         HomeError.RemovedFromSession -> res.getString(R.string.error_removed)
+        HomeError.SessionEnded       -> res.getString(R.string.error_session_ended)
         is HomeError.SessionFull     -> res.getString(R.string.error_session_full, maxPlayers)
         is HomeError.CreateFailed    -> res.getString(R.string.error_create_failed, detail ?: unknown)
         is HomeError.JoinFailed      -> res.getString(R.string.error_join_failed, detail ?: unknown)

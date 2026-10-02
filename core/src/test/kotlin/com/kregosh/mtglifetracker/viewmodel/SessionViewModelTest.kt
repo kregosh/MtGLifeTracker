@@ -2061,4 +2061,151 @@ class SessionViewModelTest {
 
         verify(exactly = 0) { prefs.addFriend("bob", any()) }
     }
+
+    // ── observer mode (#6) ───────────────────────────────────────────────────
+
+    private val me  = UserState("test-user-id", "Test Player")
+    private val bob = UserState("bob", "Bob")
+
+    private suspend fun TestScope.watchingFriend(settings: SessionSettings = SessionSettings()): SessionViewModel {
+        coEvery { api.getSessionById("sid-w") } returns
+            SessionInfoResponse("sid-w", "WATCH123", 1, settings, userIds = setOf("bob"))
+        val vm = makeVm()
+        vm.joinFriendSession("sid-w", watch = true)
+        advanceUntilIdle()
+        serverMessages.emit(ServerMessage.State(users = listOf(bob), settings = settings,
+                                                observers = mapOf("test-user-id" to "Test Player")))
+        advanceUntilIdle()
+        return vm
+    }
+
+    @Test
+    fun `watching a friend's game connects without a seat`() = runTest {
+        val vm = watchingFriend()
+        verify { ws.connect(asObserver = true) }
+        verify { prefs.lastSessionObserving = true }
+        assertIs<Screen.Session>(vm.screen.value)
+        assertTrue(vm.sessionUi.value.observing)
+        assertEquals(mapOf("test-user-id" to "Test Player"), vm.sessionUi.value.observers)
+    }
+
+    @Test
+    fun `a full game can still be watched`() = runTest {
+        val vm = watchingFriend(SessionSettings(maxPlayers = 1))
+        assertIs<Screen.Session>(vm.screen.value)
+        assertNull(vm.homeError.value)
+        assertFalse(vm.sessionUi.value.hasFreeSeat)
+    }
+
+    @Test
+    fun `playing a friend's game still takes a seat`() = runTest {
+        coEvery { api.getSessionById("sid-w") } returns SessionInfoResponse("sid-w", "WATCH123", 1)
+        val vm = makeVm()
+        vm.joinFriendSession("sid-w")
+        advanceUntilIdle()
+        verify { ws.connect(asObserver = false) }
+        assertFalse(vm.sessionUi.value.observing)
+    }
+
+    @Test
+    fun `observers cannot change anything`() = runTest {
+        val vm = watchingFriend()
+        vm.adjust("life", -1)
+        vm.addCustomStat("Gold")
+        vm.setMonarch("bob")
+        vm.toggleGlobal(DAY_NIGHT_GLOBAL)
+        vm.concede()
+        advanceUntilIdle()
+
+        verify(exactly = 0) { ws.adjust(any(), any()) }
+        verify(exactly = 0) { ws.addCustomStat(any(), any()) }
+        verify(exactly = 0) { ws.setMonarch(any()) }
+        verify(exactly = 0) { ws.setGlobal(any(), any()) }
+        verify(exactly = 0) { ws.setConceded(any()) }
+    }
+
+    @Test
+    fun `an observer without a seat is not treated as removed`() = runTest {
+        val vm = watchingFriend()
+        serverMessages.emit(ServerMessage.State(users = listOf(bob)))
+        advanceUntilIdle()
+        assertIs<Screen.Session>(vm.screen.value)
+    }
+
+    @Test
+    fun `when the watched session ends the observer goes home and is told`() = runTest {
+        val vm = watchingFriend()
+        serverMessages.emit(ServerMessage.SessionGone)
+        advanceUntilIdle()
+        assertEquals(Screen.Home, vm.screen.value)
+        assertEquals(HomeError.SessionEnded, vm.homeError.value)
+        verify { prefs.lastSessionId = null }
+    }
+
+    @Test
+    fun `a player whose session is gone is told they are no longer in it`() = runTest {
+        val vm = inSession()
+        serverMessages.emit(ServerMessage.SessionGone)
+        advanceUntilIdle()
+        assertEquals(Screen.Home, vm.screen.value)
+        assertEquals(HomeError.RemovedFromSession, vm.homeError.value)
+    }
+
+    @Test
+    fun `switching to watch sends unsent taps, gives up the seat and clears the history`() = runTest {
+        val vm = inSession()
+        vm.adjust("life", -2)
+        advanceUntilIdle()
+        vm.adjust("life", -1)
+
+        vm.watchInstead()
+        verify { ws.adjust("life", -1) }
+        verify { ws.setObserving(true) }
+        verify { prefs.lastSessionObserving = true }
+        assertTrue(vm.sessionUi.value.observing)
+        assertTrue(vm.history.value.isEmpty())
+
+        // The seat going away is our own doing, not a removal.
+        serverMessages.emit(ServerMessage.State(users = emptyList(), observers = mapOf("test-user-id" to "Test Player")))
+        advanceUntilIdle()
+        assertIs<Screen.Session>(vm.screen.value)
+        verify(exactly = 1) { ws.adjust("life", -1) }
+    }
+
+    @Test
+    fun `an observer takes a seat again while one is free`() = runTest {
+        val vm = watchingFriend(SessionSettings(maxPlayers = 4))
+        vm.playInstead()
+        verify { ws.setObserving(false) }
+        verify { prefs.lastSessionObserving = false }
+        assertFalse(vm.sessionUi.value.observing)
+
+        serverMessages.emit(ServerMessage.State(users = listOf(bob, me), settings = SessionSettings(maxPlayers = 4)))
+        advanceUntilIdle()
+        vm.adjust("life", -1)
+        advanceUntilIdle()
+        verify { ws.adjust("life", -1) }
+    }
+
+    @Test
+    fun `an observer cannot take a seat in a full game`() = runTest {
+        val vm = watchingFriend(SessionSettings(maxPlayers = 1))
+        vm.playInstead()
+        verify(exactly = 0) { ws.setObserving(any()) }
+        assertTrue(vm.sessionUi.value.observing)
+    }
+
+    @Test
+    fun `resuming rejoins as an observer when we were watching`() = runTest {
+        every { prefs.lastSessionId } returns "sid-w"
+        every { prefs.lastSessionObserving } returns true
+        coEvery { api.getSessionById("sid-w") } returns
+            SessionInfoResponse("sid-w", "WATCH123", 1, SessionSettings(maxPlayers = 1), userIds = setOf("bob"))
+        val vm = makeVm()
+        vm.resumeLastSession()
+        advanceUntilIdle()
+
+        verify { ws.connect(asObserver = true) }
+        assertTrue(vm.sessionUi.value.observing)
+    }
 }

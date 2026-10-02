@@ -9,7 +9,10 @@ import kotlinx.coroutines.flow.StateFlow
 interface SessionConnection {
     val messages: SharedFlow<ServerMessage>
     val connectionState: StateFlow<ConnectionState>
-    fun connect()
+    /** Joins with a seat, or with [asObserver] only to watch. */
+    fun connect(asObserver: Boolean = false)
+    /** Gives up the seat to watch, or takes a seat again. */
+    fun setObserving(observing: Boolean)
     fun adjust(stat: String, delta: Int)
     /** Turns a counter on for the local player only. */
     fun addCustomStat(name: String, type: StatType = StatType.NUMERIC)

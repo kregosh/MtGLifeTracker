@@ -6,12 +6,14 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.kregosh.mtglifetracker.data.AppColorScheme
+import androidx.compose.ui.test.assertIsNotEnabled
 import com.kregosh.mtglifetracker.data.UserPrefs
 import com.kregosh.mtglifetracker.network.ConnectionState
 import com.kregosh.mtglifetracker.network.SessionApi
 import com.kregosh.mtglifetracker.network.SessionConnection
 import com.kregosh.mtglifetracker.shared.CreateSessionResponse
 import com.kregosh.mtglifetracker.shared.ServerMessage
+import com.kregosh.mtglifetracker.shared.SessionSettings
 import com.kregosh.mtglifetracker.shared.UserState
 import com.kregosh.mtglifetracker.viewmodel.Screen
 import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
@@ -125,5 +127,39 @@ class SessionScreenTest {
 
         assertEquals(Screen.Home, vm.screen.value)
         verify { connection.close(true) }
+    }
+
+    @Test
+    fun `a player can switch to watching from the menu after confirming`() {
+        showSession(hostUserId = "bob")
+        compose.onNodeWithContentDescription("More").performClick()
+        compose.onNodeWithText("Watch instead").performClick()
+        compose.onNodeWithText("Watch instead of playing?").assertExists()
+        compose.onNodeWithText("Watch instead").performClick()
+
+        verify { connection.setObserving(true) }
+        compose.onNodeWithText("You are watching").assertExists()
+        compose.onNodeWithText("Stats").assertDoesNotExist()
+    }
+
+    @Test
+    fun `an observer can join again unless the game is full`() {
+        showSession(hostUserId = "bob")
+        vm.watchInstead()
+        messages.tryEmit(ServerMessage.State(
+            users    = listOf(UserState("bob", "Bob")),
+            settings = SessionSettings(maxPlayers = 1),
+        ))
+        idle()
+        compose.onNodeWithContentDescription("More").performClick()
+        compose.onNodeWithText("Join as a player (game full)").assertIsNotEnabled()
+
+        messages.tryEmit(ServerMessage.State(
+            users    = listOf(UserState("bob", "Bob")),
+            settings = SessionSettings(maxPlayers = 2),
+        ))
+        idle()
+        compose.onNodeWithText("Join as a player").performClick()
+        verify { connection.setObserving(false) }
     }
 }

@@ -23,10 +23,11 @@ object SeatRules {
 
     /**
      * After [myId] leaves: the seats of offline players to clear before the session is
-     * deleted, or null if anyone else is still online and the session must stay.
+     * deleted, or null if anyone else is still there (online, or [othersWatching]) and
+     * the session must stay.
      */
-    fun ghostsToClearAfterLeaving(users: List<UserState>, myId: String): List<String>? {
+    fun ghostsToClearAfterLeaving(users: List<UserState>, myId: String, othersWatching: Boolean = false): List<String>? {
         val others = users.filter { it.id != myId }
-        return if (others.any { it.online }) null else others.map { it.id }
+        return if (othersWatching || others.any { it.online }) null else others.map { it.id }
     }
 }
