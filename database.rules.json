@@ -65,16 +65,20 @@
                 ".validate": "$stat.matches(/^[A-Za-z0-9 _'-]{1,32}$/) && newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000"
               }
             },
+            // The counters this player tracks, by name, with their type.
+            "stats": {
+              "$name": {
+                ".validate": "$name.matches(/^[A-Za-z0-9 _'-]{1,32}$/) && $name.toLowerCase() != 'life' && $name.toLowerCase() != 'displayname' && $name.toLowerCase() != 'conceded' && $name.toLowerCase() != 'customstats' && (newData.val() == 'NUMERIC' || newData.val() == 'TOGGLE' || newData.val() == 'RING_STAGE')"
+              }
+            },
             "$other": { ".validate": false }
           }
         },
 
-        // ── Custom stat definitions ────────────────────────────────────
-        "customStatNames": {
-          "$name": {
-            ".write": "auth != null",
-            ".validate": "$name.matches(/^[A-Za-z0-9 _'-]{1,32}$/) && $name.toLowerCase() != 'life' && $name.toLowerCase() != 'displayname' && $name.toLowerCase() != 'conceded' && $name.toLowerCase() != 'customstats' && (newData.val() == 'NUMERIC' || newData.val() == 'TOGGLE' || newData.val() == 'RING_STAGE')"
-          }
+        // ── Monarch: any player can pass it to someone seated, or end it ──
+        "monarch": {
+          ".write": "auth != null",
+          ".validate": "newData.isString() && root.child('sessions').child($sessionId).child('users').child(newData.val()).exists()"
         },
 
         // ── Global stats (day/night, etc.) ─────────────────────────────

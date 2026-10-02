@@ -26,11 +26,12 @@ class SessionSchemaTest {
                 "conceded" to true,
                 "customStats" to mapOf("poison" to 3L),
                 "commanderDamage" to mapOf("bob" to 7L),
+                "stats" to mapOf("poison" to "NUMERIC", "initiative" to "TOGGLE", "ring" to "RING_STAGE"),
             ),
             "bob" to mapOf("displayName" to "Bob", "life" to 40L, "online" to false, "game" to 1L),
         ),
-        "customStatNames" to mapOf("poison" to "NUMERIC", "monarch" to "TOGGLE", "ring" to "RING_STAGE"),
         "globalStats"     to mapOf("daynight" to 1L),
+        "monarch"         to "bob",
     )
 
     @Test
@@ -44,15 +45,13 @@ class SessionSchemaTest {
             assertEquals(2L, game)
             assertEquals(SessionSettings(40u, 21u, 10u, 4), settings)
             assertEquals(mapOf("daynight" to 1u), globalStats)
-            assertEquals(
-                mapOf("poison" to StatType.NUMERIC, "monarch" to StatType.TOGGLE, "ring" to StatType.RING_STAGE),
-                statDefs,
-            )
+            assertEquals("bob", monarch)
             assertEquals(
                 listOf(
                     UserState(
                         id = "alice", displayName = "Alice", life = 33u, conceded = true, online = true, game = 2,
                         customStats = mapOf("poison" to 3u), commanderDamage = mapOf("bob" to 7u),
+                        stats = mapOf("poison" to StatType.NUMERIC, "initiative" to StatType.TOGGLE, "ring" to StatType.RING_STAGE),
                     ),
                     UserState(id = "bob", displayName = "Bob", life = 40u, online = false, game = 1),
                 ),
@@ -134,7 +133,8 @@ class SessionSchemaTest {
 
     @Test
     fun `a seat written for a new game reads back the same`() {
-        val seat = UserState(id = "alice", displayName = "Alice", life = 40u, online = true, game = 3)
+        val seat = UserState(id = "alice", displayName = "Alice", life = 40u, online = true, game = 3,
+                             stats = mapOf("poison" to StatType.NUMERIC, "ring" to StatType.RING_STAGE))
         val parsed = SessionSchema.parseSession(mapOf("users" to mapOf("alice" to SessionSchema.seatToMap(seat))), 20u)!!
         assertEquals(seat, parsed.state.users.single())
     }

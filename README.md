@@ -8,9 +8,10 @@ counters, and sees everyone else's update in real time.
 
 - Life totals with optimistic updates, plus undo and a per-game history covering every
   counter, turning counters on or off, and Day/Night
-- Per-player counters: commander damage (tracked per opposing commander), poison,
-  energy, experience, storm, commander tax, the Ring, monarch, initiative,
-  city's blessing, and custom counters
+- Per-player counters, each player picking their own: commander damage (tracked per
+  opposing commander), poison, energy, experience, storm, commander tax, the Ring,
+  initiative, city's blessing, and custom counters
+- The monarch: one player at a time, shown with a crown
 - Session-wide Day/Night toggle and a game timer (stopwatch or countdown)
 - Host controls: shared game rules (starting life, damage limits, player cap),
   new game in the same session, removing players
@@ -56,9 +57,10 @@ sessions/<sessionId>/
     code, createdAt, hostUserId, game
     settings/                  startLife, commanderDeathThreshold, infectDeathThreshold, maxPlayers
     users/<playerId>/          displayName, life, conceded, online, game,
-                               customStats/<stat>, commanderDamage/<opponentId>
-    customStatNames/<stat>     NUMERIC | TOGGLE | RING_STAGE
+                               customStats/<stat>, commanderDamage/<opponentId>,
+                               stats/<stat>: NUMERIC | TOGGLE | RING_STAGE (the counters they track)
     globalStats/<stat>         session-wide values (Day/Night)
+    monarch                    player ID of the monarch
     friendRequests/<to>/<from>, friendAccepted/<to>/<from>
 ```
 

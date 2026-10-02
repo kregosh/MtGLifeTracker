@@ -122,8 +122,8 @@ describe('player seats (#55)', () => {
   });
 });
 
-describe('stat names (#57)', () => {
-  const def = name => alice().ref(`sessions/${SID}/customStatNames/${name}`);
+describe('stat names (#57) and per-player counters (#29)', () => {
+  const def = name => alice().ref(`sessions/${SID}/users/${ALICE}/stats/${name}`);
 
   test('presets and ordinary custom names are accepted', async () => {
     await assertSucceeds(def('commander').set('NUMERIC'));
@@ -148,12 +148,36 @@ describe('stat names (#57)', () => {
     await assertFails(alice().ref(`sessions/${SID}/users/${ALICE}/customStats/gold!`).set(1));
   });
 
-  test('any player can turn a counter and Day/Night off again (undo)', async () => {
+  test('a player turns counters on and off on their own seat only', async () => {
     await assertSucceeds(def('gold').set('NUMERIC'));
     await assertSucceeds(def('gold').remove());
+    await assertFails(alice().ref(`sessions/${SID}/users/${BOB}/stats/gold`).set('NUMERIC'));
+  });
+
+  test('the shared stat list is gone', async () => {
+    await assertFails(alice().ref(`sessions/${SID}/customStatNames/gold`).set('NUMERIC'));
+  });
+
+  test('any player can turn Day/Night off again (undo)', async () => {
     const dayNight = alice().ref(`sessions/${SID}/globalStats/daynight`);
     await assertSucceeds(dayNight.set(0));
     await assertSucceeds(dayNight.remove());
+  });
+});
+
+describe('monarch (#29)', () => {
+  const monarch = db => db.ref(`sessions/${SID}/monarch`);
+
+  test('any player can pass the monarch to someone seated, or end it', async () => {
+    await assertSucceeds(monarch(alice()).set(ALICE));
+    await assertSucceeds(monarch(bob()).set(BOB));
+    await assertSucceeds(monarch(alice()).set(BOB));
+    await assertSucceeds(monarch(bob()).remove());
+  });
+
+  test('the monarch must be a seated player', async () => {
+    await assertFails(monarch(alice()).set(STRANGER));
+    await assertFails(monarch(alice()).set(42));
   });
 });
 

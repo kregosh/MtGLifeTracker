@@ -14,8 +14,9 @@ data class SessionSettings(
 sealed interface ServerMessage {
     data class State(
         val users       : List<UserState>,
-        val statDefs    : Map<String, StatType> = emptyMap(),
         val globalStats : Map<String, UInt>     = emptyMap(),
+        /** The player who is the monarch; null while nobody is (or the mechanic isn't in play). */
+        val monarch     : String?               = null,
         val hostUserId  : String?               = null,
         val settings    : SessionSettings?      = null,
         /** Bumped by the host to start a new game in the same session. */

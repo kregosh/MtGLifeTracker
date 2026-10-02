@@ -11,9 +11,12 @@ interface SessionConnection {
     val connectionState: StateFlow<ConnectionState>
     fun connect()
     fun adjust(stat: String, delta: Int)
+    /** Turns a counter on for the local player only. */
     fun addCustomStat(name: String, type: StatType = StatType.NUMERIC)
-    /** Turns a counter off for everyone. Players' values are kept. */
+    /** Turns a counter off for the local player. Its value is kept. */
     fun removeCustomStat(name: String)
+    /** Makes [userId] the monarch; null takes the monarch out of the game. */
+    fun setMonarch(userId: String?)
     fun setGlobal(stat: String, value: UInt)
     fun removeGlobal(stat: String)
     fun setConceded(conceded: Boolean)

@@ -17,7 +17,6 @@ internal fun PredefinedStat.labelRes(): Int = when (this) {
     PredefinedStat.STORM      -> R.string.stat_storm
     PredefinedStat.TAX        -> R.string.stat_tax
     PredefinedStat.RING       -> R.string.stat_ring
-    PredefinedStat.MONARCH    -> R.string.stat_monarch
     PredefinedStat.INITIATIVE -> R.string.stat_initiative
     PredefinedStat.BLESSING   -> R.string.stat_blessing
 }

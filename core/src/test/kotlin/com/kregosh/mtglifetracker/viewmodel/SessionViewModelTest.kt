@@ -139,19 +139,19 @@ class SessionViewModelTest {
     }
 
     @Test
-    fun `State message updates sessionUi users and statDefs`() = runTest {
+    fun `State message updates sessionUi users and their counters`() = runTest {
         coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
 
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
 
-        val users = listOf(UserState("test-user-id", "Test Player", life = 20u))
-        serverMessages.emit(ServerMessage.State(users, statDefs = mapOf("energy" to StatType.NUMERIC)))
+        val users = listOf(UserState("test-user-id", "Test Player", life = 20u, stats = mapOf("energy" to StatType.NUMERIC)))
+        serverMessages.emit(ServerMessage.State(users))
         advanceUntilIdle()
 
         assertEquals(users, vm.sessionUi.value.users)
-        assertEquals(mapOf("energy" to StatType.NUMERIC), vm.sessionUi.value.statDefs)
+        assertEquals(mapOf("energy" to StatType.NUMERIC), vm.sessionUi.value.myStats)
     }
 
     @Test
@@ -254,7 +254,7 @@ class SessionViewModelTest {
         vm.createSession()
         advanceUntilIdle()
 
-        serverMessages.emit(ServerMessage.State(emptyList(), statDefs = mapOf("Energy" to StatType.NUMERIC)))
+        serverMessages.emit(ServerMessage.State(listOf(UserState("test-user-id", "Test Player", stats = mapOf("Energy" to StatType.NUMERIC)))))
         advanceUntilIdle()
 
         vm.removeCustomStat("Energy")
@@ -412,8 +412,30 @@ class SessionViewModelTest {
         val vm = makeVm()
         vm.createSession()
         advanceUntilIdle()
+        verify(exactly = 0) { ws.addCustomStat(any(), any()) }  // not before the seat exists
 
-        verify { ws.addCustomStat("commander", StatType.NUMERIC) }
+        serverMessages.emit(ServerMessage.State(listOf(UserState("test-user-id", "Test Player"))))
+        advanceUntilIdle()
+        serverMessages.emit(ServerMessage.State(listOf(UserState("test-user-id", "Test Player"))))
+        advanceUntilIdle()
+
+        verify(exactly = 1) { ws.addCustomStat("commander", StatType.NUMERIC) }
+        assertTrue(vm.history.value.isEmpty())
+    }
+
+    @Test
+    fun `commanderDefaultEnabled leaves a seat that already tracks commander damage alone`() = runTest {
+        every { prefs.commanderDefaultEnabled } returns true
+        coEvery { api.createSession(any(), any()) } returns CreateSessionResponse("sid-1", "CODE01")
+
+        val vm = makeVm()
+        vm.createSession()
+        advanceUntilIdle()
+        serverMessages.emit(ServerMessage.State(listOf(
+            UserState("test-user-id", "Test Player", stats = mapOf(COMMANDER_STAT to StatType.NUMERIC)))))
+        advanceUntilIdle()
+
+        verify(exactly = 0) { ws.addCustomStat(any(), any()) }
     }
 
     @Test
@@ -456,8 +478,9 @@ class SessionViewModelTest {
             displayName = "Test Player",
             life        = 20u,
             commanderDamage = mapOf("opponent" to 21u),
+            stats           = mapOf(COMMANDER_STAT to StatType.NUMERIC),
         )
-        serverMessages.emit(ServerMessage.State(listOf(deadUser), statDefs = mapOf(COMMANDER_STAT to StatType.NUMERIC)))
+        serverMessages.emit(ServerMessage.State(listOf(deadUser)))
         advanceUntilIdle()
 
         val uiState = vm.sessionUi.value
@@ -1553,14 +1576,15 @@ class SessionViewModelTest {
         assertEquals(17u, history.single().valueAfter)
     }
 
+    private val MY_STATS = mapOf("poison" to StatType.NUMERIC, "initiative" to StatType.TOGGLE, COMMANDER_STAT to StatType.NUMERIC)
+
     private val SessionViewModel.statChanges: List<StatChange>
         get() = history.value.filterIsInstance<StatChange>()
 
     private suspend fun TestScope.inSessionWithStats(): SessionViewModel {
         val vm = inSession()
         serverMessages.emit(ServerMessage.State(
-            users    = listOf(UserState("test-user-id", "Test Player", life = 20u), UserState("bob", "Bob")),
-            statDefs = mapOf("poison" to StatType.NUMERIC, "monarch" to StatType.TOGGLE, COMMANDER_STAT to StatType.NUMERIC),
+            users = listOf(UserState("test-user-id", "Test Player", life = 20u, stats = MY_STATS), UserState("bob", "Bob")),
         ))
         advanceUntilIdle()
         return vm
@@ -1584,13 +1608,13 @@ class SessionViewModelTest {
     @Test
     fun `toggles and commander damage are recorded too`() = runTest {
         val vm = inSessionWithStats()
-        vm.adjust("monarch", 1)
+        vm.adjust("initiative", 1)
         advanceUntilIdle()
         vm.adjust(commanderDamageStat("bob"), 4)
         advanceUntilIdle()
 
         assertEquals(
-            listOf(commanderDamageStat("bob") to 4, "monarch" to 1),
+            listOf(commanderDamageStat("bob") to 4, "initiative" to 1),
             vm.statChanges.map { it.stat to it.delta },
         )
         vm.undoLastChange()
@@ -1631,11 +1655,11 @@ class SessionViewModelTest {
         advanceUntilIdle()
         val me = UserState("test-user-id", "Test Player", life = 19u, customStats = mapOf("poison" to 1u))
 
-        serverMessages.emit(ServerMessage.State(users = listOf(me), statDefs = mapOf("monarch" to StatType.TOGGLE)))
+        serverMessages.emit(ServerMessage.State(users = listOf(me.copy(stats = mapOf("initiative" to StatType.TOGGLE)))))
         advanceUntilIdle()
         assertEquals(listOf("life"), vm.statChanges.map { it.stat })
 
-        serverMessages.emit(ServerMessage.State(users = listOf(me), statDefs = mapOf("poison" to StatType.NUMERIC)))
+        serverMessages.emit(ServerMessage.State(users = listOf(me.copy(stats = mapOf("poison" to StatType.NUMERIC)))))
         advanceUntilIdle()
         assertEquals(listOf("life", "poison"), vm.statChanges.map { it.stat })
     }
@@ -1646,8 +1670,7 @@ class SessionViewModelTest {
         vm.addCustomStat("Gold", StatType.NUMERIC)
         verify { ws.addCustomStat("Gold", StatType.NUMERIC) }
         serverMessages.emit(ServerMessage.State(
-            users    = listOf(UserState("test-user-id", "Test Player")),
-            statDefs = mapOf("poison" to StatType.NUMERIC, "Gold" to StatType.NUMERIC),
+            users = listOf(UserState("test-user-id", "Test Player", stats = MY_STATS + ("Gold" to StatType.NUMERIC))),
         ))
         advanceUntilIdle()
 
@@ -1660,17 +1683,16 @@ class SessionViewModelTest {
     @Test
     fun `turning a counter off is undone by turning it back on with its type`() = runTest {
         val vm = inSessionWithStats()
-        vm.removeCustomStat("monarch")
-        verify { ws.removeCustomStat("monarch") }
+        vm.removeCustomStat("initiative")
+        verify { ws.removeCustomStat("initiative") }
         serverMessages.emit(ServerMessage.State(
-            users    = listOf(UserState("test-user-id", "Test Player")),
-            statDefs = mapOf("poison" to StatType.NUMERIC),
+            users = listOf(UserState("test-user-id", "Test Player", stats = mapOf("poison" to StatType.NUMERIC))),
         ))
         advanceUntilIdle()
 
-        assertEquals(listOf(StatToggled(0, "monarch", StatType.TOGGLE, enabled = false)), vm.history.value)
+        assertEquals(listOf(StatToggled(0, "initiative", StatType.TOGGLE, enabled = false)), vm.history.value)
         vm.undoLastChange()
-        verify { ws.addCustomStat("monarch", StatType.TOGGLE) }
+        verify { ws.addCustomStat("initiative", StatType.TOGGLE) }
     }
 
     @Test
@@ -1682,16 +1704,15 @@ class SessionViewModelTest {
     }
 
     @Test
-    fun `a counter someone else turned back on is no longer offered for undo`() = runTest {
+    fun `a counter turned back on elsewhere is no longer offered for undo`() = runTest {
         val vm = inSessionWithStats()
         vm.removeCustomStat("poison")
-        serverMessages.emit(ServerMessage.State(users = listOf(UserState("test-user-id", "Test Player")), statDefs = emptyMap()))
+        serverMessages.emit(ServerMessage.State(users = listOf(UserState("test-user-id", "Test Player"))))
         advanceUntilIdle()
         assertEquals(1, vm.history.value.size)
 
         serverMessages.emit(ServerMessage.State(
-            users    = listOf(UserState("test-user-id", "Test Player")),
-            statDefs = mapOf("poison" to StatType.NUMERIC),
+            users = listOf(UserState("test-user-id", "Test Player", stats = mapOf("poison" to StatType.NUMERIC))),
         ))
         advanceUntilIdle()
         assertTrue(vm.history.value.isEmpty())
@@ -1736,11 +1757,78 @@ class SessionViewModelTest {
     }
 
     @Test
-    fun `poison and commander damage only kill while their counters are on`() {
+    fun `poison and commander damage only kill while the player tracks them`() {
         val user = UserState("u", "U", customStats = mapOf(POISON_STAT to 10u), commanderDamage = mapOf("bob" to 21u))
         assertFalse(user.isDead(SessionUiState()))
-        assertTrue(user.isDead(SessionUiState(statDefs = mapOf(POISON_STAT to StatType.NUMERIC))))
-        assertTrue(user.isDead(SessionUiState(statDefs = mapOf(COMMANDER_STAT to StatType.NUMERIC))))
+        assertTrue(user.copy(stats = mapOf(POISON_STAT to StatType.NUMERIC)).isDead(SessionUiState()))
+        assertTrue(user.copy(stats = mapOf(COMMANDER_STAT to StatType.NUMERIC)).isDead(SessionUiState()))
+    }
+
+    @Test
+    fun `counters are per player`() = runTest {
+        val vm = inSessionWithStats()
+        vm.addCustomStat("Gold")
+        verify { ws.addCustomStat("Gold", StatType.NUMERIC) }
+
+        // Bob tracking Gold doesn't turn it on for us, and doesn't stop us adding it.
+        serverMessages.emit(ServerMessage.State(users = listOf(
+            UserState("test-user-id", "Test Player", stats = MY_STATS),
+            UserState("bob", "Bob", stats = mapOf("Energy" to StatType.NUMERIC)),
+        )))
+        advanceUntilIdle()
+        vm.addCustomStat("Energy")
+        verify { ws.addCustomStat("Energy", StatType.NUMERIC) }
+        assertEquals(MY_STATS, vm.sessionUi.value.myStats)
+    }
+
+    @Test
+    fun `taking the monarch is recorded and undone by passing it back`() = runTest {
+        val vm = inSessionWithStats()
+        val users = listOf(UserState("test-user-id", "Test Player", stats = MY_STATS), UserState("bob", "Bob"))
+        serverMessages.emit(ServerMessage.State(users = users, monarch = "bob"))
+        advanceUntilIdle()
+
+        vm.setMonarch("test-user-id")
+        verify { ws.setMonarch("test-user-id") }
+        serverMessages.emit(ServerMessage.State(users = users, monarch = "test-user-id"))
+        advanceUntilIdle()
+        assertEquals(listOf(MonarchChange(0, before = "bob", after = "test-user-id")), vm.history.value)
+
+        vm.undoLastChange()
+        verify { ws.setMonarch("bob") }
+    }
+
+    @Test
+    fun `a monarch passed on by someone else is no longer offered for undo`() = runTest {
+        val vm = inSessionWithStats()
+        vm.setMonarch("test-user-id")
+        val users = listOf(UserState("test-user-id", "Test Player", stats = MY_STATS), UserState("bob", "Bob"))
+        serverMessages.emit(ServerMessage.State(users = users, monarch = "test-user-id"))
+        advanceUntilIdle()
+        assertEquals(1, vm.history.value.size)
+
+        serverMessages.emit(ServerMessage.State(users = users, monarch = "bob"))
+        advanceUntilIdle()
+        assertTrue(vm.history.value.isEmpty())
+    }
+
+    @Test
+    fun `setting the monarch to who already holds it does nothing`() = runTest {
+        val vm = inSession()
+        vm.setMonarch(null)
+        verify(exactly = 0) { ws.setMonarch(any()) }
+    }
+
+    @Test
+    fun `a new game ends the monarch`() = runTest {
+        val vm = inSession(hostUserId = "test-user-id")
+        serverMessages.emit(ServerMessage.State(
+            users = listOf(UserState("test-user-id", "Test Player")), hostUserId = "test-user-id", monarch = "test-user-id"))
+        advanceUntilIdle()
+
+        vm.startNewGame()
+        verify { ws.startNewGame() }
+        verify { ws.setMonarch(null) }
     }
 
     @Test
