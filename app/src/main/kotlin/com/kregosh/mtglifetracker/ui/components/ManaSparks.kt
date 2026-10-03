@@ -40,41 +40,36 @@ internal class CropMapping(imageW: Float, imageH: Float, viewW: Float, viewH: Fl
     fun radius(orb: OrbSpot)  = orb.radius * iw * scale
 }
 
-// ── timing ────────────────────────────────────────────────────────────────────
+// ── intensity ─────────────────────────────────────────────────────────────────
+
+/** Every orb always sparkles at least this much, sparkles per second. */
+internal const val BASE_SPARKLES_PER_SECOND = 1.5f
+
+/** The busiest a pulse can get, on top of the base rate. */
+internal const val MIN_PULSE_PEAK = 3f
+internal const val MAX_PULSE_PEAK = 12f
 
 /**
- * One emission: the same orb(s) sparkle for [durationMs], swelling and fading along a
- * bell curve, then everything rests for [pauseMs] before the next orbs take over.
+ * One swell of an orb's sparkling: the rate rises and falls along a bell curve over
+ * [durationMs], peaking at [peak] in the middle. Each orb runs its own endless chain of
+ * pulses with random lengths and strengths, so the orbs' intensities drift independently.
  */
-internal data class EmissionPhase(val orbs: List<Int>, val durationMs: Long, val pauseMs: Long) {
-    val totalMs: Long get() = durationMs + pauseMs
-}
+internal data class Pulse(val durationMs: Long, val peak: Float)
 
-internal fun nextPhase(rng: Random, orbCount: Int = 5): EmissionPhase = EmissionPhase(
-    orbs       = pickOrbs(rng, orbCount),
-    durationMs = rng.nextLong(3_000L, 5_001L),
-    pauseMs    = rng.nextLong(500L, 1_501L),
+internal fun nextPulse(rng: Random): Pulse = Pulse(
+    durationMs = rng.nextLong(2_500L, 6_001L),
+    peak       = MIN_PULSE_PEAK + rng.nextFloat() * (MAX_PULSE_PEAK - MIN_PULSE_PEAK),
 )
 
-/** Mostly one orb at a time, sometimes two or three, never the same orb twice. */
-internal fun pickOrbs(rng: Random, orbCount: Int = 5): List<Int> {
-    val roll  = rng.nextFloat()
-    val count = when {
-        roll < 0.6f -> 1
-        roll < 0.9f -> 2
-        else        -> 3
-    }.coerceAtMost(orbCount)
-    return (0 until orbCount).shuffled(rng).take(count)
-}
-
-/** Sparkles per second from one orb at its busiest, in the middle of a phase. */
-internal const val PEAK_SPARKLES_PER_SECOND = 12f
+/** Sparkles per second from an orb [elapsedMs] into [pulse]: the base rate plus the swell. */
+internal fun orbRate(elapsedMs: Float, pulse: Pulse): Float =
+    BASE_SPARKLES_PER_SECOND + swell(elapsedMs, pulse.durationMs.toFloat(), pulse.peak)
 
 /**
- * Sparkles per second [elapsedMs] into an emission of [durationMs]: a Gaussian centred on
- * the middle, with σ a sixth of the duration, so it starts and ends at about 1% of the peak.
+ * The bell-curve part of the rate: a Gaussian centred on the middle of [durationMs], with σ
+ * a sixth of the duration, so it starts and ends at about 1% of [peak]; zero outside.
  */
-internal fun emissionRate(elapsedMs: Float, durationMs: Float, peak: Float = PEAK_SPARKLES_PER_SECOND): Float {
+internal fun swell(elapsedMs: Float, durationMs: Float, peak: Float): Float {
     if (elapsedMs < 0f || elapsedMs > durationMs || durationMs <= 0f) return 0f
     val mean  = durationMs / 2f
     val sigma = durationMs / 6f

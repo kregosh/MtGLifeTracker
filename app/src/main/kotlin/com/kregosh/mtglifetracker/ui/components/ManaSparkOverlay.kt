@@ -64,16 +64,25 @@ private fun spawnMote(
     )
 }
 
-/**
- * The current emission phase and how far each of its orbs is towards its next sparkle.
- * Each orb runs a little faster or slower than the curve, so they don't pulse in step.
- */
-private class Emitter(val startNs: Long, val phase: EmissionPhase, rng: Random) {
-    val pace    = phase.orbs.associateWith { 0.8f + rng.nextFloat() * 0.4f }
-    val pending = phase.orbs.associateWith { 0f }.toMutableMap()
+/** One orb's current pulse, and how far it is towards its next sparkle. */
+private class OrbPulse(var startNs: Long, var pulse: Pulse) {
+    var pending = 0f
 
     fun elapsedMs(nowNs: Long) = (nowNs - startNs) / 1e6f
-    fun over(nowNs: Long)      = elapsedMs(nowNs) > phase.totalMs
+
+    /** Moves on to a fresh pulse once this one has run its course. */
+    fun advance(nowNs: Long, rng: Random) {
+        if (elapsedMs(nowNs) > pulse.durationMs) {
+            startNs = nowNs
+            pulse   = nextPulse(rng)
+        }
+    }
+}
+
+/** Each orb starts part-way into its first pulse, so the orbs are out of step from the start. */
+private fun startPulses(count: Int, nowNs: Long, rng: Random): List<OrbPulse> = List(count) {
+    val pulse = nextPulse(rng)
+    OrbPulse(startNs = nowNs - (rng.nextFloat() * pulse.durationMs * 1_000_000L).toLong(), pulse = pulse)
 }
 
 /** The halo swells and fades with the orb's emission; [intensity] is 0..1. */
@@ -132,7 +141,7 @@ private fun DrawScope.drawMote(mote: Mote, color: ManaColor, nowNs: Long) {
 
 /**
  * Eerie sparks drifting off the mana orbs of the Mana Orbs background, in each orb's colour.
- * One or a few orbs at a time emit for 3–5 s, swelling and fading, then a short pause.
+ * All orbs sparkle all the time; each one's intensity swells and fades on its own random rhythm.
  * [imageWidth] × [imageHeight] is the background bitmap, drawn full-screen with ContentScale.Crop.
  */
 @Composable
@@ -144,10 +153,10 @@ fun ManaSparkOverlay(imageWidth: Int, imageHeight: Int, dark: Boolean, modifier:
     var viewH   by remember { mutableFloatStateOf(0f) }
     var nowNs   by remember { mutableLongStateOf(0L) }
     val motes   = remember { mutableListOf<Mote>() }
-    var emitter by remember { mutableStateOf<Emitter?>(null) }
+    var pulses  by remember { mutableStateOf<List<OrbPulse>>(emptyList()) }
 
-    // Frame clock: runs the emission phases, spawns sparkles along each phase's bell
-    // curve, and drops what has faded out.
+    // Frame clock: every orb sparkles all the time, at a rate that swells and fades along
+    // its own chain of random pulses; faded sparkles are dropped.
     LaunchedEffect(imageWidth, imageHeight, dark) {
         var lastNs = 0L
         while (true) {
@@ -157,19 +166,17 @@ fun ManaSparkOverlay(imageWidth: Int, imageHeight: Int, dark: Boolean, modifier:
                 nowNs  = frame
                 motes.removeAll { frame - it.bornNs > it.lifeNs }
 
-                val current = emitter?.takeUnless { it.over(frame) }
-                    ?: Emitter(frame, nextPhase(Random, orbs.size), Random).also { emitter = it }
+                if (pulses.size != orbs.size) pulses = startPulses(orbs.size, frame, Random)
                 if (viewW == 0f || viewH == 0f) return@withFrameNanos
 
-                val rate    = emissionRate(current.elapsedMs(frame), current.phase.durationMs.toFloat())
                 val mapping = CropMapping(imageWidth.toFloat(), imageHeight.toFloat(), viewW, viewH)
-                current.phase.orbs.forEach { i ->
-                    var due = current.pending.getValue(i) + rate * current.pace.getValue(i) * dtSecs
-                    while (due >= 1f) {
+                pulses.forEachIndexed { i, orb ->
+                    orb.advance(frame, Random)
+                    orb.pending += orbRate(orb.elapsedMs(frame), orb.pulse) * dtSecs
+                    while (orb.pending >= 1f) {
                         motes += spawnMote(i, mapping.centre(orbs[i]), mapping.radius(orbs[i]), density, frame, Random)
-                        due -= 1f
+                        orb.pending -= 1f
                     }
-                    current.pending[i] = due
                 }
             }
         }
@@ -186,11 +193,11 @@ fun ManaSparkOverlay(imageWidth: Int, imageHeight: Int, dark: Boolean, modifier:
         val now = nowNs
         if (now == 0L || viewW == 0f) return@Canvas
         val mapping = CropMapping(imageWidth.toFloat(), imageHeight.toFloat(), size.width, size.height)
-        emitter?.let { e ->
-            val intensity = emissionRate(e.elapsedMs(now), e.phase.durationMs.toFloat()) / PEAK_SPARKLES_PER_SECOND
-            e.phase.orbs.forEach { i ->
-                drawHalo(mapping.centre(orbs[i]), mapping.radius(orbs[i]), MANA_COLORS[i], intensity)
-            }
+        // The halo follows each orb's swell, with a faint glow even at rest.
+        pulses.forEachIndexed { i, orb ->
+            val swelling  = swell(orb.elapsedMs(now), orb.pulse.durationMs.toFloat(), orb.pulse.peak)
+            val intensity = 0.15f + 0.85f * swelling / MAX_PULSE_PEAK
+            drawHalo(mapping.centre(orbs[i]), mapping.radius(orbs[i]), MANA_COLORS[i], intensity)
         }
         motes.forEach { drawMote(it, MANA_COLORS[it.orb], now) }
     }
