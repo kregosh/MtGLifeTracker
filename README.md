@@ -127,3 +127,16 @@ cd rules-tests && npm ci && npm test   # security rules against the database emu
 CI (`.github/workflows/ci.yml`) runs all of the above plus a minified release
 build on every pull request. Every push to `main` publishes a debug APK as a
 GitHub release (`.github/workflows/release.yml`).
+
+The published APKs are all signed with one debug key, so each installs over the
+previous one. It lives in the `DEBUG_KEYSTORE_BASE64` Actions secret (a base64-encoded
+PKCS12 keystore, store/key password `android`, alias `androiddebugkey`). To make one:
+
+```bash
+keytool -genkeypair -keystore debug.keystore -storepass android -keypass android \
+  -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
+  -dname "CN=MtG Life Tracker Debug" -storetype PKCS12
+base64 -w0 debug.keystore   # paste the output into the secret
+```
+
+Changing the key means one more uninstall on every phone.
