@@ -58,7 +58,7 @@ sessions/<sessionId>/
     code, createdAt, hostUserId, game
     settings/                  startLife, commanderDeathThreshold, infectDeathThreshold, maxPlayers
     users/<playerId>/          displayName, life, conceded, online, game,
-                               customStats/<stat>, commanderDamage/<opponentId>,
+                               customStats/<stat> (commander damage is the counter "commander"),
                                stats/<stat>: NUMERIC | TOGGLE | RING_STAGE (the counters they track)
     globalStats/<stat>         session-wide values (Day/Night)
     monarch                    player ID of the monarch

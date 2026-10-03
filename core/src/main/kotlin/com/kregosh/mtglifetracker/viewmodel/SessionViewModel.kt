@@ -19,7 +19,6 @@ import com.kregosh.mtglifetracker.shared.SessionSettings
 import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.shared.UserState
 import com.kregosh.mtglifetracker.shared.StatTarget
-import com.kregosh.mtglifetracker.shared.commanderDamageSource
 import com.kregosh.mtglifetracker.shared.statTarget
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -102,20 +101,20 @@ data class SessionUiState(
     val hasFreeSeat: Boolean get() = settings.maxPlayers <= 0 || users.size < settings.maxPlayers
 }
 
-/** Dead at 0 life, or at the threshold of commander damage from any single commander, or of poison. */
+/** Dead at 0 life, or at the threshold of commander damage (in total) or of poison. */
 // Only counters the player tracks count; turned-off ones keep their values (so turning
 // them back on restores them) but are ignored.
 fun UserState.isDead(state: SessionUiState): Boolean =
     life == 0u
         || (COMMANDER_STAT in stats &&
-            (commanderDamage.values.maxOrNull() ?: 0u) >= state.settings.commanderDeathThreshold)
+            (customStats[COMMANDER_STAT] ?: 0u) >= state.settings.commanderDeathThreshold)
         || (POISON_STAT in stats &&
             (customStats[POISON_STAT] ?: 0u) >= state.settings.infectDeathThreshold)
 
 /** Something the local player did that can be undone. The history lists them newest first. */
 sealed interface Change { val id: Long }
 
-/** A committed change to one of the player's stats: life, a counter, commander damage from an opponent. */
+/** A committed change to one of the player's stats: life or a counter. */
 data class StatChange(override val id: Long, val stat: String, val delta: Int, val valueAfter: UInt) : Change
 
 /** A counter turned on ([enabled]) or off for the local player. */
@@ -131,9 +130,8 @@ private const val MAX_HISTORY = 50
 
 /** The value of [stat] on this seat. */
 fun UserState.valueOf(stat: String): UInt = when (val target = statTarget(stat)) {
-    StatTarget.Life               -> life
-    is StatTarget.CommanderDamage -> commanderDamage[target.fromUserId] ?: 0u
-    is StatTarget.Custom          -> customStats[target.name] ?: 0u
+    StatTarget.Life      -> life
+    is StatTarget.Custom -> customStats[target.name] ?: 0u
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -549,9 +547,8 @@ class SessionViewModel(
 
     private fun isTracked(stat: String, statDefs: Map<String, StatType>): Boolean =
         when (val target = statTarget(stat)) {
-            StatTarget.Life               -> true
-            is StatTarget.CommanderDamage -> COMMANDER_STAT in statDefs
-            is StatTarget.Custom          -> target.name in statDefs
+            StatTarget.Life      -> true
+            is StatTarget.Custom -> target.name in statDefs
         }
 
     // ── host controls ─────────────────────────────────────────────────
@@ -681,12 +678,9 @@ class SessionViewModel(
 
     private fun UserState.withDelta(stat: String, delta: Int): UserState {
         fun clamp(v: Long) = v.coerceIn(0L, UInt.MAX_VALUE.toLong()).toUInt()
-        val opponent = commanderDamageSource(stat)
-        return when {
-            stat == LIFE_STAT -> copy(life = clamp(life.toLong() + delta))
-            opponent != null  -> copy(commanderDamage = commanderDamage +
-                (opponent to clamp((commanderDamage[opponent] ?: 0u).toLong() + delta)))
-            else -> copy(customStats = customStats +
+        return when (stat) {
+            LIFE_STAT -> copy(life = clamp(life.toLong() + delta))
+            else      -> copy(customStats = customStats +
                 (stat to clamp((customStats[stat] ?: 0u).toLong() + delta)))
         }
     }

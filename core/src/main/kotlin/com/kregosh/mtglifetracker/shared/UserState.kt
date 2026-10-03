@@ -7,8 +7,6 @@ data class UserState(
     val customStats     : Map<String, UInt> = emptyMap(),
     val conceded        : Boolean           = false,
     val online          : Boolean           = true,
-    /** Commander damage taken, keyed by the user ID of the opponent who dealt it. */
-    val commanderDamage : Map<String, UInt> = emptyMap(),
     /** The counters this player tracks; each player picks their own. */
     val stats           : Map<String, StatType> = emptyMap(),
     /** The game (see [ServerMessage.State.game]) this seat's stats belong to. */

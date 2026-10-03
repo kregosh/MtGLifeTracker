@@ -22,17 +22,8 @@ class StatsTest {
     }
 
     @Test
-    fun `commander damage keys round-trip and never look like custom stats`() {
-        val key = commanderDamageStat("opponent-id")
-        assertEquals("opponent-id", commanderDamageSource(key))
-        assertNull(commanderDamageSource(COMMANDER_STAT))
-        assertTrue(!isValidStatName(key))
-    }
-
-    @Test
-    fun `stat keys route to life, per-opponent commander damage or custom counters`() {
+    fun `stat keys route to life or a counter, commander damage included`() {
         assertEquals(StatTarget.Life, statTarget(LIFE_STAT))
-        assertEquals(StatTarget.CommanderDamage("bob"), statTarget(commanderDamageStat("bob")))
         assertEquals(StatTarget.Custom("poison"), statTarget("poison"))
         assertEquals(StatTarget.Custom(COMMANDER_STAT), statTarget(COMMANDER_STAT))
     }

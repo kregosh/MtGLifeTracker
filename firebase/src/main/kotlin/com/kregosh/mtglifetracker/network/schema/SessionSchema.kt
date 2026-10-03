@@ -25,7 +25,6 @@ object SessionSchema {
     /** Seat field holding a stat, relative to the seat. */
     fun statField(target: StatTarget): String = when (target) {
         StatTarget.Life                  -> "life"
-        is StatTarget.CommanderDamage    -> "commanderDamage/${target.fromUserId}"
         is StatTarget.Custom             -> "customStats/${target.name}"
     }
 
@@ -73,7 +72,6 @@ object SessionSchema {
         customStats     = seat["customStats"].asUIntMap(),
         conceded        = seat["conceded"] as? Boolean ?: false,
         online          = seat["online"] as? Boolean ?: true,
-        commanderDamage = seat["commanderDamage"].asUIntMap(),
         stats           = seat["stats"].asMap().orEmpty().mapValues { (_, type) -> parseStatType(type as? String) },
         game            = seat["game"].asLong() ?: 0L,
     )
@@ -116,7 +114,6 @@ object SessionSchema {
         put("game", seat.game)
         if (seat.conceded) put("conceded", true)
         if (seat.customStats.isNotEmpty()) put("customStats", seat.customStats.mapValues { it.value.toLong() })
-        if (seat.commanderDamage.isNotEmpty()) put("commanderDamage", seat.commanderDamage.mapValues { it.value.toLong() })
         if (seat.stats.isNotEmpty()) put("stats", seat.stats.mapValues { it.value.name })
     }
 

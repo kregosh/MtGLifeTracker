@@ -177,7 +177,6 @@
     <string name="player_you">You</string>
     <string name="life_decrease">Decrease life</string>
     <string name="life_increase">Increase life</string>
-    <string name="commander_damage_from">CMD %1$s</string>
     <string name="stat_decrease">Decrease %1$s</string>
     <string name="stat_increase">Increase %1$s</string>
     <string name="stat_active">Active</string>

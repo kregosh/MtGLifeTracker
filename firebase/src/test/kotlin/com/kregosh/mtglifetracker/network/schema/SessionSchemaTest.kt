@@ -24,8 +24,7 @@ class SessionSchemaTest {
             "alice" to mapOf(
                 "displayName" to "Alice", "life" to 33L, "online" to true, "game" to 2L,
                 "conceded" to true,
-                "customStats" to mapOf("poison" to 3L),
-                "commanderDamage" to mapOf("bob" to 7L),
+                "customStats" to mapOf("poison" to 3L, "commander" to 7L),
                 "stats" to mapOf("poison" to "NUMERIC", "initiative" to "TOGGLE", "ring" to "RING_STAGE"),
             ),
             "bob" to mapOf("displayName" to "Bob", "life" to 40L, "online" to false, "game" to 1L),
@@ -52,7 +51,7 @@ class SessionSchemaTest {
                 listOf(
                     UserState(
                         id = "alice", displayName = "Alice", life = 33u, conceded = true, online = true, game = 2,
-                        customStats = mapOf("poison" to 3u), commanderDamage = mapOf("bob" to 7u),
+                        customStats = mapOf("poison" to 3u, "commander" to 7u),
                         stats = mapOf("poison" to StatType.NUMERIC, "initiative" to StatType.TOGGLE, "ring" to StatType.RING_STAGE),
                     ),
                     UserState(id = "bob", displayName = "Bob", life = 40u, online = false, game = 1),
@@ -150,7 +149,7 @@ class SessionSchemaTest {
     @Test
     fun `stats are stored at the right field of the seat`() {
         assertEquals("life", SessionSchema.statField(StatTarget.Life))
-        assertEquals("commanderDamage/bob", SessionSchema.statField(StatTarget.CommanderDamage("bob")))
+        assertEquals("customStats/commander", SessionSchema.statField(StatTarget.Custom("commander")))
         assertEquals("customStats/poison", SessionSchema.statField(StatTarget.Custom("poison")))
     }
 

@@ -16,7 +16,6 @@ import com.kregosh.mtglifetracker.shared.COMMANDER_STAT
 import com.kregosh.mtglifetracker.shared.DAY_NIGHT_GLOBAL
 import com.kregosh.mtglifetracker.shared.POISON_STAT
 import com.kregosh.mtglifetracker.shared.SessionSettings
-import com.kregosh.mtglifetracker.shared.commanderDamageStat
 import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.shared.UserState
 import com.kregosh.mtglifetracker.viewmodel.RESERVED_STAT_NAMES
@@ -477,8 +476,8 @@ class SessionViewModelTest {
             id          = "test-user-id",
             displayName = "Test Player",
             life        = 20u,
-            commanderDamage = mapOf("opponent" to 21u),
-            stats           = mapOf(COMMANDER_STAT to StatType.NUMERIC),
+            customStats = mapOf(COMMANDER_STAT to 21u),
+            stats       = mapOf(COMMANDER_STAT to StatType.NUMERIC),
         )
         serverMessages.emit(ServerMessage.State(listOf(deadUser)))
         advanceUntilIdle()
@@ -1438,17 +1437,16 @@ class SessionViewModelTest {
     }
 
     @Test
-    fun `commander damage is tracked per opponent`() = runTest {
+    fun `commander damage is one counter`() = runTest {
         val vm = inSession()
 
-        vm.adjust(commanderDamageStat("bob"), 3)
-        vm.adjust(commanderDamageStat("carol"), 5)
+        vm.adjust(COMMANDER_STAT, 3)
+        vm.adjust(COMMANDER_STAT, 5)
 
         val me = vm.sessionUi.value.users.single()
-        assertEquals(mapOf("bob" to 3u, "carol" to 5u), me.commanderDamage)
+        assertEquals(8u, me.customStats[COMMANDER_STAT])
         advanceUntilIdle()
-        verify { ws.adjust(commanderDamageStat("bob"), 3) }
-        verify { ws.adjust(commanderDamageStat("carol"), 5) }
+        verify { ws.adjust(COMMANDER_STAT, 8) }
     }
 
     @Test
@@ -1610,16 +1608,16 @@ class SessionViewModelTest {
         val vm = inSessionWithStats()
         vm.adjust("initiative", 1)
         advanceUntilIdle()
-        vm.adjust(commanderDamageStat("bob"), 4)
+        vm.adjust(COMMANDER_STAT, 4)
         advanceUntilIdle()
 
         assertEquals(
-            listOf(commanderDamageStat("bob") to 4, "initiative" to 1),
+            listOf(COMMANDER_STAT to 4, "initiative" to 1),
             vm.statChanges.map { it.stat to it.delta },
         )
         vm.undoLastChange()
         advanceUntilIdle()
-        verify { ws.adjust(commanderDamageStat("bob"), -4) }
+        verify { ws.adjust(COMMANDER_STAT, -4) }
     }
 
     @Test
@@ -1758,7 +1756,7 @@ class SessionViewModelTest {
 
     @Test
     fun `poison and commander damage only kill while the player tracks them`() {
-        val user = UserState("u", "U", customStats = mapOf(POISON_STAT to 10u), commanderDamage = mapOf("bob" to 21u))
+        val user = UserState("u", "U", customStats = mapOf(POISON_STAT to 10u, COMMANDER_STAT to 21u))
         assertFalse(user.isDead(SessionUiState()))
         assertTrue(user.copy(stats = mapOf(POISON_STAT to StatType.NUMERIC)).isDead(SessionUiState()))
         assertTrue(user.copy(stats = mapOf(COMMANDER_STAT to StatType.NUMERIC)).isDead(SessionUiState()))

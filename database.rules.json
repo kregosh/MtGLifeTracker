@@ -55,11 +55,6 @@
             "conceded":    { ".validate": "newData.isBoolean()" },
             "online":      { ".validate": "newData.isBoolean()" },
             "game":        { ".validate": "newData.isNumber() && newData.val() >= 0" },
-            "commanderDamage": {
-              "$fromUserId": {
-                ".validate": "$fromUserId.matches(/^[A-Za-z0-9_-]{1,128}$/) && newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000"
-              }
-            },
             "customStats": {
               "$stat": {
                 ".validate": "$stat.matches(/^[A-Za-z0-9 _'-]{1,32}$/) && newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000"
