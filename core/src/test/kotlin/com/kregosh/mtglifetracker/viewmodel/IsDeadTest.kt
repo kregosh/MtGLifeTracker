@@ -24,8 +24,10 @@ class IsDeadTest {
         stats       = mapOf(COMMANDER_STAT to StatType.NUMERIC, POISON_STAT to StatType.NUMERIC),
         displayName = "Alice",
         life        = life,
-        customStats     = if (poisonDamage > 0u) mapOf("poison" to poisonDamage) else emptyMap(),
-        commanderDamage = if (commanderDamage > 0u) mapOf("opponent" to commanderDamage) else emptyMap(),
+        customStats = buildMap {
+            if (poisonDamage > 0u)    put("poison", poisonDamage)
+            if (commanderDamage > 0u) put(COMMANDER_STAT, commanderDamage)
+        },
     )
 
     @Test
@@ -78,10 +80,8 @@ class IsDeadTest {
     }
 
     @Test
-    fun `commander damage counts per commander, not in total`() {
-        val user = user().copy(commanderDamage = mapOf("bob" to 15u, "carol" to 15u))
-        assertFalse(user.isDead(defaultUi))
-        assertTrue(user.copy(commanderDamage = mapOf("bob" to 21u, "carol" to 0u)).isDead(defaultUi))
+    fun `commander damage counts in total, whichever commander dealt it`() {
+        assertTrue(user(commanderDamage = 15u + 6u).isDead(defaultUi))
     }
 
     @Test

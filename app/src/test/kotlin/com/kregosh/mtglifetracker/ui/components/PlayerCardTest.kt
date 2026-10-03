@@ -10,7 +10,6 @@ import androidx.compose.ui.test.performClick
 import com.kregosh.mtglifetracker.shared.COMMANDER_STAT
 import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.shared.UserState
-import com.kregosh.mtglifetracker.shared.commanderDamageStat
 import com.kregosh.mtglifetracker.viewmodel.SessionUiState
 import org.junit.Rule
 import org.junit.runner.RunWith
@@ -24,7 +23,7 @@ class PlayerCardTest {
     @get:Rule val compose = createComposeRule()
 
     private val me    = UserState("me", "Alice", life = 20u)
-    private val bob   = UserState("bob", "Bob", life = 20u, commanderDamage = mapOf("me" to 4u))
+    private val bob   = UserState("bob", "Bob", life = 20u, customStats = mapOf(COMMANDER_STAT to 4u))
     private val carol = UserState("carol", "Carol", life = 20u, online = false)
 
     private val commander = mapOf(COMMANDER_STAT to StatType.NUMERIC)
@@ -33,17 +32,19 @@ class PlayerCardTest {
         SessionUiState(myUserId = "me", users = listOf(me, bob, carol), monarch = monarch)
 
     @Test
-    fun `commander damage has one row per opponent`() {
+    fun `commander damage is one counter, even without opponents`() {
         compose.setContent {
-            PlayerCard(user = me.copy(stats = commander), isMe = true, sessionUi = ui())
+            PlayerCard(
+                user      = me.copy(stats = commander),
+                isMe      = true,
+                sessionUi = SessionUiState(myUserId = "me", users = listOf(me)),
+            )
         }
-        compose.onNodeWithText("CMD Bob").assertExists()
-        compose.onNodeWithText("CMD Carol").assertExists()
-        compose.onAllNodesWithText("CMD Alice").assertCountEquals(0)
+        compose.onAllNodesWithText("CMD Dmg").assertCountEquals(1)
     }
 
     @Test
-    fun `tapping plus on a commander row adds damage from that opponent only`() {
+    fun `tapping plus on commander damage adds to the one counter`() {
         val adjustments = mutableListOf<Pair<String, Int>>()
         compose.setContent {
             PlayerCard(
@@ -53,18 +54,57 @@ class PlayerCardTest {
                 onAdjust  = { stat, delta -> adjustments += stat to delta },
             )
         }
-        compose.onNodeWithContentDescription("Increase CMD Carol").performClick()
-        assertEquals(listOf(commanderDamageStat("carol") to 1), adjustments)
+        compose.onNodeWithContentDescription("Increase CMD Dmg").performClick()
+        assertEquals(listOf(COMMANDER_STAT to 1), adjustments)
     }
 
     @Test
-    fun `an opponent's card shows the damage they took from me without buttons`() {
+    fun `an opponent's card shows their commander damage without buttons`() {
         compose.setContent {
             PlayerCard(user = bob.copy(stats = commander), isMe = false, sessionUi = ui())
         }
-        compose.onNodeWithText("CMD Alice").assertExists()
+        compose.onNodeWithText("CMD Dmg").assertExists()
         compose.onNodeWithText("4").assertExists()
-        compose.onNodeWithContentDescription("Increase CMD Alice").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Increase CMD Dmg").assertDoesNotExist()
+    }
+
+    // ── skull and white flag (#85) ───────────────────────────────────────────
+
+    @Test
+    fun `an opponent at 0 life gets the skull`() {
+        compose.setContent { PlayerCard(user = bob.copy(life = 0u), isMe = false, sessionUi = ui()) }
+        compose.onNodeWithText("💀").assertExists()
+    }
+
+    @Test
+    fun `an opponent at the commander damage threshold gets the skull`() {
+        val dead = bob.copy(stats = commander, customStats = mapOf(COMMANDER_STAT to 21u))
+        compose.setContent { PlayerCard(user = dead, isMe = false, sessionUi = ui()) }
+        compose.onNodeWithText("💀").assertExists()
+    }
+
+    @Test
+    fun `an opponent who conceded gets the white flag`() {
+        compose.setContent { PlayerCard(user = bob.copy(conceded = true), isMe = false, sessionUi = ui()) }
+        compose.onNodeWithText("🏳️").assertExists()
+    }
+
+    @Test
+    fun `my own card shows the white flag and undo concede still works`() {
+        var undone = false
+        compose.setContent {
+            PlayerCard(user = me.copy(conceded = true), isMe = true, sessionUi = ui(), onUnconcede = { undone = true })
+        }
+        compose.onNodeWithText("🏳️").assertExists()
+        compose.onNodeWithText("Undo").performClick()
+        assertEquals(true, undone)
+    }
+
+    @Test
+    fun `players still in the game have no overlay`() {
+        compose.setContent { PlayerCard(user = bob, isMe = false, sessionUi = ui()) }
+        compose.onNodeWithText("💀").assertDoesNotExist()
+        compose.onNodeWithText("🏳️").assertDoesNotExist()
     }
 
     @Test

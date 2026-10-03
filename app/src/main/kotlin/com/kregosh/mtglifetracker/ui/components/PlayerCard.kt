@@ -43,7 +43,6 @@ import com.kregosh.mtglifetracker.shared.LIFE_STAT
 import com.kregosh.mtglifetracker.shared.POISON_STAT
 import com.kregosh.mtglifetracker.shared.StatType
 import com.kregosh.mtglifetracker.shared.UserState
-import com.kregosh.mtglifetracker.shared.commanderDamageStat
 import com.kregosh.mtglifetracker.ui.theme.LocalCardBackground
 import com.kregosh.mtglifetracker.viewmodel.SessionUiState
 import com.kregosh.mtglifetracker.viewmodel.isDead
@@ -364,33 +363,26 @@ fun PlayerCard(
                             }
                             user.stats.forEach { (name, type) ->
                                 val value = user.customStats[name] ?: 0u
-                                when {
-                                    name == COMMANDER_STAT -> sessionUi.users
-                                        .filter { it.id != user.id }
-                                        .forEach { opponent ->
-                                            val damage = user.commanderDamage[opponent.id] ?: 0u
-                                            NumericStatRow(
-                                                label    = stringResource(R.string.commander_damage_from, opponent.displayName),
-                                                value    = damage,
-                                                isMe     = isMe,
-                                                isDead   = damage >= sessionUi.settings.commanderDeathThreshold,
-                                                onAdjust = { d -> onAdjust(commanderDamageStat(opponent.id), d) },
-                                            )
-                                        }
-                                    type == StatType.NUMERIC -> NumericStatRow(
+                                val lethalAt = when (name) {
+                                    COMMANDER_STAT -> sessionUi.settings.commanderDeathThreshold
+                                    POISON_STAT    -> sessionUi.settings.infectDeathThreshold
+                                    else           -> null
+                                }
+                                when (type) {
+                                    StatType.NUMERIC -> NumericStatRow(
                                         label    = statShortLabel(name),
                                         value    = value,
                                         isMe     = isMe,
-                                        isDead   = name == POISON_STAT && value >= sessionUi.settings.infectDeathThreshold,
+                                        isDead   = lethalAt != null && value >= lethalAt,
                                         onAdjust = { d -> onAdjust(name, d) },
                                     )
-                                    type == StatType.TOGGLE -> ToggleStatRow(
+                                    StatType.TOGGLE -> ToggleStatRow(
                                         label    = statShortLabel(name),
                                         value    = value,
                                         isMe     = isMe,
                                         onToggle = { onAdjust(name, if (value > 0u) -1 else 1) },
                                     )
-                                    else -> RingStageRow(
+                                    StatType.RING_STAGE -> RingStageRow(
                                         label    = statShortLabel(name),
                                         value    = value,
                                         isMe     = isMe,
@@ -404,17 +396,27 @@ fun PlayerCard(
             }
         }
 
-        // Overlay for eliminated / conceded opponents
-        if (!isMe && (dead || conceded)) {
-            val overlayAlpha = if (dead) 0.60f else 0.45f
+        // Overlay for eliminated / conceded players. Lighter on your own card, and it doesn't
+        // take touches, so "Undo concede" and the life buttons underneath still work.
+        if (dead || conceded) {
+            val overlayAlpha = when {
+                isMe -> 0.30f
+                dead -> 0.60f
+                else -> 0.45f
+            }
             Box(
                 modifier = Modifier
                     .matchParentSize()
                     .clip(RoundedCornerShape(14.dp))
                     .background(Color.Black.copy(alpha = overlayAlpha)),
-                contentAlignment = Alignment.Center,
+                // On your own card the mark sits in the corner, clear of your life total.
+                contentAlignment = if (isMe) Alignment.BottomEnd else Alignment.Center,
             ) {
-                Text(text = if (dead) "💀" else "🏳️", fontSize = 64.sp)
+                Text(
+                    text     = if (dead) "💀" else "🏳️",
+                    fontSize = if (isMe) 40.sp else 64.sp,
+                    modifier = if (isMe) Modifier.padding(12.dp) else Modifier,
+                )
             }
         }
     }

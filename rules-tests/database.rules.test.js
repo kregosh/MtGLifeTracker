@@ -319,16 +319,16 @@ describe('host controls and shared rules (#44, #46)', () => {
   });
 });
 
-describe('commander damage (#40)', () => {
-  const dmg = from => `sessions/${SID}/users/${ALICE}/commanderDamage/${from}`;
+describe('commander damage (#86)', () => {
+  const seatOf = uid => `sessions/${SID}/users/${uid}`;
 
-  test('a player tracks damage per opposing commander', async () => {
-    await assertSucceeds(alice().ref(dmg(BOB)).set(7));
-    await assertFails(bob().ref(dmg(BOB)).set(0));
+  test('is one counter on the player\'s own seat', async () => {
+    await assertSucceeds(alice().ref(`${seatOf(ALICE)}/customStats/commander`).set(7));
+    await assertFails(bob().ref(`${seatOf(ALICE)}/customStats/commander`).set(0));
   });
 
-  test('sources must look like player IDs', async () => {
-    await assertFails(alice().ref(dmg('not an id!')).set(7));
+  test('the old per-opponent field is gone', async () => {
+    await assertFails(alice().ref(`${seatOf(ALICE)}/commanderDamage/${BOB}`).set(7));
   });
 });
 

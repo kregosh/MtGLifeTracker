@@ -1,5 +1,6 @@
 package com.kregosh.mtglifetracker.network
 
+import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.database.*
 import com.kregosh.mtglifetracker.domain.SeatRules
@@ -146,15 +147,16 @@ class FirebaseSessionConnection(
     override fun adjust(stat: String, delta: Int) {
         myUserRef.child(SessionSchema.statField(statTarget(stat))).runTransaction(transaction(
             update = { data -> data.value = applyDelta(data.getValue(Long::class.java), delta) },
+            onDone = { error -> if (error != null) emit(ServerMessage.Error(error.message)) },
         ))
     }
 
     override fun addCustomStat(name: String, type: StatType) {
-        myUserRef.child(SessionSchema.seatStatPath(name)).setValue(type.name)
+        myUserRef.child(SessionSchema.seatStatPath(name)).setValue(type.name).reportFailure()
     }
 
     override fun removeCustomStat(name: String) {
-        myUserRef.child(SessionSchema.seatStatPath(name)).removeValue()
+        myUserRef.child(SessionSchema.seatStatPath(name)).removeValue().reportFailure()
     }
 
     override fun setMonarch(userId: String?) {
@@ -254,6 +256,12 @@ class FirebaseSessionConnection(
     }
 
     // ── Firebase plumbing ─────────────────────────────────────────────────
+
+    // A write the rules refuse (for example after a schema change the rules haven't caught
+    // up with) is shown to the player instead of failing silently.
+    private fun Task<*>.reportFailure() {
+        addOnFailureListener { emit(ServerMessage.Error(it.message ?: it.toString())) }
+    }
 
     private fun emit(message: ServerMessage) {
         scope.launch { _messages.emit(message) }

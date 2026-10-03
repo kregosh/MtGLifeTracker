@@ -42,7 +42,6 @@ import com.kregosh.mtglifetracker.ui.toTimerString
 import com.kregosh.mtglifetracker.ui.components.InviteDialog
 import com.kregosh.mtglifetracker.ui.components.PlayerCard
 import com.kregosh.mtglifetracker.ui.components.statLabel
-import com.kregosh.mtglifetracker.ui.components.statShortLabel
 import com.kregosh.mtglifetracker.ui.components.statTypeLabel
 import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
 import com.kregosh.mtglifetracker.viewmodel.FriendRequestInfo
@@ -913,7 +912,7 @@ private data class ChangeLine(val label: String, val delta: Int?, val result: St
 private fun describe(change: Change, users: List<UserState>, statDefs: Map<String, StatType>): ChangeLine =
     when (change) {
         is StatChange   -> ChangeLine(
-            label  = changeLabel(change.stat, users),
+            label  = changeLabel(change.stat),
             delta  = change.delta,
             result = stringResource(R.string.history_value_after, valueText(change, statDefs)),
         )
@@ -946,15 +945,11 @@ private fun changeText(change: Change, users: List<UserState>, statDefs: Map<Str
            else                    stringResource(R.string.change_snackbar_plain, line.label, line.result)
 }
 
-/** Which counter a change was made to: life, commander damage from someone, or a stat by name. */
+/** Which counter a change was made to: life, or a stat by name. */
 @Composable
-private fun changeLabel(stat: String, users: List<UserState>): String = when (val target = statTarget(stat)) {
-    StatTarget.Life               -> stringResource(R.string.stat_life)
-    is StatTarget.CommanderDamage -> stringResource(
-        R.string.commander_damage_from,
-        users.find { it.id == target.fromUserId }?.displayName ?: stringResource(R.string.history_unknown_player),
-    )
-    is StatTarget.Custom          -> statShortLabel(target.name)
+private fun changeLabel(stat: String): String = when (val target = statTarget(stat)) {
+    StatTarget.Life      -> stringResource(R.string.stat_life)
+    is StatTarget.Custom -> statLabel(target.name)
 }
 
 /** Toggles read as on/off; everything else as its number. */
