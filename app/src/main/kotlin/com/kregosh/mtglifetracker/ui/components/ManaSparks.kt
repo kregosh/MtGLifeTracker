@@ -1,5 +1,6 @@
 package com.kregosh.mtglifetracker.ui.components
 
+import kotlin.math.exp
 import kotlin.math.max
 import kotlin.random.Random
 
@@ -41,10 +42,21 @@ internal class CropMapping(imageW: Float, imageH: Float, viewW: Float, viewH: Fl
 
 // ── timing ────────────────────────────────────────────────────────────────────
 
-/** Bursts come every 0.2–0.5 s: far more often than the storm's lightning, but never in step. */
-internal fun nextBurstDelayMs(rng: Random): Long = rng.nextLong(200L, 501L)
+/**
+ * One emission: the same orb(s) sparkle for [durationMs], swelling and fading along a
+ * bell curve, then everything rests for [pauseMs] before the next orbs take over.
+ */
+internal data class EmissionPhase(val orbs: List<Int>, val durationMs: Long, val pauseMs: Long) {
+    val totalMs: Long get() = durationMs + pauseMs
+}
 
-/** Mostly one orb at a time, sometimes two or three, never the same orb twice in a burst. */
+internal fun nextPhase(rng: Random, orbCount: Int = 5): EmissionPhase = EmissionPhase(
+    orbs       = pickOrbs(rng, orbCount),
+    durationMs = rng.nextLong(3_000L, 5_001L),
+    pauseMs    = rng.nextLong(500L, 1_501L),
+)
+
+/** Mostly one orb at a time, sometimes two or three, never the same orb twice. */
 internal fun pickOrbs(rng: Random, orbCount: Int = 5): List<Int> {
     val roll  = rng.nextFloat()
     val count = when {
@@ -53,4 +65,19 @@ internal fun pickOrbs(rng: Random, orbCount: Int = 5): List<Int> {
         else        -> 3
     }.coerceAtMost(orbCount)
     return (0 until orbCount).shuffled(rng).take(count)
+}
+
+/** Sparkles per second from one orb at its busiest, in the middle of a phase. */
+internal const val PEAK_SPARKLES_PER_SECOND = 12f
+
+/**
+ * Sparkles per second [elapsedMs] into an emission of [durationMs]: a Gaussian centred on
+ * the middle, with σ a sixth of the duration, so it starts and ends at about 1% of the peak.
+ */
+internal fun emissionRate(elapsedMs: Float, durationMs: Float, peak: Float = PEAK_SPARKLES_PER_SECOND): Float {
+    if (elapsedMs < 0f || elapsedMs > durationMs || durationMs <= 0f) return 0f
+    val mean  = durationMs / 2f
+    val sigma = durationMs / 6f
+    val z     = (elapsedMs - mean) / sigma
+    return peak * exp(-0.5f * z * z)
 }
