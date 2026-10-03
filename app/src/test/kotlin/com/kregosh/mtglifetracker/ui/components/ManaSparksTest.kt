@@ -8,9 +8,42 @@ import kotlin.test.assertTrue
 class ManaSparksTest {
 
     @Test
-    fun `bursts come every 0_2 to 0_5 seconds`() {
+    fun `the same orbs emit for 3 to 5 seconds, then rest briefly`() {
         val rng = Random(1)
-        repeat(1_000) { assertTrue(nextBurstDelayMs(rng) in 200L..500L) }
+        repeat(1_000) {
+            val phase = nextPhase(rng)
+            assertTrue(phase.durationMs in 3_000L..5_000L)
+            assertTrue(phase.pauseMs in 500L..1_500L)
+            assertEquals(phase.durationMs + phase.pauseMs, phase.totalMs)
+            assertTrue(phase.orbs.size in 1..3)
+        }
+    }
+
+    @Test
+    fun `the emission swells to a peak in the middle and fades at both ends`() {
+        val d = 4_000f
+        assertEquals(PEAK_SPARKLES_PER_SECOND, emissionRate(d / 2f, d), 1e-3f)
+        assertTrue(emissionRate(0f, d) < PEAK_SPARKLES_PER_SECOND * 0.02f)
+        assertTrue(emissionRate(d, d)  < PEAK_SPARKLES_PER_SECOND * 0.02f)
+        // Rising before the middle, falling after it, and symmetric.
+        assertTrue(emissionRate(1_000f, d) < emissionRate(1_500f, d))
+        assertTrue(emissionRate(2_500f, d) > emissionRate(3_000f, d))
+        assertEquals(emissionRate(1_200f, d), emissionRate(d - 1_200f, d), 1e-4f)
+    }
+
+    @Test
+    fun `nothing is emitted outside the phase or during the pause`() {
+        assertEquals(0f, emissionRate(-1f, 4_000f))
+        assertEquals(0f, emissionRate(4_001f, 4_000f))
+        assertEquals(0f, emissionRate(10f, 0f))
+    }
+
+    @Test
+    fun `one phase emits a calm handful of sparkles per orb`() {
+        // Integrate the curve over a 4 s phase: about 20 sparkles, not hundreds.
+        val d     = 4_000f
+        val total = (0..4_000 step 10).sumOf { t -> (emissionRate(t.toFloat(), d) * 0.01f).toDouble() }
+        assertTrue(total in 15.0..25.0, "total $total")
     }
 
     @Test
