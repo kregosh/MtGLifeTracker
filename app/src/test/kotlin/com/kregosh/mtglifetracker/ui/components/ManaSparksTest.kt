@@ -8,63 +8,48 @@ import kotlin.test.assertTrue
 class ManaSparksTest {
 
     @Test
-    fun `the same orbs emit for 3 to 5 seconds, then rest briefly`() {
-        val rng = Random(1)
-        repeat(1_000) {
-            val phase = nextPhase(rng)
-            assertTrue(phase.durationMs in 3_000L..5_000L)
-            assertTrue(phase.pauseMs in 500L..1_500L)
-            assertEquals(phase.durationMs + phase.pauseMs, phase.totalMs)
-            assertTrue(phase.orbs.size in 1..3)
+    fun `pulses have random lengths and strengths within bounds`() {
+        val rng    = Random(1)
+        val pulses = List(1_000) { nextPulse(rng) }
+        assertTrue(pulses.all { it.durationMs in 2_500L..6_000L })
+        assertTrue(pulses.all { it.peak in MIN_PULSE_PEAK..MAX_PULSE_PEAK })
+        // Genuinely varied, not one fixed rhythm.
+        assertTrue(pulses.map { it.durationMs }.toSet().size > 100)
+        assertTrue(pulses.maxOf { it.peak } - pulses.minOf { it.peak } > (MAX_PULSE_PEAK - MIN_PULSE_PEAK) * 0.8f)
+    }
+
+    @Test
+    fun `an orb never stops sparkling`() {
+        val pulse = Pulse(durationMs = 4_000L, peak = 10f)
+        for (t in listOf(-500f, 0f, 1f, 2_000f, 3_999f, 4_000f, 9_000f)) {
+            assertTrue(orbRate(t, pulse) >= BASE_SPARKLES_PER_SECOND, "rate at $t")
         }
     }
 
     @Test
-    fun `the emission swells to a peak in the middle and fades at both ends`() {
-        val d = 4_000f
-        assertEquals(PEAK_SPARKLES_PER_SECOND, emissionRate(d / 2f, d), 1e-3f)
-        assertTrue(emissionRate(0f, d) < PEAK_SPARKLES_PER_SECOND * 0.02f)
-        assertTrue(emissionRate(d, d)  < PEAK_SPARKLES_PER_SECOND * 0.02f)
-        // Rising before the middle, falling after it, and symmetric.
-        assertTrue(emissionRate(1_000f, d) < emissionRate(1_500f, d))
-        assertTrue(emissionRate(2_500f, d) > emissionRate(3_000f, d))
-        assertEquals(emissionRate(1_200f, d), emissionRate(d - 1_200f, d), 1e-4f)
+    fun `a pulse swells to its peak in the middle and fades at both ends`() {
+        val pulse = Pulse(durationMs = 4_000L, peak = 10f)
+        assertEquals(BASE_SPARKLES_PER_SECOND + 10f, orbRate(2_000f, pulse), 1e-3f)
+        assertTrue(orbRate(0f, pulse)     < BASE_SPARKLES_PER_SECOND + 0.2f)
+        assertTrue(orbRate(4_000f, pulse) < BASE_SPARKLES_PER_SECOND + 0.2f)
+        assertTrue(orbRate(1_000f, pulse) < orbRate(1_500f, pulse))
+        assertTrue(orbRate(2_500f, pulse) > orbRate(3_000f, pulse))
+        assertEquals(orbRate(1_200f, pulse), orbRate(2_800f, pulse), 1e-4f)
     }
 
     @Test
-    fun `nothing is emitted outside the phase or during the pause`() {
-        assertEquals(0f, emissionRate(-1f, 4_000f))
-        assertEquals(0f, emissionRate(4_001f, 4_000f))
-        assertEquals(0f, emissionRate(10f, 0f))
+    fun `the swell is zero outside its pulse`() {
+        assertEquals(0f, swell(-1f, 4_000f, 10f))
+        assertEquals(0f, swell(4_001f, 4_000f, 10f))
+        assertEquals(0f, swell(10f, 0f, 10f))
     }
 
     @Test
-    fun `one phase emits a calm handful of sparkles per orb`() {
-        // Integrate the curve over a 4 s phase: about 20 sparkles, not hundreds.
-        val d     = 4_000f
-        val total = (0..4_000 step 10).sumOf { t -> (emissionRate(t.toFloat(), d) * 0.01f).toDouble() }
-        assertTrue(total in 15.0..25.0, "total $total")
-    }
-
-    @Test
-    fun `a burst uses one to three different orbs, usually one`() {
-        val rng    = Random(2)
-        val counts = IntArray(4)
-        repeat(1_000) {
-            val picked = pickOrbs(rng)
-            assertTrue(picked.size in 1..3)
-            assertEquals(picked.size, picked.toSet().size)
-            assertTrue(picked.all { it in 0..4 })
-            counts[picked.size]++
-        }
-        assertTrue(counts[1] > counts[2] && counts[2] > counts[3] && counts[3] > 0)
-    }
-
-    @Test
-    fun `every orb gets its turn`() {
-        val rng  = Random(3)
-        val seen = (1..200).flatMap { pickOrbs(rng) }.toSet()
-        assertEquals((0..4).toSet(), seen)
+    fun `a strong pulse gives a stream, not a flood`() {
+        // Integrate the strongest 4 s pulse: a few dozen sparkles from one orb, not hundreds.
+        val pulse = Pulse(durationMs = 4_000L, peak = MAX_PULSE_PEAK)
+        val total = (0..4_000 step 10).sumOf { t -> (orbRate(t.toFloat(), pulse) * 0.01f).toDouble() }
+        assertTrue(total in 20.0..35.0, "total $total")
     }
 
     @Test
