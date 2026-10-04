@@ -11,8 +11,10 @@ interface SessionConnection {
     val connectionState: StateFlow<ConnectionState>
     /** Joins with a seat, or with [asObserver] only to watch. */
     fun connect(asObserver: Boolean = false)
-    /** Gives up the seat to watch, or takes a seat again. */
-    fun setObserving(observing: Boolean)
+    /** Gives up the seat to keep watching. */
+    fun watch()
+    /** Takes a seat after watching; a new seat starts at [startLife], the session's current rule. */
+    fun play(startLife: UInt)
     fun adjust(stat: String, delta: Int)
     /** Turns a counter on for the local player only. */
     fun addCustomStat(name: String, type: StatType = StatType.NUMERIC)
