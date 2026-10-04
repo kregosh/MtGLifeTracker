@@ -105,7 +105,7 @@ class FirebaseSessionConnection(
         emit(state)
     }
 
-    private fun claimSeat() {
+    private fun claimSeat(startLife: UInt = this.startLife) {
         myUserRef.runTransaction(transaction(
             update     = { data ->
                 data.child("displayName").value = displayName
@@ -129,18 +129,21 @@ class FirebaseSessionConnection(
         presenceRef.setValue(sessionId)
     }
 
-    override fun setObserving(observing: Boolean) {
-        if (observing == this.observing) return
-        this.observing = observing
-        if (observing) {
-            // A pending onDisconnect write would recreate a nameless stub of the seat.
-            onlineRef.onDisconnect().cancel()
-            myUserRef.removeValue()
-        } else {
-            observerRef.onDisconnect().cancel()
-            observerRef.removeValue()
-            claimSeat()
-        }
+    override fun watch() {
+        if (observing) return
+        observing = true
+        // A pending onDisconnect write would recreate a nameless stub of the seat.
+        onlineRef.onDisconnect().cancel()
+        myUserRef.removeValue()
+        if (_state.value == ConnectionState.Connected) markOnline()
+    }
+
+    override fun play(startLife: UInt) {
+        if (!observing) return
+        observing = false
+        observerRef.onDisconnect().cancel()
+        observerRef.removeValue()
+        claimSeat(startLife)
         if (_state.value == ConnectionState.Connected) markOnline()
     }
 

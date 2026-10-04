@@ -2169,7 +2169,7 @@ class SessionViewModelTest {
 
         vm.watchInstead()
         verify { ws.adjust("life", -1) }
-        verify { ws.setObserving(true) }
+        verify { ws.watch() }
         verify { prefs.lastSessionObserving = true }
         assertTrue(vm.sessionUi.value.observing)
         assertTrue(vm.history.value.isEmpty())
@@ -2185,7 +2185,7 @@ class SessionViewModelTest {
     fun `an observer takes a seat again while one is free`() = runTest {
         val vm = watchingFriend(SessionSettings(maxPlayers = 4))
         vm.playInstead()
-        verify { ws.setObserving(false) }
+        verify { ws.play(20u) }
         verify { prefs.lastSessionObserving = false }
         assertFalse(vm.sessionUi.value.observing)
 
@@ -2197,10 +2197,21 @@ class SessionViewModelTest {
     }
 
     @Test
+    fun `taking a seat uses the start life the host set since we started watching`() = runTest {
+        val vm = watchingFriend(SessionSettings(startLife = 20u, maxPlayers = 4))
+        serverMessages.emit(ServerMessage.State(users = listOf(bob), settings = SessionSettings(startLife = 40u, maxPlayers = 4)))
+        advanceUntilIdle()
+
+        vm.playInstead()
+        verify { ws.play(40u) }
+        verify(exactly = 0) { ws.play(20u) }
+    }
+
+    @Test
     fun `an observer cannot take a seat in a full game`() = runTest {
         val vm = watchingFriend(SessionSettings(maxPlayers = 1))
         vm.playInstead()
-        verify(exactly = 0) { ws.setObserving(any()) }
+        verify(exactly = 0) { ws.play(any()) }
         assertTrue(vm.sessionUi.value.observing)
     }
 

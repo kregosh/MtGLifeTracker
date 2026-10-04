@@ -645,7 +645,7 @@ class SessionViewModel(
         _sessionUi.update { it.copy(observing = true) }
         publishHistory()
         prefs.lastSessionObserving = true
-        conn.setObserving(true)
+        conn.watch()
     }
 
     /** Takes a seat again after watching, if there is one free. */
@@ -656,7 +656,8 @@ class SessionViewModel(
         _sessionUi.update { it.copy(observing = false) }
         prefs.lastSessionObserving = false
         defaultStatsAdded = false
-        conn.setObserving(false)
+        // The rules may have changed since we connected, so the seat uses today's start life.
+        conn.play(ui.settings.startLife)
     }
 
     fun leaveSession() {
