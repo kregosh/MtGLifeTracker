@@ -12,6 +12,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.*
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -836,6 +839,9 @@ private fun AddCustomStatDialog(
                 placeholder   = { Text(Strings.customStatPlaceholder) },
                 singleLine    = true,
                 isError       = showError,
+                // Enter (or the keyboard's Done key) adds the stat, like the Add button.
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { if (isValid) onConfirm(trimmed) }),
                 supportingText = if (showError) {
                     {
                         Text(
