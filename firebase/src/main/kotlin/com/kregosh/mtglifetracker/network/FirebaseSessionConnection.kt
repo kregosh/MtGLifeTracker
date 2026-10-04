@@ -56,6 +56,7 @@ class FirebaseSessionConnection(
     private var acceptedChildListener : ChildEventListener? = null
 
     private var resetForGame = -1L
+    @Volatile private var sessionCode: String? = null
 
     // Watching without a seat: nothing is written to users/, only to observers/.
     @Volatile private var observing = false
@@ -94,6 +95,7 @@ class FirebaseSessionConnection(
             emit(ServerMessage.SessionGone)
             return
         }
+        sessionCode = parsed.code ?: sessionCode
         val state = parsed.state
         val mySeat = state.users.find { it.id == userId }
         if (SeatRules.needsReset(mySeat, state.game, resetForGame)) {
@@ -217,13 +219,7 @@ class FirebaseSessionConnection(
     }
 
     override fun close(removePlayer: Boolean) {
-        _state.value = ConnectionState.Closed
-        connectedListener?.let     { connectedRef.removeEventListener(it) }
-        sessionListener?.let       { sessionRef.removeEventListener(it) }
-        requestChildListener?.let  { inboundRequestRef.removeEventListener(it) }
-        acceptedChildListener?.let { inboundAcceptedRef.removeEventListener(it) }
-        presenceRef.onDisconnect().cancel()
-        presenceRef.removeValue()
+        detach()
         if (observing) {
             // Observers keep nothing behind; resuming adds them back.
             observerRef.onDisconnect().cancel()
@@ -239,6 +235,27 @@ class FirebaseSessionConnection(
             onlineRef.setValue(false)
         }
         scope.cancel()
+    }
+
+    override fun endSession() {
+        detach()
+        // Nothing of ours may be written back after the session is gone.
+        onlineRef.onDisconnect().cancel()
+        observerRef.onDisconnect().cancel()
+        val code = sessionCode
+        sessionRef.removeValue()
+            .addOnSuccessListener { code?.let { db.getReference(SessionSchema.codePath(it)).removeValue() } }
+        scope.cancel()
+    }
+
+    private fun detach() {
+        _state.value = ConnectionState.Closed
+        connectedListener?.let     { connectedRef.removeEventListener(it) }
+        sessionListener?.let       { sessionRef.removeEventListener(it) }
+        requestChildListener?.let  { inboundRequestRef.removeEventListener(it) }
+        acceptedChildListener?.let { inboundAcceptedRef.removeEventListener(it) }
+        presenceRef.onDisconnect().cancel()
+        presenceRef.removeValue()
     }
 
     private fun closeSessionIfEmpty() {

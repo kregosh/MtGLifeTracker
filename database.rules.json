@@ -16,9 +16,10 @@
     "sessions": {
       "$sessionId": {
         ".read": "auth != null",
-        // Create once. Delete when nobody is left in it, or when it is more
-        // than a day old (abandoned sessions are reclaimed on code collisions).
-        ".write": "auth != null && ((!data.exists() && newData.exists()) || (data.exists() && !newData.exists() && (!data.child('users').exists() || data.child('createdAt').val() < now - 86400000)))",
+        // Create once. Delete when nobody is left in it, when the host leaves (which ends it
+        // for everyone), or when it is more than a day old (abandoned sessions are reclaimed
+        // on code collisions).
+        ".write": "auth != null && ((!data.exists() && newData.exists()) || (data.exists() && !newData.exists() && (!data.child('users').exists() || data.child('hostUserId').val() == auth.uid || data.child('createdAt').val() < now - 86400000)))",
         ".validate": "newData.hasChildren(['code', 'createdAt'])",
 
         "code":      { ".validate": "newData.isString() && newData.val().matches(/^[A-Z0-9]{6,8}$/) && !data.exists()" },

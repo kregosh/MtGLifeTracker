@@ -26,7 +26,7 @@
     <string name="error_session_not_found">No session with that code. Check the code and try again.</string>
     <string name="error_session_full">This session is full (%1$d players).</string>
     <string name="error_removed">You are no longer in that session.</string>
-    <string name="error_session_ended">The session you were watching has ended.</string>
+    <string name="error_session_ended">The session has ended.</string>
     <string name="error_create_failed">Couldn\'t create a session: %1$s</string>
     <string name="error_join_failed">Couldn\'t join the session: %1$s</string>
     <string name="error_unknown">unknown error</string>
@@ -114,6 +114,7 @@
     <string name="remove_player_text">Their card and stats are removed from this session.</string>
     <string name="leave_title">Leave session?</string>
     <string name="leave_text">Your life total and stats will be removed from this game.</string>
+    <string name="leave_text_host">You are the host: leaving ends the session for everyone.</string>
     <string name="leave_confirm">Leave</string>
     <string name="leave_stay">Stay</string>
     <string name="day">Day</string>

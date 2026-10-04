@@ -2152,12 +2152,39 @@ class SessionViewModelTest {
     }
 
     @Test
-    fun `a player whose session is gone is told they are no longer in it`() = runTest {
+    fun `players are sent home when the session ends`() = runTest {
         val vm = inSession()
         serverMessages.emit(ServerMessage.SessionGone)
         advanceUntilIdle()
         assertEquals(Screen.Home, vm.screen.value)
-        assertEquals(HomeError.RemovedFromSession, vm.homeError.value)
+        assertEquals(HomeError.SessionEnded, vm.homeError.value)
+        verify { prefs.lastSessionId = null }
+    }
+
+    @Test
+    fun `the host leaving ends the session for everyone`() = runTest {
+        val vm = inSession(hostUserId = "test-user-id")
+        vm.leaveSession()
+
+        verify { ws.endSession() }
+        verify(exactly = 0) { ws.close(any()) }
+        assertEquals(Screen.Home, vm.screen.value)
+    }
+
+    @Test
+    fun `another player leaving only gives up their own seat`() = runTest {
+        val vm = inSession(hostUserId = "someone-else")
+        vm.leaveSession()
+
+        verify { ws.close(true) }
+        verify(exactly = 0) { ws.endSession() }
+    }
+
+    @Test
+    fun `the host switching to watching keeps the session going`() = runTest {
+        val vm = inSession(hostUserId = "test-user-id")
+        vm.watchInstead()
+        verify(exactly = 0) { ws.endSession() }
     }
 
     @Test
