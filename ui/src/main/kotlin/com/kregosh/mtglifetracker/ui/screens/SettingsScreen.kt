@@ -7,6 +7,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -345,6 +349,9 @@ internal fun DisplayNameDialog(
                 value          = name,
                 onValueChange  = { if (it.length <= MAX_DISPLAY_NAME_LENGTH) name = it },
                 singleLine     = true,
+                // Enter (or the keyboard's Done key) confirms, like the OK button.
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { if (name.isNotBlank()) onConfirm(name) }),
                 placeholder    = { Text(Strings.nameDialogPlaceholder) },
                 supportingText = { Text(Strings.nameDialogCounter(name.length, MAX_DISPLAY_NAME_LENGTH)) },
             )
