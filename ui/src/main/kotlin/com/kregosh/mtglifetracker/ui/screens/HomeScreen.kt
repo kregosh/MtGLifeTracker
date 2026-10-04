@@ -1,5 +1,6 @@
 package com.kregosh.mtglifetracker.ui.screens
 
+import com.kregosh.mtglifetracker.ui.Strings
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
@@ -15,12 +16,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
-import com.kregosh.mtglifetracker.R
 import com.kregosh.mtglifetracker.ui.components.FriendsSheet
 import com.kregosh.mtglifetracker.ui.message
 import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
@@ -40,7 +38,7 @@ fun HomeScreen(vm: SessionViewModel) {
     if (displayName.isBlank()) {
         DisplayNameDialog(
             initial     = "",
-            title       = stringResource(R.string.home_first_launch_title),
+            title       = Strings.homeFirstLaunchTitle,
             dismissible = false,
             onConfirm   = vm::setDisplayName,
             onDismiss   = {},
@@ -71,7 +69,7 @@ fun HomeScreen(vm: SessionViewModel) {
         containerColor = if (hasBg) Color.Transparent else MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.app_name)) },
+                title = { Text(Strings.appName) },
                 colors = if (hasBg) TopAppBarDefaults.topAppBarColors(
                     containerColor         = Color.Black.copy(alpha = 0.45f),
                     titleContentColor      = Color.White,
@@ -79,10 +77,10 @@ fun HomeScreen(vm: SessionViewModel) {
                 ) else TopAppBarDefaults.topAppBarColors(),
                 actions = {
                     IconButton(onClick = { showFriendsSheet = true }) {
-                        Icon(Icons.Default.People, contentDescription = stringResource(R.string.friends))
+                        Icon(Icons.Default.People, contentDescription = Strings.friends)
                     }
                     IconButton(onClick = vm::openSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings))
+                        Icon(Icons.Default.Settings, contentDescription = Strings.settings)
                     }
                 },
             )
@@ -98,7 +96,7 @@ fun HomeScreen(vm: SessionViewModel) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                text  = stringResource(R.string.home_welcome, displayName.ifBlank { stringResource(R.string.default_player_name) }),
+                text  = Strings.homeWelcome(displayName.ifBlank { Strings.defaultPlayerName }),
                 style = MaterialTheme.typography.headlineSmall,
             )
 
@@ -111,14 +109,14 @@ fun HomeScreen(vm: SessionViewModel) {
             ) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.home_create_session))
+                Text(Strings.homeCreateSession)
             }
 
             OutlinedTextField(
                 value          = codeInput,
                 onValueChange  = { codeInput = it.uppercase() },
-                label          = { Text(stringResource(R.string.home_invite_code)) },
-                placeholder    = { Text(stringResource(R.string.home_invite_code_placeholder)) },
+                label          = { Text(Strings.homeInviteCode) },
+                placeholder    = { Text(Strings.homeInviteCodePlaceholder) },
                 singleLine     = true,
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.Characters,
@@ -137,7 +135,7 @@ fun HomeScreen(vm: SessionViewModel) {
             ) {
                 Icon(Icons.Default.Link, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.home_join_session))
+                Text(Strings.homeJoinSession)
             }
 
             if (loading) {
@@ -146,12 +144,12 @@ fun HomeScreen(vm: SessionViewModel) {
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                    Text(stringResource(R.string.home_connecting), style = MaterialTheme.typography.bodySmall)
+                    Text(Strings.homeConnecting, style = MaterialTheme.typography.bodySmall)
                 }
             }
 
             error?.let { err ->
-                val msg = err.message(LocalContext.current.resources)
+                val msg = err.message()
                 Card(
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer,

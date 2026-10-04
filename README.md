@@ -34,10 +34,13 @@ MtGLifeTracker/
 │                 CodeRegistry / UserPrefs interfaces a backend implements
 ├── firebase/     Firebase adapter: SessionSchema (pure mapping to the database
 │                 layout) plus thin FirebaseSessionApi / FirebaseSessionConnection
-├── app/          Jetpack Compose UI, SharedPreferences-backed UserPrefs
-├── web/          Browser app (preview): Compose Multiplatform on Kotlin/Wasm. A
-│                 standalone Gradle build that compiles core and SessionSchema
-│                 with a Firebase JS SDK adapter and localStorage UserPrefs
+├── ui/           The Compose screens, shared by the Android and browser apps.
+│                 Platform bits (images, picker, share, QR, back, screen-on)
+│                 go through the Platform interface; text lives in Strings.kt
+├── app/          Android app: AndroidPlatform, SharedPreferences-backed UserPrefs
+├── web/          Browser app: Compose Multiplatform on Kotlin/Wasm. A standalone
+│                 Gradle build that compiles core, SessionSchema and ui/ with a
+│                 Firebase JS SDK adapter, WebPlatform and localStorage UserPrefs
 ├── rules-tests/  Emulator tests for database.rules.json
 └── docs/join/    Invite landing page served by GitHub Pages
 ```

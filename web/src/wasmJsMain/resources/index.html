@@ -4,11 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="theme-color" content="#1d1b20">
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <title>MtG Life Tracker</title>
   <style>
-    html, body { height: 100%; margin: 0; background: #1d1b20; overflow: hidden; }
-    #app { position: fixed; inset: 0; }
+    html, body { height: 100%; margin: 0; background: #000; overflow: hidden; }
+    /* Keep the app clear of the iPhone's notch and home indicator. */
+    #app {
+      position: fixed;
+      top: env(safe-area-inset-top, 0px); bottom: env(safe-area-inset-bottom, 0px);
+      left: env(safe-area-inset-left, 0px); right: env(safe-area-inset-right, 0px);
+    }
   </style>
   <!-- Written by the Pages deploy from a repository secret; sets window.MTG_FIREBASE_CONFIG. -->
   <script src="firebase-config.js"></script>

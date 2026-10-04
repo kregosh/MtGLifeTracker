@@ -1,5 +1,6 @@
 package com.kregosh.mtglifetracker.ui.components
 
+import com.kregosh.mtglifetracker.ui.Strings
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -28,8 +29,8 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
+import com.kregosh.mtglifetracker.ui.platform.BuiltInImage
+import com.kregosh.mtglifetracker.ui.platform.LocalPlatform
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -37,7 +38,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kregosh.mtglifetracker.R
 import com.kregosh.mtglifetracker.shared.COMMANDER_STAT
 import com.kregosh.mtglifetracker.shared.LIFE_STAT
 import com.kregosh.mtglifetracker.shared.POISON_STAT
@@ -196,7 +196,7 @@ fun PlayerCard(
     val hasCardBg = isMe && cardBg != null
 
     // Alternate between two parchment textures so adjacent cards feel distinct
-    val parchmentRes = if (playerIndex % 2 == 0) R.drawable.card_parchment_a else R.drawable.card_parchment_b
+    val parchment = if (playerIndex % 2 == 0) BuiltInImage.PARCHMENT_A else BuiltInImage.PARCHMENT_B
 
     Box(modifier = modifier.fillMaxWidth().graphicsLayer { alpha = if (user.online) 1f else 0.6f }) {
         Card(
@@ -218,7 +218,7 @@ fun PlayerCard(
                 } else {
                     // SrcAtop darkens only the page itself, so its transparent torn margins stay clear
                     Image(
-                        painter            = painterResource(parchmentRes),
+                        painter            = LocalPlatform.current.parchment(parchment),
                         contentDescription = null,
                         contentScale       = ContentScale.Crop,
                         modifier           = Modifier.matchParentSize(),
@@ -254,7 +254,7 @@ fun PlayerCard(
                             )
                             if (!user.online) {
                                 Text(
-                                    text  = stringResource(R.string.player_offline),
+                                    text  = Strings.playerOffline,
                                     style = MaterialTheme.typography.labelSmall,
                                     color = PARCHMENT_SEPIA,
                                 )
@@ -267,7 +267,7 @@ fun PlayerCard(
                             ) {
                                 Icon(
                                     imageVector        = Icons.Default.PersonRemove,
-                                    contentDescription = stringResource(R.string.player_remove, user.displayName),
+                                    contentDescription = Strings.playerRemove(user.displayName),
                                     modifier           = Modifier.size(18.dp),
                                     tint               = PARCHMENT_SEPIA.copy(alpha = 0.75f),
                                 )
@@ -280,7 +280,7 @@ fun PlayerCard(
                             ) {
                                 Icon(
                                     imageVector        = Icons.Default.PersonAdd,
-                                    contentDescription = stringResource(R.string.player_send_friend_request),
+                                    contentDescription = Strings.playerSendFriendRequest,
                                     modifier           = Modifier.size(18.dp),
                                     tint               = PARCHMENT_SEPIA.copy(alpha = 0.75f),
                                 )
@@ -291,7 +291,7 @@ fun PlayerCard(
                                 modifier       = Modifier.height(28.dp),
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                             ) {
-                                Text(stringResource(R.string.player_undo_concede), style = MaterialTheme.typography.labelSmall, color = PARCHMENT_SEPIA)
+                                Text(Strings.playerUndoConcede, style = MaterialTheme.typography.labelSmall, color = PARCHMENT_SEPIA)
                             }
                         } else if (isMe && !dead) {
                             TextButton(
@@ -300,7 +300,7 @@ fun PlayerCard(
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                             ) {
                                 Text(
-                                    stringResource(R.string.player_concede),
+                                    Strings.playerConcede,
                                     style = MaterialTheme.typography.labelSmall,
                                     color = PARCHMENT_ERROR,
                                 )
@@ -308,7 +308,7 @@ fun PlayerCard(
                         } else if (isMe) {
                             SuggestionChip(
                                 onClick  = {},
-                                label    = { Text(stringResource(R.string.player_you), style = MaterialTheme.typography.labelSmall) },
+                                label    = { Text(Strings.playerYou, style = MaterialTheme.typography.labelSmall) },
                                 modifier = Modifier.height(24.dp),
                             )
                         }
@@ -324,7 +324,7 @@ fun PlayerCard(
                         if (isMe) {
                             SmallAdjustButton(
                                 icon        = Icons.Default.Remove,
-                                description = stringResource(R.string.life_decrease),
+                                description = Strings.lifeDecrease,
                                 enabled     = user.life > 0u,
                                 onClick     = { onAdjust(LIFE_STAT, -1) },
                             )
@@ -338,7 +338,7 @@ fun PlayerCard(
                         if (isMe) {
                             SmallAdjustButton(
                                 icon        = Icons.Default.Add,
-                                description = stringResource(R.string.life_increase),
+                                description = Strings.lifeIncrease,
                                 onClick     = { onAdjust(LIFE_STAT, 1) },
                             )
                         }
@@ -452,7 +452,7 @@ private fun NumericStatRow(
             if (isMe) {
                 SmallAdjustButton(
                     icon        = Icons.Default.Remove,
-                    description = stringResource(R.string.stat_decrease, label),
+                    description = Strings.statDecrease(label),
                     enabled     = value > 0u,
                     onClick     = { onAdjust(-1) },
                 )
@@ -468,7 +468,7 @@ private fun NumericStatRow(
             if (isMe) {
                 SmallAdjustButton(
                     icon        = Icons.Default.Add,
-                    description = stringResource(R.string.stat_increase, label),
+                    description = Strings.statIncrease(label),
                     onClick     = { onAdjust(1) },
                 )
             }
@@ -503,13 +503,13 @@ private fun ToggleStatRow(
             FilterChip(
                 selected = active,
                 onClick  = onToggle,
-                label    = { Text(stringResource(if (active) R.string.stat_active else R.string.stat_inactive), style = MaterialTheme.typography.labelSmall) },
+                label    = { Text((if (active) Strings.statActive else Strings.statInactive), style = MaterialTheme.typography.labelSmall) },
             )
         } else {
             AssistChip(
                 onClick  = {},
                 enabled  = active,
-                label    = { Text(stringResource(if (active) R.string.stat_active else R.string.stat_inactive_other), style = MaterialTheme.typography.labelSmall) },
+                label    = { Text((if (active) Strings.statActive else Strings.statInactiveOther), style = MaterialTheme.typography.labelSmall) },
             )
         }
     }
@@ -527,7 +527,7 @@ private fun MonarchRow(isMonarch: Boolean, isMe: Boolean, onTake: () -> Unit) {
         modifier              = Modifier.fillMaxWidth(),
     ) {
         Text(
-            text     = "👑 " + stringResource(R.string.player_monarch),
+            text     = "👑 " + Strings.playerMonarch,
             style    = MaterialTheme.typography.labelMedium,
             color    = if (isMonarch) PARCHMENT_INK else PARCHMENT_SEPIA,
             fontWeight = if (isMonarch) FontWeight.Bold else FontWeight.Normal,
@@ -537,13 +537,13 @@ private fun MonarchRow(isMonarch: Boolean, isMe: Boolean, onTake: () -> Unit) {
             FilterChip(
                 selected = false,
                 onClick  = onTake,
-                label    = { Text(stringResource(R.string.player_take_monarch), style = MaterialTheme.typography.labelSmall) },
+                label    = { Text(Strings.playerTakeMonarch, style = MaterialTheme.typography.labelSmall) },
             )
         } else if (isMe) {
             FilterChip(
                 selected = true,
                 onClick  = {},
-                label    = { Text(stringResource(R.string.stat_active), style = MaterialTheme.typography.labelSmall) },
+                label    = { Text(Strings.statActive, style = MaterialTheme.typography.labelSmall) },
             )
         }
     }
@@ -578,7 +578,7 @@ private fun RingStageRow(
             if (isMe) {
                 SmallAdjustButton(
                     icon        = Icons.Default.Remove,
-                    description = stringResource(R.string.ring_previous),
+                    description = Strings.ringPrevious,
                     enabled     = value > 0u,
                     onClick     = { onAdjust(-1) },
                 )
@@ -599,7 +599,7 @@ private fun RingStageRow(
             if (isMe) {
                 SmallAdjustButton(
                     icon        = Icons.Default.Add,
-                    description = stringResource(R.string.ring_next),
+                    description = Strings.ringNext,
                     enabled     = value < 4u,
                     onClick     = { onAdjust(1) },
                 )

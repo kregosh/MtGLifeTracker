@@ -1,5 +1,6 @@
 package com.kregosh.mtglifetracker.ui.components
 
+import com.kregosh.mtglifetracker.ui.Strings
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Login
@@ -14,9 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.kregosh.mtglifetracker.R
 import com.kregosh.mtglifetracker.data.Friend
 import com.kregosh.mtglifetracker.data.KnownPlayer
 
@@ -40,15 +39,15 @@ fun FriendsList(
     joinTarget?.let { (friend, sessionId) ->
         AlertDialog(
             onDismissRequest = { joinTarget = null },
-            title = { Text(stringResource(R.string.friend_join_title, friend.displayName)) },
+            title = { Text(Strings.friendJoinTitle(friend.displayName)) },
             confirmButton = {
                 TextButton(onClick = { joinTarget = null; onJoinSession(sessionId, false) }) {
-                    Text(stringResource(R.string.friend_join_play))
+                    Text(Strings.friendJoinPlay)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { joinTarget = null; onJoinSession(sessionId, true) }) {
-                    Text(stringResource(R.string.friend_join_watch))
+                    Text(Strings.friendJoinWatch)
                 }
             },
         )
@@ -57,16 +56,16 @@ fun FriendsList(
     unfriendTarget?.let { target ->
         AlertDialog(
             onDismissRequest = { unfriendTarget = null },
-            title = { Text(stringResource(R.string.friend_remove_title)) },
-            text  = { Text(stringResource(R.string.friend_remove_text, target.displayName)) },
+            title = { Text(Strings.friendRemoveTitle) },
+            text  = { Text(Strings.friendRemoveText(target.displayName)) },
             confirmButton = {
                 TextButton(
                     onClick = { onRemoveFriend(target.userId); unfriendTarget = null },
                     colors  = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                ) { Text(stringResource(R.string.action_remove)) }
+                ) { Text(Strings.actionRemove) }
             },
             dismissButton = {
-                TextButton(onClick = { unfriendTarget = null }) { Text(stringResource(R.string.action_cancel)) }
+                TextButton(onClick = { unfriendTarget = null }) { Text(Strings.actionCancel) }
             },
         )
     }
@@ -80,21 +79,21 @@ fun FriendsList(
                 name     = friend.displayName,
                 status   = when {
                     sessionId == null             -> null
-                    sessionId == currentSessionId -> stringResource(R.string.friend_in_this_game)
-                    else                          -> stringResource(R.string.friend_in_a_game)
+                    sessionId == currentSessionId -> Strings.friendInThisGame
+                    else                          -> Strings.friendInAGame
                 },
             ) {
                 if (sessionId != null && sessionId != currentSessionId) {
                     RowAction(
                         icon        = Icons.AutoMirrored.Filled.Login,
-                        description = stringResource(R.string.friend_join, friend.displayName),
+                        description = Strings.friendJoin(friend.displayName),
                         tint        = MaterialTheme.colorScheme.primary,
                         onClick     = { joinTarget = friend to sessionId },
                     )
                 }
                 RowAction(
                     icon        = Icons.Default.PersonRemove,
-                    description = stringResource(R.string.friend_remove, friend.displayName),
+                    description = Strings.friendRemove(friend.displayName),
                     tint        = MaterialTheme.colorScheme.error,
                     onClick     = { unfriendTarget = friend },
                 )
@@ -123,14 +122,14 @@ fun RecentPlayersList(
                 if (player.userId !in friendIds) {
                     RowAction(
                         icon        = Icons.Default.PersonAdd,
-                        description = stringResource(R.string.friend_add, player.displayName),
+                        description = Strings.friendAdd(player.displayName),
                         tint        = MaterialTheme.colorScheme.primary,
                         onClick     = { onAddFriend(player.userId, player.displayName) },
                     )
                 }
                 RowAction(
                     icon        = Icons.Default.Close,
-                    description = stringResource(R.string.player_forget, player.displayName),
+                    description = Strings.playerForget(player.displayName),
                     tint        = MaterialTheme.colorScheme.onSurfaceVariant,
                     onClick     = { onForgetPlayer(player.userId) },
                 )

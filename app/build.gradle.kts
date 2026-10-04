@@ -30,6 +30,9 @@ android {
         compose = true
     }
 
+    // The screens are shared with the browser app (web/), which compiles the same folder.
+    sourceSets["main"].kotlin.srcDir("../ui/src/main/kotlin")
+
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
