@@ -137,7 +137,7 @@ class SessionScreenTest {
         compose.onNodeWithText("Watch instead of playing?").assertExists()
         compose.onNodeWithText("Watch instead").performClick()
 
-        verify { connection.setObserving(true) }
+        verify { connection.watch() }
         compose.onNodeWithText("You are watching").assertExists()
         compose.onNodeWithText("Stats").assertDoesNotExist()
     }
@@ -160,6 +160,6 @@ class SessionScreenTest {
         ))
         idle()
         compose.onNodeWithText("Join as a player").performClick()
-        verify { connection.setObserving(false) }
+        verify { connection.play(any()) }
     }
 }
