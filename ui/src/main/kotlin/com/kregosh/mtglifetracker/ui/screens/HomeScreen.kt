@@ -1,6 +1,7 @@
 package com.kregosh.mtglifetracker.ui.screens
 
 import com.kregosh.mtglifetracker.ui.Strings
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
@@ -95,9 +96,14 @@ fun HomeScreen(vm: SessionViewModel) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            // Over a background image, text and outlines drawn straight onto it are black or
+            // white, like the timer, so they don't vanish into the picture.
+            val onImage = if (hasBg) backdropTextColor() else null
+
             Text(
                 text  = Strings.homeWelcome(displayName.ifBlank { Strings.defaultPlayerName }),
                 style = MaterialTheme.typography.headlineSmall,
+                color = onImage ?: LocalContentColor.current,
             )
 
             Spacer(Modifier.height(8.dp))
@@ -126,12 +132,29 @@ fun HomeScreen(vm: SessionViewModel) {
                     if (codeInput.isNotBlank()) vm.joinByCode(codeInput)
                 }),
                 modifier = Modifier.fillMaxWidth(),
+                colors   = if (onImage == null) OutlinedTextFieldDefaults.colors() else OutlinedTextFieldDefaults.colors(
+                    focusedTextColor          = onImage,
+                    unfocusedTextColor        = onImage,
+                    focusedBorderColor        = onImage,
+                    unfocusedBorderColor      = onImage.copy(alpha = 0.7f),
+                    focusedLabelColor         = onImage,
+                    unfocusedLabelColor       = onImage.copy(alpha = 0.8f),
+                    focusedPlaceholderColor   = onImage.copy(alpha = 0.6f),
+                    unfocusedPlaceholderColor = onImage.copy(alpha = 0.6f),
+                    cursorColor               = onImage,
+                ),
             )
 
             OutlinedButton(
                 onClick  = { if (codeInput.isNotBlank()) vm.joinByCode(codeInput) },
                 enabled  = codeInput.isNotBlank() && !loading,
                 modifier = Modifier.fillMaxWidth(),
+                colors   = if (onImage == null) ButtonDefaults.outlinedButtonColors() else ButtonDefaults.outlinedButtonColors(
+                    contentColor         = onImage,
+                    disabledContentColor = onImage.copy(alpha = 0.6f),
+                ),
+                border   = if (onImage == null) ButtonDefaults.outlinedButtonBorder(enabled = codeInput.isNotBlank() && !loading)
+                           else BorderStroke(1.dp, onImage.copy(alpha = if (codeInput.isNotBlank() && !loading) 1f else 0.6f)),
             ) {
                 Icon(Icons.Default.Link, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
@@ -143,8 +166,9 @@ fun HomeScreen(vm: SessionViewModel) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                    Text(Strings.homeConnecting, style = MaterialTheme.typography.bodySmall)
+                    val color = onImage ?: LocalContentColor.current
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp, color = onImage ?: ProgressIndicatorDefaults.circularColor)
+                    Text(Strings.homeConnecting, style = MaterialTheme.typography.bodySmall, color = color)
                 }
             }
 
