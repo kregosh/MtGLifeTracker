@@ -277,7 +277,16 @@ class SessionViewModel(
         prefs.displayName = trimmed
         _displayName.value = trimmed
         connection?.setDisplayName(trimmed)
+        // A first-time player who arrived by invite joins once they've said who they are.
+        _pendingInviteCode.value?.let { code ->
+            _pendingInviteCode.value = null
+            joinByCode(code)
+        }
     }
+
+    private val _pendingInviteCode = MutableStateFlow<String?>(null)
+    /** An invite that waits for a first-time player to choose their name. */
+    val pendingInviteCode: StateFlow<String?> = _pendingInviteCode.asStateFlow()
 
     // ── background images ─────────────────────────────────────────────
 
@@ -435,7 +444,10 @@ class SessionViewModel(
     }
 
     fun handleInviteLink(code: String) {
-        if (code.isNotBlank()) joinByCode(code)
+        if (code.isBlank()) return
+        // Others would see a nameless seat, so a first-time player picks a name first.
+        if (_displayName.value.isBlank()) _pendingInviteCode.value = code.trim().uppercase()
+        else joinByCode(code)
     }
 
     /** Rejoins the session the app was in when it was last closed or killed. */
@@ -730,7 +742,7 @@ class SessionViewModel(
 
         tearDownConnection()
 
-        val name = prefs.displayName.ifBlank { "Player" }
+        val name = _displayName.value.ifBlank { "Player" }
 
         val rules = settings ?: defaultSettings()
         _sessionUi.value = SessionUiState(

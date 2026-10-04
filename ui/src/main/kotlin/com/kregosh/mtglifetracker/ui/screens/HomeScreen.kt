@@ -35,11 +35,13 @@ fun HomeScreen(vm: SessionViewModel) {
     val knownPlayers by vm.knownPlayers.collectAsState()
     val friendPresence by vm.friendPresence.collectAsState()
     val displayName  by vm.displayName.collectAsState()
+    val pendingInvite by vm.pendingInviteCode.collectAsState()
 
     if (displayName.isBlank()) {
         DisplayNameDialog(
             initial     = "",
-            title       = Strings.homeFirstLaunchTitle,
+            // Arriving by invite, the game is joined as soon as the name is set.
+            title       = pendingInvite?.let(Strings::homeFirstLaunchJoinTitle) ?: Strings.homeFirstLaunchTitle,
             dismissible = false,
             onConfirm   = vm::setDisplayName,
             onDismiss   = {},
