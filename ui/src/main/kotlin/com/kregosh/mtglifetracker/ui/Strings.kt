@@ -15,6 +15,7 @@ object Strings {
     const val friends = "Friends"
     const val settings = "Settings"
     const val homeFirstLaunchTitle = "Welcome! What's your name?"
+    fun homeFirstLaunchJoinTitle(a1: Any) = "Joining game ${a1}. What's your name?"
     fun homeWelcome(a1: Any) = "Welcome, ${a1}"
     const val homeCreateSession = "Create new session"
     const val homeInviteCode = "Invite code"

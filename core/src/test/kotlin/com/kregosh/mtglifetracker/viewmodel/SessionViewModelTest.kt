@@ -360,6 +360,25 @@ class SessionViewModelTest {
     }
 
     @Test
+    fun `a first-time player following an invite names themselves before joining`() = runTest {
+        every { prefs.displayName } returns ""
+        coEvery { api.getSessionByCode("XYZABC") } returns SessionInfoResponse("sid-3", "XYZABC", 0)
+        val vm = makeVm()
+
+        vm.handleInviteLink("xyzabc")
+        advanceUntilIdle()
+        assertEquals(Screen.Home, vm.screen.value)
+        assertEquals("XYZABC", vm.pendingInviteCode.value)
+        coVerify(exactly = 0) { api.getSessionByCode(any()) }
+
+        vm.setDisplayName("Dana")
+        advanceUntilIdle()
+        assertIs<Screen.Session>(vm.screen.value)
+        assertNull(vm.pendingInviteCode.value)
+        verify { connectionFactory("sid-3", any(), "Dana", any()) }
+    }
+
+    @Test
     fun `adjust when no session active is silent no-op`() {
         val vm = makeVm()
         vm.adjust("life", 1)
