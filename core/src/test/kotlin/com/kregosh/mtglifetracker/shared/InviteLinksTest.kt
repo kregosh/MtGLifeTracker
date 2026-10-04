@@ -32,5 +32,9 @@ class InviteLinksTest {
         assertNull(parseInviteCode("mtgtracker://join/ABC-123"))
         assertNull(parseInviteCode("${INVITE_PAGE_URL}?code=<script>"))
         assertNull(parseInviteCode("not a url"))
+        // Lookalike hosts: only the real host counts, whatever comes before an @.
+        assertNull(parseInviteCode("https://kregosh.github.io@evil.example/MtGLifeTracker/join/?code=ABCD2345"))
+        assertNull(parseInviteCode("https://kregosh.github.io.evil.example/MtGLifeTracker/join/?code=ABCD2345"))
+        assertNull(parseInviteCode("http://kregosh.github.io/MtGLifeTracker/join/?code=ABCD2345"))
     }
 }

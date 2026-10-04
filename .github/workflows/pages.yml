@@ -1,0 +1,60 @@
+name: Pages
+
+# Publishes docs/ (the invite page) together with the browser app under /app/.
+# Requires Settings → Pages → Source: "GitHub Actions" and the FIREBASE_WEB_CONFIG secret.
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Build the browser app
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon -p web wasmJsBrowserDistribution
+
+      - name: Assemble the site
+        env:
+          FIREBASE_WEB_CONFIG: ${{ secrets.FIREBASE_WEB_CONFIG }}
+        run: |
+          mkdir -p site
+          cp -r docs/. site/
+          cp -r web/build/dist/wasmJs/productionExecutable site/app
+          # The Firebase web config comes from a secret, never from the repository.
+          printf 'window.MTG_FIREBASE_CONFIG = %s;\n' "${FIREBASE_WEB_CONFIG:-null}" > site/app/firebase-config.js
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

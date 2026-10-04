@@ -26,6 +26,7 @@
       <div class="code" id="code"></div>
       <p><a class="button" id="open">Open in the app</a></p>
       <p>If nothing happens, open MtG Life Tracker and enter the code above.</p>
+      <p>No app? <a id="web">Play in your browser</a>.</p>
     </div>
     <p id="invalid" hidden>This invite link is incomplete. Ask for the session code instead.</p>
     <p>Don't have the app? Download the latest APK from
@@ -41,8 +42,11 @@
       var appLink = 'mtgtracker://join/' + code;
       document.getElementById('code').textContent = code;
       document.getElementById('open').href = appLink;
+      var webLink = '../app/?code=' + code;
+      document.getElementById('web').href = webLink;
       document.getElementById('invite').hidden = false;
-      location.href = appLink;
+      // There's no iPhone app, so iPhones go straight to the browser version.
+      location.href = /iPhone|iPad|iPod/.test(navigator.userAgent) ? webLink : appLink;
     })();
   </script>
 </body>
