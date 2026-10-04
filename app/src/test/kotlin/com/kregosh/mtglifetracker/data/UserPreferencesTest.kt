@@ -196,8 +196,8 @@ class UserPreferencesTest {
     // ── numeric settings ─────────────────────────────────────────────────────
 
     @Test
-    fun `startLife defaults to 20`() {
-        assertEquals(20u, prefs.startLife)
+    fun `startLife defaults to 40, the Commander standard`() {
+        assertEquals(40u, prefs.startLife)
     }
 
     @Test
