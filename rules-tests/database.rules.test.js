@@ -250,10 +250,15 @@ describe('session lifecycle (#59)', () => {
     await assertFails(anon().ref('sessions/session-2').set({ code: 'QWERTY23', createdAt: { '.sv': 'timestamp' } }));
   });
 
-  test('a session with players in it cannot be deleted or replaced', async () => {
-    await assertFails(alice().ref(`sessions/${SID}`).remove());
+  test('a session with players in it cannot be deleted or replaced by a player', async () => {
+    await assertFails(bob().ref(`sessions/${SID}`).remove());
+    await assertFails(stranger().ref(`sessions/${SID}`).remove());
     await assertFails(alice().ref(`sessions/${SID}`).set({ code: 'NEWCODE2', createdAt: { '.sv': 'timestamp' } }));
     await assertFails(alice().ref(`sessions/${SID}/code`).set('NEWCODE2'));
+  });
+
+  test('the host can end a session with players in it', async () => {
+    await assertSucceeds(alice().ref(`sessions/${SID}`).remove());
   });
 
   test('an empty session can be deleted', async () => {

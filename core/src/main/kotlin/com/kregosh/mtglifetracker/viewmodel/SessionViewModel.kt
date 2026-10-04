@@ -64,7 +64,7 @@ sealed interface HomeError {
     data object SessionNotFound : HomeError
     data class SessionFull(val maxPlayers: Int) : HomeError
     data object RemovedFromSession : HomeError
-    /** The session we were watching closed. */
+    /** The session closed under us, usually because the host left. */
     data object SessionEnded : HomeError
     data class CreateFailed(val detail: String?) : HomeError
     data class JoinFailed(val detail: String?) : HomeError
@@ -660,9 +660,10 @@ class SessionViewModel(
         conn.play(ui.settings.startLife)
     }
 
+    /** Leaves for good. When the host leaves, the session ends and everyone is sent home. */
     fun leaveSession() {
         prefs.lastSessionId = null
-        tearDownConnection(removePlayer = true)
+        tearDownConnection(removePlayer = true, endSession = _sessionUi.value.isHost)
         _screen.value = Screen.Home
     }
 
@@ -769,10 +770,8 @@ class SessionViewModel(
                             addDefaultStats(conn, msg.users.find { it.id == myId })
                         }
                         is ServerMessage.Error  -> _sessionUi.update { it.copy(error = msg.message) }
-                        is ServerMessage.SessionGone -> when {
-                            _sessionUi.value.observing -> leftSession(HomeError.SessionEnded)
-                            hadSeat                    -> removedFromSession()
-                        }
+                        // The host left (or the session was cleaned up): everyone goes home.
+                        is ServerMessage.SessionGone -> leftSession(HomeError.SessionEnded)
                         is ServerMessage.FriendRequest -> {
                             _pendingFriendRequests.update {
                                 if (it.any { r -> r.fromUserId == msg.fromUserId }) it
@@ -816,7 +815,7 @@ class SessionViewModel(
         _homeError.value = reason
     }
 
-    private fun tearDownConnection(removePlayer: Boolean = true) {
+    private fun tearDownConnection(removePlayer: Boolean = true, endSession: Boolean = false) {
         debounceJobs.values.forEach { it.cancel() }
         debounceJobs.clear()
         pendingDeltas.clear()
@@ -830,7 +829,7 @@ class SessionViewModel(
         _pendingFriendRequests.value = emptyList()
         collectorJob?.cancel()
         collectorJob = null
-        connection?.close(removePlayer)
+        if (endSession) connection?.endSession() else connection?.close(removePlayer)
         connection = null
         resetTimer()
     }

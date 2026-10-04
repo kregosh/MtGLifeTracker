@@ -121,12 +121,26 @@ class SessionScreenTest {
 
     @Test
     fun `confirming leave removes the player and returns home`() {
-        showSession(hostUserId = "me")
+        showSession(hostUserId = "bob")
         compose.onNodeWithContentDescription("Leave session").performClick()
+        compose.onNodeWithText("Your life total and stats will be removed from this game.").assertExists()
         compose.onNodeWithText("Leave").performClick()
 
         assertEquals(Screen.Home, vm.screen.value)
         verify { connection.close(true) }
+        verify(exactly = 0) { connection.endSession() }
+    }
+
+    @Test
+    fun `the host is warned that leaving ends the session for everyone`() {
+        showSession(hostUserId = "me")
+        compose.onNodeWithContentDescription("Leave session").performClick()
+        compose.onNodeWithText("You are the host: leaving ends the session for everyone.").assertExists()
+        compose.onNodeWithText("Leave").performClick()
+
+        assertEquals(Screen.Home, vm.screen.value)
+        verify { connection.endSession() }
+        verify(exactly = 0) { connection.close(any()) }
     }
 
     @Test

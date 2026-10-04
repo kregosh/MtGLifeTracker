@@ -43,4 +43,7 @@ interface SessionConnection {
      * without it they stay in the session as offline so they can resume later.
      */
     fun close(removePlayer: Boolean = true)
+
+    /** The host leaving: deletes the session for everyone, then detaches. */
+    fun endSession()
 }
