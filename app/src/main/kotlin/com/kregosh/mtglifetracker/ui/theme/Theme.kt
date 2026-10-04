@@ -12,6 +12,12 @@ import com.kregosh.mtglifetracker.data.AppColorScheme
 /** True when a user-chosen background image is visible behind the app. */
 val LocalHasBackground  = compositionLocalOf { false }
 
+/**
+ * Average luminance (0..1) of the background image's top band, where text sits on it
+ * directly; null without a background image.
+ */
+val LocalBackdropLuminance = compositionLocalOf<Float?> { null }
+
 /** Non-null when the local player has chosen a card background image. */
 val LocalCardBackground = compositionLocalOf<ImageBitmap?> { null }
 

@@ -43,7 +43,9 @@ import com.kregosh.mtglifetracker.ui.components.InviteDialog
 import com.kregosh.mtglifetracker.ui.components.PlayerCard
 import com.kregosh.mtglifetracker.ui.components.statLabel
 import com.kregosh.mtglifetracker.ui.components.statTypeLabel
+import com.kregosh.mtglifetracker.ui.theme.LocalBackdropLuminance
 import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
+import com.kregosh.mtglifetracker.ui.prefersDarkText
 import com.kregosh.mtglifetracker.viewmodel.FriendRequestInfo
 import com.kregosh.mtglifetracker.viewmodel.MAX_STAT_NAME_LENGTH
 import com.kregosh.mtglifetracker.viewmodel.RESERVED_STAT_NAMES
@@ -521,7 +523,7 @@ private fun WatchersRow(ui: SessionUiState) {
         else                             -> stringResource(R.string.watching_others, others.joinToString())
     }
     val color = onBackdropColor(
-        hasBackground = LocalHasBackground.current,
+        backdropLuminance = LocalBackdropLuminance.current,
         lightTheme    = MaterialTheme.colorScheme.background.luminance() > 0.5f,
         themeColor    = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -537,14 +539,14 @@ private fun WatchersRow(ui: SessionUiState) {
 }
 
 /**
- * Text drawn straight onto the screen's backdrop (timer, who's watching). Background images
- * are dark, so it's white over one, like the top bar; otherwise black in light mode and the
- * theme's muted colour in dark mode.
+ * Text drawn straight onto the screen's backdrop (timer, who's watching). Over a background
+ * image it's black or white, whichever contrasts better with how bright the image is there;
+ * without one, black in light mode and the theme's muted colour in dark mode.
  */
-internal fun onBackdropColor(hasBackground: Boolean, lightTheme: Boolean, themeColor: Color): Color = when {
-    hasBackground -> Color.White
-    lightTheme    -> Color.Black
-    else          -> themeColor
+internal fun onBackdropColor(backdropLuminance: Float?, lightTheme: Boolean, themeColor: Color): Color = when {
+    backdropLuminance != null -> if (prefersDarkText(backdropLuminance)) Color.Black else Color.White
+    lightTheme                -> Color.Black
+    else                      -> themeColor
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -566,7 +568,7 @@ private fun GameTimerRow(
                      (running || elapsed > Duration.ZERO)
     val hasStarted = elapsed > Duration.ZERO || running
     val idleTint   = onBackdropColor(
-        hasBackground = LocalHasBackground.current,
+        backdropLuminance = LocalBackdropLuminance.current,
         lightTheme    = MaterialTheme.colorScheme.background.luminance() > 0.5f,
         themeColor    = MaterialTheme.colorScheme.onSurfaceVariant,
     )

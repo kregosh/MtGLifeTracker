@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -32,7 +33,10 @@ import com.kregosh.mtglifetracker.ui.screens.HomeScreen
 import com.kregosh.mtglifetracker.ui.screens.SessionScreen
 import com.kregosh.mtglifetracker.ui.screens.SettingsScreen
 import com.kregosh.mtglifetracker.ui.theme.LocalCardBackground
+import com.kregosh.mtglifetracker.ui.theme.LocalBackdropLuminance
 import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
+import com.kregosh.mtglifetracker.ui.BACKDROP_TEXT_BAND
+import com.kregosh.mtglifetracker.ui.averageLuminance
 import com.kregosh.mtglifetracker.ui.theme.MtGLifeTrackerTheme
 import com.kregosh.mtglifetracker.ui.theme.migratedPresetUri
 import com.kregosh.mtglifetracker.viewmodel.Screen
@@ -72,6 +76,7 @@ class MainActivity : ComponentActivity() {
             val context         = LocalContext.current
 
             var bgBitmap     by remember { mutableStateOf<ImageBitmap?>(null) }
+            var bgLuminance  by remember { mutableStateOf<Float?>(null) }
             var cardBgBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 
             LaunchedEffect(bgUriString, colorSchemePref) {
@@ -95,6 +100,7 @@ class MainActivity : ComponentActivity() {
                         }.getOrNull()
                     }
                 }
+                bgLuminance = bgBitmap?.let { bmp -> withContext(Dispatchers.Default) { topBandLuminance(bmp) } }
             }
 
             LaunchedEffect(cardBgUriString) {
@@ -111,6 +117,7 @@ class MainActivity : ComponentActivity() {
             MtGLifeTrackerTheme(colorScheme = colorSchemePref) {
                 CompositionLocalProvider(
                     LocalHasBackground  provides (bgBitmap != null),
+                    LocalBackdropLuminance provides bgLuminance,
                     LocalCardBackground provides cardBgBitmap,
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
@@ -174,4 +181,17 @@ class MainActivity : ComponentActivity() {
         vm.handleInviteLink(code)
         return true
     }
+}
+
+/** Average luminance of the image's top band, sampled from a small downscaled copy. */
+private fun topBandLuminance(image: ImageBitmap): Float {
+    val source = image.asAndroidBitmap()
+    val width  = 32
+    val height = (width * source.height / source.width.coerceAtLeast(1)).coerceAtLeast(1)
+    val small  = android.graphics.Bitmap.createScaledBitmap(source, width, height, true)
+    val rows   = (height * BACKDROP_TEXT_BAND).toInt().coerceIn(1, height)
+    val pixels = IntArray(width * rows)
+    small.getPixels(pixels, 0, width, 0, 0, width, rows)
+    if (small !== source) small.recycle()
+    return averageLuminance(pixels)
 }
