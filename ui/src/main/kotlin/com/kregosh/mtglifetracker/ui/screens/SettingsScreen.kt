@@ -7,6 +7,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -274,22 +281,25 @@ fun SettingsScreen(vm: SessionViewModel) {
                 PresetRow(
                     label    = Strings.rulesStartingLife,
                     current  = startLife,
-                    presets  = listOf(20u, 30u, 40u),
+                    presets  = listOf(40u, 20u),
                     onSelect = vm::setStartLife,
+                    custom   = START_LIFE_RANGE,
                 )
                 Spacer(Modifier.height(12.dp))
                 PresetRow(
                     label    = Strings.rulesCommanderLimit,
                     current  = commanderThreshold,
-                    presets  = listOf(21u, 15u, 10u),
+                    presets  = listOf(21u),
                     onSelect = vm::setCommanderThreshold,
+                    custom   = DAMAGE_LIMIT_RANGE,
                 )
                 Spacer(Modifier.height(12.dp))
                 PresetRow(
                     label    = Strings.rulesInfectLimit,
                     current  = infectThreshold,
-                    presets  = listOf(10u, 7u, 5u),
+                    presets  = listOf(10u),
                     onSelect = vm::setInfectThreshold,
+                    custom   = DAMAGE_LIMIT_RANGE,
                 )
                 Spacer(Modifier.height(12.dp))
                 var commanderDefault by remember { mutableStateOf(vm.commanderDefaultEnabled) }
@@ -345,6 +355,9 @@ internal fun DisplayNameDialog(
                 value          = name,
                 onValueChange  = { if (it.length <= MAX_DISPLAY_NAME_LENGTH) name = it },
                 singleLine     = true,
+                // Enter (or the keyboard's Done key) confirms, like the OK button.
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { if (name.isNotBlank()) onConfirm(name) }),
                 placeholder    = { Text(Strings.nameDialogPlaceholder) },
                 supportingText = { Text(Strings.nameDialogCounter(name.length, MAX_DISPLAY_NAME_LENGTH)) },
             )
@@ -387,6 +400,10 @@ private fun SettingsSection(title: String, content: @Composable ColumnScope.() -
 // Preset row (segmented buttons for numeric settings)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Segmented buttons for a numeric setting. With [custom], a last "Custom" button lets the
+ * player type any value in that range; it shows the value while one is chosen.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun PresetRow(
@@ -395,7 +412,12 @@ internal fun PresetRow(
     presets  : List<UInt>,
     onSelect : (UInt) -> Unit,
     valueText: (UInt) -> String = { it.toString() },
+    custom   : UIntRange? = null,
 ) {
+    var editing by remember { mutableStateOf(false) }
+    val count    = presets.size + if (custom != null) 1 else 0
+    val isCustom = current !in presets
+
     Text(label, style = MaterialTheme.typography.labelMedium)
     Spacer(Modifier.height(4.dp))
     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
@@ -403,8 +425,72 @@ internal fun PresetRow(
             SegmentedButton(
                 selected = current == value,
                 onClick  = { onSelect(value) },
-                shape    = SegmentedButtonDefaults.itemShape(index = idx, count = presets.size),
+                shape    = SegmentedButtonDefaults.itemShape(index = idx, count = count),
             ) { Text(valueText(value)) }
         }
+        if (custom != null) {
+            SegmentedButton(
+                selected = isCustom,
+                onClick  = { editing = true },
+                shape    = SegmentedButtonDefaults.itemShape(index = presets.size, count = count),
+            ) { Text(if (isCustom) Strings.rulesCustomValue(valueText(current)) else Strings.rulesCustom) }
+        }
+    }
+
+    if (editing && custom != null) {
+        NumberDialog(
+            title     = label,
+            initial   = current.takeIf { isCustom },
+            range     = custom,
+            onConfirm = { onSelect(it); editing = false },
+            onDismiss = { editing = false },
+        )
     }
 }
+
+/** Asks for a whole number in [range]; Enter confirms like OK. */
+@Composable
+private fun NumberDialog(
+    title    : String,
+    initial  : UInt?,
+    range    : UIntRange,
+    onConfirm: (UInt) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var text by remember { mutableStateOf(initial?.toString().orEmpty()) }
+    val value = parseInRange(text, range)
+    // Straight into typing: the field takes focus, so the keyboard comes up.
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text  = {
+            OutlinedTextField(
+                value           = text,
+                onValueChange   = { input -> text = input.filter(Char::isDigit).take(4) },
+                singleLine      = true,
+                isError         = text.isNotEmpty() && value == null,
+                supportingText  = { Text(Strings.rulesCustomRange(range.first, range.last)) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { value?.let(onConfirm) }),
+                modifier        = Modifier.focusRequester(focus),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { value?.let(onConfirm) }, enabled = value != null) { Text(Strings.actionOk) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(Strings.actionCancel) }
+        },
+    )
+}
+
+/** [text] as a number if it's one within [range], else null. */
+internal fun parseInRange(text: String, range: UIntRange): UInt? =
+    text.trim().toUIntOrNull()?.takeIf { it in range }
+
+// The same bounds as database.rules.json, which refuses anything outside them.
+internal val START_LIFE_RANGE   = 1u..1000u
+internal val DAMAGE_LIMIT_RANGE = 1u..100u

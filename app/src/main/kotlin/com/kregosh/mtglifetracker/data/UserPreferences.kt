@@ -36,7 +36,7 @@ class UserPreferences(
         }
 
     override var startLife: UInt
-        get() = prefs.getInt(KEY_START_LIFE, 20).toUInt()
+        get() = prefs.getInt(KEY_START_LIFE, 40).toUInt()
         set(value) { prefs.edit().putInt(KEY_START_LIFE, value.toInt()).apply() }
 
     override var commanderDeathThreshold: UInt

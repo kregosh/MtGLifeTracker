@@ -12,6 +12,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.*
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -836,6 +839,9 @@ private fun AddCustomStatDialog(
                 placeholder   = { Text(Strings.customStatPlaceholder) },
                 singleLine    = true,
                 isError       = showError,
+                // Enter (or the keyboard's Done key) adds the stat, like the Add button.
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { if (isValid) onConfirm(trimmed) }),
                 supportingText = if (showError) {
                     {
                         Text(
@@ -1009,12 +1015,12 @@ private fun GameRulesDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (editable) {
-                    PresetRow(Strings.rulesStartingLifeShort, draft.startLife, listOf(20u, 30u, 40u),
-                        { draft = draft.copy(startLife = it) })
-                    PresetRow(Strings.rulesCommanderLimit, draft.commanderDeathThreshold, listOf(21u, 15u, 10u),
-                        { draft = draft.copy(commanderDeathThreshold = it) })
-                    PresetRow(Strings.rulesInfectLimit, draft.infectDeathThreshold, listOf(10u, 7u, 5u),
-                        { draft = draft.copy(infectDeathThreshold = it) })
+                    PresetRow(Strings.rulesStartingLifeShort, draft.startLife, listOf(40u, 20u),
+                        { draft = draft.copy(startLife = it) }, custom = START_LIFE_RANGE)
+                    PresetRow(Strings.rulesCommanderLimit, draft.commanderDeathThreshold, listOf(21u),
+                        { draft = draft.copy(commanderDeathThreshold = it) }, custom = DAMAGE_LIMIT_RANGE)
+                    PresetRow(Strings.rulesInfectLimit, draft.infectDeathThreshold, listOf(10u),
+                        { draft = draft.copy(infectDeathThreshold = it) }, custom = DAMAGE_LIMIT_RANGE)
                     PresetRow(Strings.rulesMaxPlayers, draft.maxPlayers.toUInt(), listOf(0u, 2u, 4u, 6u),
                         { draft = draft.copy(maxPlayers = it.toInt()) }, valueText = ::players)
                     Text(

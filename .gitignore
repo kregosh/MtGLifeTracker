@@ -26,3 +26,6 @@ Thumbs.db
 # Rules tests
 node_modules/
 *-debug.log
+
+# Kotlin compiler daemon logs
+.kotlin/

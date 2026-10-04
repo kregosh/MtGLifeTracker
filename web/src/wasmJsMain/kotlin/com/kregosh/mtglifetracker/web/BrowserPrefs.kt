@@ -37,7 +37,7 @@ class BrowserPrefs : UserPrefs {
         get() = string("cardBackgroundImageUri")
         set(v) = store("cardBackgroundImageUri", v)
     override var startLife: UInt
-        get() = uint("startLife", 20u)
+        get() = uint("startLife", 40u)
         set(v) = store("startLife", v)
     override var commanderDeathThreshold: UInt
         get() = uint("commanderDeathThreshold", 21u)
