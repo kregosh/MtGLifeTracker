@@ -105,4 +105,23 @@ class SeatRulesTest {
         assertNull(SeatRules.nextHost(listOf(seat("host")), "host"))
         assertNull(SeatRules.nextHost(emptyList(), "host"))
     }
+
+    @Test
+    fun `the last one online closing the app clears every seat, their own included`() {
+        val users = listOf(seat("me", online = false), seat("ghost", online = false))
+        assertEquals(listOf("ghost", "me"), SeatRules.seatsToClearBeforeDeleting(users, "me"))
+    }
+
+    @Test
+    fun `closing the app while someone else is online or watching keeps the session`() {
+        val users = listOf(seat("me"), seat("bob"))
+        assertNull(SeatRules.seatsToClearBeforeDeleting(users, "me"))
+        assertNull(SeatRules.seatsToClearBeforeDeleting(listOf(seat("me")), "me", othersWatching = true))
+    }
+
+    @Test
+    fun `a player who already left has no seat of their own to clear`() {
+        val users = listOf(seat("ghost", online = false))
+        assertEquals(listOf("ghost"), SeatRules.seatsToClearBeforeDeleting(users, "me"))
+    }
 }

@@ -224,16 +224,18 @@ class FirebaseSessionConnection(
         if (observing) {
             // Observers keep nothing behind; resuming adds them back.
             observerRef.onDisconnect().cancel()
-            observerRef.removeValue().addOnSuccessListener { if (removePlayer) closeSessionIfEmpty() }
+            observerRef.removeValue().addOnSuccessListener { closeSessionIfEmpty() }
             scope.cancel()
             return
         }
         // A pending onDisconnect write would recreate a nameless stub of a removed player.
         onlineRef.onDisconnect().cancel()
+        // Leaving removes the seat; closing the app keeps it, offline, for a later resume.
+        // Either way, if nobody else is still online the session is cleaned up.
         if (removePlayer) {
             myUserRef.removeValue().addOnSuccessListener { closeSessionIfEmpty() }
         } else {
-            onlineRef.setValue(false)
+            onlineRef.setValue(false).addOnSuccessListener { closeSessionIfEmpty() }
         }
         scope.cancel()
     }
@@ -256,7 +258,7 @@ class FirebaseSessionConnection(
         sessionRef.get().addOnSuccessListener { snapshot ->
             val parsed = SessionSchema.parseSession(snapshot.value, startLife) ?: return@addOnSuccessListener
             val othersWatching = (parsed.state.observers.keys - userId).isNotEmpty()
-            val ghosts = SeatRules.ghostsToClearAfterLeaving(parsed.state.users, userId, othersWatching)
+            val ghosts = SeatRules.seatsToClearBeforeDeleting(parsed.state.users, userId, othersWatching)
                 ?: return@addOnSuccessListener
             val cleared = if (ghosts.isEmpty()) Tasks.forResult<Void>(null)
                           else sessionRef.updateChildren(SessionSchema.clearSeats(ghosts))
