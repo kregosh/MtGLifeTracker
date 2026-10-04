@@ -44,6 +44,6 @@ interface SessionConnection {
      */
     fun close(removePlayer: Boolean = true)
 
-    /** The host leaving: deletes the session for everyone, then detaches. */
-    fun endSession()
+    /** Passes the host role to [toUserId], a seated player. Only the current host can. */
+    fun handOverHost(toUserId: String)
 }

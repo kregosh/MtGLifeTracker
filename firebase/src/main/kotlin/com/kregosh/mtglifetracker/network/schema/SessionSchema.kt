@@ -21,6 +21,7 @@ object SessionSchema {
     fun seatStatPath(name: String)     = "stats/$name"
     fun observerPath(userId: String)   = "observers/$userId"
     const val MONARCH                  = "monarch"
+    const val HOST                     = "hostUserId"
 
     /** Seat field holding a stat, relative to the seat. */
     fun statField(target: StatTarget): String = when (target) {

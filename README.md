@@ -82,9 +82,9 @@ restarts and is lost when the app's data is cleared; backups don't copy it.
 3. Other players scan the code, tap the link, or type the code on the home screen.
 4. Life changes are batched for 400 ms and written with Firebase transactions.
    A player who loses connection is shown as offline (via `onDisconnect`) and
-   keeps their seat, so they can resume. When the host leaves, the session ends
-   and everyone else is sent back to the home screen; otherwise the last player
-   to leave deletes the session.
+   keeps their seat, so they can resume. A host who leaves hands hosting to the
+   first other player (preferring one who is online). The last player to leave
+   deletes the session.
 
 ## Setup
 

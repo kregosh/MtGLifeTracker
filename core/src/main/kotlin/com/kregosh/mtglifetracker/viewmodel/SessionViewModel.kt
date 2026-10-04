@@ -6,6 +6,7 @@ import com.kregosh.mtglifetracker.data.AppColorScheme
 import com.kregosh.mtglifetracker.data.Friend
 import com.kregosh.mtglifetracker.data.KnownPlayer
 import com.kregosh.mtglifetracker.data.UserPrefs
+import com.kregosh.mtglifetracker.domain.SeatRules
 import com.kregosh.mtglifetracker.network.SessionApi
 import com.kregosh.mtglifetracker.network.SessionConnection
 import com.kregosh.mtglifetracker.network.SessionNotFoundException
@@ -64,7 +65,7 @@ sealed interface HomeError {
     data object SessionNotFound : HomeError
     data class SessionFull(val maxPlayers: Int) : HomeError
     data object RemovedFromSession : HomeError
-    /** The session closed under us, usually because the host left. */
+    /** The session closed under us (cleaned up after everyone else left). */
     data object SessionEnded : HomeError
     data class CreateFailed(val detail: String?) : HomeError
     data class JoinFailed(val detail: String?) : HomeError
@@ -660,12 +661,25 @@ class SessionViewModel(
         conn.play(ui.settings.startLife)
     }
 
-    /** Leaves for good. When the host leaves, the session ends and everyone is sent home. */
+    /**
+     * Leaves for good. A leaving host first passes hosting on (see [nextHost]); the session
+     * itself ends only when everyone has left.
+     */
     fun leaveSession() {
+        val ui = _sessionUi.value
+        if (ui.isHost) nextHost?.let { connection?.handOverHost(it.id) }
         prefs.lastSessionId = null
-        tearDownConnection(removePlayer = true, endSession = _sessionUi.value.isHost)
+        tearDownConnection(removePlayer = true)
         _screen.value = Screen.Home
     }
+
+    /** Who would become host if the host left now. */
+    val nextHost: UserState?
+        get() {
+            val ui = _sessionUi.value
+            val id = SeatRules.nextHost(ui.users, ui.myUserId) ?: return null
+            return ui.users.find { it.id == id }
+        }
 
     // ── internal ─────────────────────────────────────────────────────
 
@@ -770,7 +784,7 @@ class SessionViewModel(
                             addDefaultStats(conn, msg.users.find { it.id == myId })
                         }
                         is ServerMessage.Error  -> _sessionUi.update { it.copy(error = msg.message) }
-                        // The host left (or the session was cleaned up): everyone goes home.
+                        // Everyone else left, or the session was cleaned up: go home.
                         is ServerMessage.SessionGone -> leftSession(HomeError.SessionEnded)
                         is ServerMessage.FriendRequest -> {
                             _pendingFriendRequests.update {
@@ -815,7 +829,7 @@ class SessionViewModel(
         _homeError.value = reason
     }
 
-    private fun tearDownConnection(removePlayer: Boolean = true, endSession: Boolean = false) {
+    private fun tearDownConnection(removePlayer: Boolean = true) {
         debounceJobs.values.forEach { it.cancel() }
         debounceJobs.clear()
         pendingDeltas.clear()
@@ -829,7 +843,7 @@ class SessionViewModel(
         _pendingFriendRequests.value = emptyList()
         collectorJob?.cancel()
         collectorJob = null
-        if (endSession) connection?.endSession() else connection?.close(removePlayer)
+        connection?.close(removePlayer)
         connection = null
         resetTimer()
     }

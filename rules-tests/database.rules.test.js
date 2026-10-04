@@ -250,15 +250,24 @@ describe('session lifecycle (#59)', () => {
     await assertFails(anon().ref('sessions/session-2').set({ code: 'QWERTY23', createdAt: { '.sv': 'timestamp' } }));
   });
 
-  test('a session with players in it cannot be deleted or replaced by a player', async () => {
+  test('a session with players in it cannot be deleted or replaced', async () => {
+    await assertFails(alice().ref(`sessions/${SID}`).remove());
     await assertFails(bob().ref(`sessions/${SID}`).remove());
-    await assertFails(stranger().ref(`sessions/${SID}`).remove());
     await assertFails(alice().ref(`sessions/${SID}`).set({ code: 'NEWCODE2', createdAt: { '.sv': 'timestamp' } }));
     await assertFails(alice().ref(`sessions/${SID}/code`).set('NEWCODE2'));
   });
 
-  test('the host can end a session with players in it', async () => {
-    await assertSucceeds(alice().ref(`sessions/${SID}`).remove());
+  test('the host hands hosting to a seated player', async () => {
+    await assertSucceeds(alice().ref(`sessions/${SID}/hostUserId`).set(BOB));
+    // Bob is host now, and Alice no longer is.
+    await assertFails(alice().ref(`sessions/${SID}/hostUserId`).set(ALICE));
+    await assertSucceeds(bob().ref(`sessions/${SID}/hostUserId`).set(ALICE));
+  });
+
+  test('nobody else can take hosting, and it cannot go to someone without a seat', async () => {
+    await assertFails(bob().ref(`sessions/${SID}/hostUserId`).set(BOB));
+    await assertFails(alice().ref(`sessions/${SID}/hostUserId`).set(STRANGER));
+    await assertFails(alice().ref(`sessions/${SID}/hostUserId`).remove());
   });
 
   test('an empty session can be deleted', async () => {
@@ -291,9 +300,9 @@ describe('host controls and shared rules (#44, #46)', () => {
     }));
   });
 
-  test('the host cannot be changed', async () => {
+  test('only the host can change who hosts', async () => {
     await assertFails(bob().ref(`sessions/${SID}/hostUserId`).set(BOB));
-    await assertFails(alice().ref(`sessions/${SID}/hostUserId`).set(BOB));
+    await assertFails(stranger().ref(`sessions/${SID}/hostUserId`).set(STRANGER));
   });
 
   test('only the host changes the rules', async () => {

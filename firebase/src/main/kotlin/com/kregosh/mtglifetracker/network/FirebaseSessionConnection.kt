@@ -56,7 +56,6 @@ class FirebaseSessionConnection(
     private var acceptedChildListener : ChildEventListener? = null
 
     private var resetForGame = -1L
-    @Volatile private var sessionCode: String? = null
 
     // Watching without a seat: nothing is written to users/, only to observers/.
     @Volatile private var observing = false
@@ -95,7 +94,6 @@ class FirebaseSessionConnection(
             emit(ServerMessage.SessionGone)
             return
         }
-        sessionCode = parsed.code ?: sessionCode
         val state = parsed.state
         val mySeat = state.users.find { it.id == userId }
         if (SeatRules.needsReset(mySeat, state.game, resetForGame)) {
@@ -240,15 +238,8 @@ class FirebaseSessionConnection(
         scope.cancel()
     }
 
-    override fun endSession() {
-        detach()
-        // Nothing of ours may be written back after the session is gone.
-        onlineRef.onDisconnect().cancel()
-        observerRef.onDisconnect().cancel()
-        val code = sessionCode
-        sessionRef.removeValue()
-            .addOnSuccessListener { code?.let { db.getReference(SessionSchema.codePath(it)).removeValue() } }
-        scope.cancel()
+    override fun handOverHost(toUserId: String) {
+        sessionRef.child(SessionSchema.HOST).setValue(toUserId).reportFailure()
     }
 
     private fun detach() {

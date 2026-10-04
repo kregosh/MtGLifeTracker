@@ -2162,30 +2162,48 @@ class SessionViewModelTest {
     }
 
     @Test
-    fun `the host leaving ends the session for everyone`() = runTest {
-        val vm = inSession(hostUserId = "test-user-id")
+    fun `a leaving host hands hosting to the first other player who is online`() = runTest {
+        val vm = inSession(
+            users = listOf(
+                UserState("test-user-id", "Test Player"),
+                UserState("ghost", "Ghost", online = false),
+                UserState("bob", "Bob"),
+                UserState("carol", "Carol"),
+            ),
+            hostUserId = "test-user-id",
+        )
+        assertEquals("bob", vm.nextHost?.id)
         vm.leaveSession()
 
-        verify { ws.endSession() }
-        verify(exactly = 0) { ws.close(any()) }
+        verifyOrder {
+            ws.handOverHost("bob")
+            ws.close(true)
+        }
         assertEquals(Screen.Home, vm.screen.value)
     }
 
     @Test
-    fun `another player leaving only gives up their own seat`() = runTest {
-        val vm = inSession(hostUserId = "someone-else")
+    fun `a host alone in the session just leaves`() = runTest {
+        val vm = inSession(hostUserId = "test-user-id")
+        assertNull(vm.nextHost)
         vm.leaveSession()
 
+        verify(exactly = 0) { ws.handOverHost(any()) }
         verify { ws.close(true) }
-        verify(exactly = 0) { ws.endSession() }
     }
 
     @Test
-    fun `the host switching to watching keeps the session going`() = runTest {
-        val vm = inSession(hostUserId = "test-user-id")
-        vm.watchInstead()
-        verify(exactly = 0) { ws.endSession() }
+    fun `another player leaving hands nothing over`() = runTest {
+        val vm = inSession(
+            users = listOf(UserState("test-user-id", "Test Player"), UserState("bob", "Bob")),
+            hostUserId = "bob",
+        )
+        vm.leaveSession()
+
+        verify(exactly = 0) { ws.handOverHost(any()) }
+        verify { ws.close(true) }
     }
+
 
     @Test
     fun `switching to watch sends unsent taps, gives up the seat and clears the history`() = runTest {
