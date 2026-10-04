@@ -520,15 +520,31 @@ private fun WatchersRow(ui: SessionUiState) {
         ui.observing                     -> stringResource(R.string.watching_you_and, others.joinToString())
         else                             -> stringResource(R.string.watching_others, others.joinToString())
     }
+    val color = onBackdropColor(
+        hasBackground = LocalHasBackground.current,
+        lightTheme    = MaterialTheme.colorScheme.background.luminance() > 0.5f,
+        themeColor    = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
     Row(
         modifier              = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(18.dp),
-             tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+             tint = color)
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = color)
     }
+}
+
+/**
+ * Text drawn straight onto the screen's backdrop (timer, who's watching). Background images
+ * are dark, so it's white over one, like the top bar; otherwise black in light mode and the
+ * theme's muted colour in dark mode.
+ */
+internal fun onBackdropColor(hasBackground: Boolean, lightTheme: Boolean, themeColor: Color): Color = when {
+    hasBackground -> Color.White
+    lightTheme    -> Color.Black
+    else          -> themeColor
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -549,8 +565,11 @@ private fun GameTimerRow(
     val urgent     = countDown && display < 1.minutes &&
                      (running || elapsed > Duration.ZERO)
     val hasStarted = elapsed > Duration.ZERO || running
-    val isLight    = MaterialTheme.colorScheme.background.luminance() > 0.5f
-    val idleTint   = if (isLight) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant
+    val idleTint   = onBackdropColor(
+        hasBackground = LocalHasBackground.current,
+        lightTheme    = MaterialTheme.colorScheme.background.luminance() > 0.5f,
+        themeColor    = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
     val tint       = if (urgent) MaterialTheme.colorScheme.error else idleTint
 
     Row(
