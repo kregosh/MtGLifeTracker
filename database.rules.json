@@ -16,10 +16,9 @@
     "sessions": {
       "$sessionId": {
         ".read": "auth != null",
-        // Create once. Delete when nobody is left in it, when the host leaves (which ends it
-        // for everyone), or when it is more than a day old (abandoned sessions are reclaimed
-        // on code collisions).
-        ".write": "auth != null && ((!data.exists() && newData.exists()) || (data.exists() && !newData.exists() && (!data.child('users').exists() || data.child('hostUserId').val() == auth.uid || data.child('createdAt').val() < now - 86400000)))",
+        // Create once. Delete when nobody is left in it, or when it is more than a day old
+        // (abandoned sessions are reclaimed on code collisions).
+        ".write": "auth != null && ((!data.exists() && newData.exists()) || (data.exists() && !newData.exists() && (!data.child('users').exists() || data.child('createdAt').val() < now - 86400000)))",
         ".validate": "newData.hasChildren(['code', 'createdAt'])",
 
         "code":      { ".validate": "newData.isString() && newData.val().matches(/^[A-Z0-9]{6,8}$/) && !data.exists()" },
@@ -28,7 +27,11 @@
         // ── Host and shared game rules ─────────────────────────────────
         // The creator becomes host. Only the host changes the rules or starts
         // a new game; each player then resets their own seat.
-        "hostUserId": { ".validate": "newData.isString() && !data.exists() && newData.val() == auth.uid" },
+        // The creator becomes host; a leaving host hands the role to a seated player.
+        "hostUserId": {
+          ".write":    "auth != null && data.val() == auth.uid && newData.exists()",
+          ".validate": "newData.isString() && ((!data.exists() && newData.val() == auth.uid) || (data.exists() && root.child('sessions').child($sessionId).child('users').child(newData.val()).exists()))"
+        },
         "game": {
           ".write":    "auth != null && root.child('sessions').child($sessionId).child('hostUserId').val() == auth.uid",
           ".validate": "newData.isNumber() && (!data.exists() || newData.val() > data.val())"

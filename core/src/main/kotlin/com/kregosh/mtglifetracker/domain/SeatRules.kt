@@ -22,6 +22,15 @@ object SeatRules {
         UserState(id = myId, displayName = displayName, life = startLife, online = true, game = game, stats = stats)
 
     /**
+     * Who becomes host when [hostId] leaves: the first other player in the session's list,
+     * preferring one who is online. Null when no other player is seated.
+     */
+    fun nextHost(users: List<UserState>, hostId: String): String? {
+        val others = users.filter { it.id != hostId }
+        return (others.firstOrNull { it.online } ?: others.firstOrNull())?.id
+    }
+
+    /**
      * After [myId] leaves: the seats of offline players to clear before the session is
      * deleted, or null if anyone else is still there (online, or [othersWatching]) and
      * the session must stay.

@@ -218,7 +218,13 @@ private fun SessionContent(
         AlertDialog(
             onDismissRequest = { showLeaveDialog = false },
             title = { Text(stringResource(R.string.leave_title)) },
-            text  = { Text(stringResource(if (ui.isHost) R.string.leave_text_host else R.string.leave_text)) },
+            text  = {
+                val successor = if (ui.isHost) vm.nextHost else null
+                Text(
+                    if (successor != null) stringResource(R.string.leave_text_host, successor.displayName)
+                    else stringResource(R.string.leave_text)
+                )
+            },
             confirmButton = {
                 TextButton(
                     onClick = { showLeaveDialog = false; vm.leaveSession() },

@@ -87,4 +87,22 @@ class SeatRulesTest {
     fun `the last observer out of a session without players closes it`() {
         assertEquals(emptyList(), SeatRules.ghostsToClearAfterLeaving(emptyList(), "me"))
     }
+
+    @Test
+    fun `the next host is the first other player, preferring one who is online`() {
+        val users = listOf(seat("host"), seat("off", online = false), seat("bob"), seat("carol"))
+        assertEquals("bob", SeatRules.nextHost(users, "host"))
+    }
+
+    @Test
+    fun `with only offline players left the first of them becomes host`() {
+        val users = listOf(seat("host"), seat("off1", online = false), seat("off2", online = false))
+        assertEquals("off1", SeatRules.nextHost(users, "host"))
+    }
+
+    @Test
+    fun `nobody becomes host when the host was the only player`() {
+        assertNull(SeatRules.nextHost(listOf(seat("host")), "host"))
+        assertNull(SeatRules.nextHost(emptyList(), "host"))
+    }
 }

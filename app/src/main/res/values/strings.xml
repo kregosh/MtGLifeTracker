@@ -114,7 +114,7 @@
     <string name="remove_player_text">Their card and stats are removed from this session.</string>
     <string name="leave_title">Leave session?</string>
     <string name="leave_text">Your life total and stats will be removed from this game.</string>
-    <string name="leave_text_host">You are the host: leaving ends the session for everyone.</string>
+    <string name="leave_text_host">Your life total and stats will be removed from this game, and %1$s becomes the host.</string>
     <string name="leave_confirm">Leave</string>
     <string name="leave_stay">Stay</string>
     <string name="day">Day</string>

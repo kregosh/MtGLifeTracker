@@ -128,19 +128,19 @@ class SessionScreenTest {
 
         assertEquals(Screen.Home, vm.screen.value)
         verify { connection.close(true) }
-        verify(exactly = 0) { connection.endSession() }
+        verify(exactly = 0) { connection.handOverHost(any()) }
     }
 
     @Test
-    fun `the host is warned that leaving ends the session for everyone`() {
+    fun `a leaving host is told who takes over, and hands hosting on`() {
         showSession(hostUserId = "me")
         compose.onNodeWithContentDescription("Leave session").performClick()
-        compose.onNodeWithText("You are the host: leaving ends the session for everyone.").assertExists()
+        compose.onNodeWithText("Your life total and stats will be removed from this game, and Bob becomes the host.").assertExists()
         compose.onNodeWithText("Leave").performClick()
 
         assertEquals(Screen.Home, vm.screen.value)
-        verify { connection.endSession() }
-        verify(exactly = 0) { connection.close(any()) }
+        verify { connection.handOverHost("bob") }
+        verify { connection.close(true) }
     }
 
     @Test
