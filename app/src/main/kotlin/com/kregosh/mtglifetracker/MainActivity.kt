@@ -4,45 +4,17 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import android.content.Intent
-import android.content.res.Configuration
-import android.graphics.BitmapFactory
-import android.net.Uri
 import android.os.Bundle
-import com.kregosh.mtglifetracker.data.AppColorScheme
 import com.kregosh.mtglifetracker.data.UserPreferences
 import com.kregosh.mtglifetracker.network.FirebaseSessionApi
 import com.kregosh.mtglifetracker.network.FirebaseSessionConnection
 import com.kregosh.mtglifetracker.shared.parseInviteCode
-import com.kregosh.mtglifetracker.ui.components.LightningOverlay
-import com.kregosh.mtglifetracker.ui.components.ManaSparkOverlay
-import com.kregosh.mtglifetracker.ui.screens.HomeScreen
-import com.kregosh.mtglifetracker.ui.screens.SessionScreen
-import com.kregosh.mtglifetracker.ui.screens.SettingsScreen
-import com.kregosh.mtglifetracker.ui.theme.LocalCardBackground
-import com.kregosh.mtglifetracker.ui.theme.LocalBackdropLuminance
-import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
-import com.kregosh.mtglifetracker.ui.BACKDROP_TEXT_BAND
-import com.kregosh.mtglifetracker.ui.averageLuminance
-import com.kregosh.mtglifetracker.ui.theme.MtGLifeTrackerTheme
+import com.kregosh.mtglifetracker.ui.AppRoot
 import com.kregosh.mtglifetracker.ui.theme.migratedPresetUri
-import com.kregosh.mtglifetracker.viewmodel.Screen
 import com.kregosh.mtglifetracker.viewmodel.SessionViewModel
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
 
@@ -66,98 +38,8 @@ class MainActivity : ComponentActivity() {
         // On recreation (rotation, theme change) the launch intent was already handled.
         if (savedInstanceState == null && !handleInvite(intent)) vm.resumeLastSession()
 
-        setContent {
-            val screen          by vm.screen.collectAsState()
-            val bgUriString     by vm.backgroundImageUri.collectAsState()
-            val cardBgUriString by vm.cardBackgroundImageUri.collectAsState()
-            val isStormPreset   by vm.isStormPreset.collectAsState()
-            val isManaOrbs      by vm.isManaOrbsPreset.collectAsState()
-            val colorSchemePref by vm.colorScheme.collectAsState()
-            val context         = LocalContext.current
-
-            var bgBitmap     by remember { mutableStateOf<ImageBitmap?>(null) }
-            var bgLuminance  by remember { mutableStateOf<Float?>(null) }
-            var cardBgBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
-
-            LaunchedEffect(bgUriString, colorSchemePref) {
-                bgBitmap = withContext(Dispatchers.IO) {
-                    bgUriString?.let { uriStr ->
-                        runCatching {
-                            val resolveCtx = if (uriStr.startsWith("android.resource://")) {
-                                val nightMode = when (colorSchemePref) {
-                                    AppColorScheme.DARK   -> Configuration.UI_MODE_NIGHT_YES
-                                    AppColorScheme.LIGHT  -> Configuration.UI_MODE_NIGHT_NO
-                                    AppColorScheme.SYSTEM -> null
-                                }
-                                if (nightMode != null) {
-                                    val cfg = Configuration(context.resources.configuration)
-                                    cfg.uiMode = (cfg.uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or nightMode
-                                    context.createConfigurationContext(cfg)
-                                } else context
-                            } else context
-                            resolveCtx.contentResolver.openInputStream(Uri.parse(uriStr))
-                                ?.use { BitmapFactory.decodeStream(it)?.asImageBitmap() }
-                        }.getOrNull()
-                    }
-                }
-                bgLuminance = bgBitmap?.let { bmp -> withContext(Dispatchers.Default) { topBandLuminance(bmp) } }
-            }
-
-            LaunchedEffect(cardBgUriString) {
-                cardBgBitmap = withContext(Dispatchers.IO) {
-                    cardBgUriString?.let { uriStr ->
-                        runCatching {
-                            context.contentResolver.openInputStream(Uri.parse(uriStr))
-                                ?.use { BitmapFactory.decodeStream(it)?.asImageBitmap() }
-                        }.getOrNull()
-                    }
-                }
-            }
-
-            MtGLifeTrackerTheme(colorScheme = colorSchemePref) {
-                CompositionLocalProvider(
-                    LocalHasBackground  provides (bgBitmap != null),
-                    LocalBackdropLuminance provides bgLuminance,
-                    LocalCardBackground provides cardBgBitmap,
-                ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        bgBitmap?.let { bmp ->
-                            Image(
-                                bitmap             = bmp,
-                                contentDescription = null,
-                                contentScale       = ContentScale.Crop,
-                                modifier           = Modifier.fillMaxSize(),
-                            )
-                        }
-
-                        if (isStormPreset) {
-                            LightningOverlay()
-                        }
-
-                        // Presets resolve their night image by the app's theme, so the sparks follow it too.
-                        val darkBackground = when (colorSchemePref) {
-                            AppColorScheme.DARK   -> true
-                            AppColorScheme.LIGHT  -> false
-                            AppColorScheme.SYSTEM -> isSystemInDarkTheme()
-                        }
-                        val orbsBitmap = bgBitmap
-                        if (isManaOrbs && orbsBitmap != null) {
-                            ManaSparkOverlay(
-                                imageWidth  = orbsBitmap.width,
-                                imageHeight = orbsBitmap.height,
-                                dark        = darkBackground,
-                            )
-                        }
-
-                        when (screen) {
-                            is Screen.Home     -> HomeScreen(vm)
-                            is Screen.Session  -> SessionScreen(vm)
-                            is Screen.Settings -> SettingsScreen(vm)
-                        }
-                    }
-                }
-            }
-        }
+        val platform = AndroidPlatform(this)
+        setContent { AppRoot(vm, platform) }
     }
 
     // Presets used to be saved by numeric resource ID, which never matched the
@@ -181,17 +63,4 @@ class MainActivity : ComponentActivity() {
         vm.handleInviteLink(code)
         return true
     }
-}
-
-/** Average luminance of the image's top band, sampled from a small downscaled copy. */
-private fun topBandLuminance(image: ImageBitmap): Float {
-    val source = image.asAndroidBitmap()
-    val width  = 32
-    val height = (width * source.height / source.width.coerceAtLeast(1)).coerceAtLeast(1)
-    val small  = android.graphics.Bitmap.createScaledBitmap(source, width, height, true)
-    val rows   = (height * BACKDROP_TEXT_BAND).toInt().coerceIn(1, height)
-    val pixels = IntArray(width * rows)
-    small.getPixels(pixels, 0, width, 0, 0, width, rows)
-    if (small !== source) small.recycle()
-    return averageLuminance(pixels)
 }

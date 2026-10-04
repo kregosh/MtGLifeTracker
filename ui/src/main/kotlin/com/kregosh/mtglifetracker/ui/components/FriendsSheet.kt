@@ -1,5 +1,6 @@
 package com.kregosh.mtglifetracker.ui.components
 
+import com.kregosh.mtglifetracker.ui.Strings
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -7,9 +8,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.kregosh.mtglifetracker.R
 import com.kregosh.mtglifetracker.data.Friend
 import com.kregosh.mtglifetracker.data.KnownPlayer
 
@@ -28,7 +27,7 @@ fun FriendsSheet(
     onDismiss       : () -> Unit,
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf(stringResource(R.string.friends_tab), stringResource(R.string.recent_tab))
+    val tabs = listOf(Strings.friendsTab, Strings.recentTab)
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -53,7 +52,7 @@ fun FriendsSheet(
 
             when (selectedTab) {
                 0 -> if (friendList.isEmpty()) {
-                    EmptyHint(stringResource(R.string.friends_empty))
+                    EmptyHint(Strings.friendsEmpty)
                 } else {
                     FriendsList(
                         friends          = friendList,
@@ -65,7 +64,7 @@ fun FriendsSheet(
                     )
                 }
                 1 -> if (knownPlayers.isEmpty()) {
-                    EmptyHint(stringResource(R.string.recent_empty))
+                    EmptyHint(Strings.recentEmpty)
                 } else {
                     RecentPlayersList(
                         players        = knownPlayers,

@@ -1,5 +1,6 @@
 package com.kregosh.mtglifetracker.ui.components
 
+import com.kregosh.mtglifetracker.ui.setPlatformContent
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -19,7 +20,7 @@ class FriendsListTest {
     private val joins = mutableListOf<Pair<String, Boolean>>()
 
     private fun showFriendInGame() {
-        compose.setContent {
+        compose.setPlatformContent {
             FriendsList(
                 friends          = listOf(Friend("bob", "Bob")),
                 friendPresence   = mapOf("bob" to "sid-1"),

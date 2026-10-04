@@ -24,11 +24,18 @@ class BrowserPrefs : UserPrefs {
     private fun bool(key: String, default: Boolean) = string(key)?.toBooleanStrictOrNull() ?: default
 
     override var displayName: String
-        get() = string("displayName") ?: "Player"
+        get() = string("displayName") ?: ""
         set(v) = store("displayName", v)
-    // Backgrounds aren't part of the web version yet.
-    override var backgroundImageUri: String? = null
-    override var cardBackgroundImageUri: String? = null
+    // As on Android: unset means the Mana Orbs default, and no background is stored as "".
+    // Picked images are data URLs, scaled down by the platform layer to fit.
+    override var backgroundImageUri: String?
+        get() = string("backgroundImageUri").let { stored ->
+            if (stored == null) "builtin:bg_mana_orbs" else stored.ifEmpty { null }
+        }
+        set(v) = store("backgroundImageUri", v ?: "")
+    override var cardBackgroundImageUri: String?
+        get() = string("cardBackgroundImageUri")
+        set(v) = store("cardBackgroundImageUri", v)
     override var startLife: UInt
         get() = uint("startLife", 20u)
         set(v) = store("startLife", v)

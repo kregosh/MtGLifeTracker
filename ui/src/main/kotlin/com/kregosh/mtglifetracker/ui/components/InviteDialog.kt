@@ -1,7 +1,6 @@
 package com.kregosh.mtglifetracker.ui.components
 
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
+import com.kregosh.mtglifetracker.ui.Strings
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Share
@@ -10,43 +9,38 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.FilterQuality
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import android.content.Intent
-import com.kregosh.mtglifetracker.R
+import com.kregosh.mtglifetracker.ui.platform.LocalPlatform
 import com.kregosh.mtglifetracker.shared.inviteUrl
 
 /** Session code, a QR code to scan and a share button with a link chat apps can open. */
 @Composable
 fun InviteDialog(code: String, onDismiss: () -> Unit) {
-    val context = LocalContext.current
+    val platform = LocalPlatform.current
     val link    = inviteUrl(code)
-    val qr      = remember(link) { qrCode(link) }
-    val shareText    = stringResource(R.string.invite_share_text, link, code)
-    val chooserTitle = stringResource(R.string.invite_share_chooser)
+    val qr      = remember(link) { platform.qrModules(link) }
+    val shareText    = Strings.inviteShareText(link, code)
+    val chooserTitle = Strings.inviteShareChooser
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.invite_title)) },
+        title = { Text(Strings.inviteTitle) },
         text  = {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier            = Modifier.fillMaxWidth(),
             ) {
-                Image(
-                    bitmap             = qr,
-                    contentDescription = stringResource(R.string.invite_qr_description),
-                    filterQuality      = FilterQuality.None,
-                    modifier           = Modifier
+                QrCode(
+                    modules  = qr,
+                    modifier = Modifier
                         .size(220.dp)
-                        .background(Color.White),
+                        .semantics { contentDescription = Strings.inviteQrDescription },
                 )
-                Text(stringResource(R.string.invite_hint))
+                Text(Strings.inviteHint)
                 Text(
                     code,
                     style      = MaterialTheme.typography.headlineMedium,
@@ -56,19 +50,15 @@ fun InviteDialog(code: String, onDismiss: () -> Unit) {
         },
         confirmButton = {
             TextButton(onClick = {
-                val intent = Intent(Intent.ACTION_SEND).apply {
-                    type = "text/plain"
-                    putExtra(Intent.EXTRA_TEXT, shareText)
-                }
-                context.startActivity(Intent.createChooser(intent, chooserTitle))
+                platform.share(shareText, chooserTitle)
             }) {
                 Icon(Icons.Default.Share, contentDescription = null)
                 Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.invite_share))
+                Text(Strings.inviteShare)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
+            TextButton(onClick = onDismiss) { Text(Strings.actionClose) }
         },
     )
 }

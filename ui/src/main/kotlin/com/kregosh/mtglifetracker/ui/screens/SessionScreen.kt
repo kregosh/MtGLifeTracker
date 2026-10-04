@@ -1,6 +1,6 @@
 package com.kregosh.mtglifetracker.ui.screens
 
-import androidx.activity.compose.BackHandler
+import com.kregosh.mtglifetracker.ui.Strings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,12 +20,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.res.stringResource
+import com.kregosh.mtglifetracker.ui.platform.LocalPlatform
 import androidx.compose.ui.unit.dp
-import com.kregosh.mtglifetracker.R
 import com.kregosh.mtglifetracker.data.Friend
 import com.kregosh.mtglifetracker.data.KnownPlayer
 import com.kregosh.mtglifetracker.network.ConnectionState
@@ -78,12 +75,9 @@ fun SessionScreen(vm: SessionViewModel) {
     val friendList            by vm.friendList.collectAsState()
     val knownPlayers          by vm.knownPlayers.collectAsState()
     val hasBg   = LocalHasBackground.current
-    val view    = LocalView.current
+    val platform = LocalPlatform.current
 
-    DisposableEffect(view) {
-        view.keepScreenOn = true
-        onDispose { view.keepScreenOn = false }
-    }
+    platform.KeepScreenOn()
 
     val friendIds = remember(friendList) { friendList.map { it.userId }.toSet() }
 
@@ -128,7 +122,6 @@ private fun SessionContent(
     var removeTarget     by remember { mutableStateOf<UserState?>(null) }
 
     val history      by vm.history.collectAsState()
-    val resources    = LocalContext.current.resources
     val snackbarHost = remember { SnackbarHostState() }
     var announcedUpTo by remember { mutableLongStateOf(-1L) }
     val latestChange = history.firstOrNull()
@@ -142,7 +135,7 @@ private fun SessionContent(
         announcedUpTo = change.id
         val result = snackbarHost.showSnackbar(
             message     = text,
-            actionLabel = resources.getString(R.string.action_undo),
+            actionLabel = Strings.actionUndo,
             duration    = SnackbarDuration.Short,
         )
         if (result == SnackbarResult.ActionPerformed) vm.undoLastChange()
@@ -170,13 +163,13 @@ private fun SessionContent(
     if (showNewGame) {
         AlertDialog(
             onDismissRequest = { showNewGame = false },
-            title = { Text(stringResource(R.string.new_game_title)) },
-            text  = { Text(stringResource(R.string.new_game_text, ui.settings.startLife.toInt())) },
+            title = { Text(Strings.newGameTitle) },
+            text  = { Text(Strings.newGameText(ui.settings.startLife.toInt())) },
             confirmButton = {
-                TextButton(onClick = { showNewGame = false; vm.startNewGame() }) { Text(stringResource(R.string.session_new_game)) }
+                TextButton(onClick = { showNewGame = false; vm.startNewGame() }) { Text(Strings.sessionNewGame) }
             },
             dismissButton = {
-                TextButton(onClick = { showNewGame = false }) { Text(stringResource(R.string.action_cancel)) }
+                TextButton(onClick = { showNewGame = false }) { Text(Strings.actionCancel) }
             },
         )
     }
@@ -184,13 +177,13 @@ private fun SessionContent(
     if (showWatchDialog) {
         AlertDialog(
             onDismissRequest = { showWatchDialog = false },
-            title = { Text(stringResource(R.string.watch_title)) },
-            text  = { Text(stringResource(R.string.watch_text)) },
+            title = { Text(Strings.watchTitle) },
+            text  = { Text(Strings.watchText) },
             confirmButton = {
-                TextButton(onClick = { showWatchDialog = false; vm.watchInstead() }) { Text(stringResource(R.string.session_watch)) }
+                TextButton(onClick = { showWatchDialog = false; vm.watchInstead() }) { Text(Strings.sessionWatch) }
             },
             dismissButton = {
-                TextButton(onClick = { showWatchDialog = false }) { Text(stringResource(R.string.action_cancel)) }
+                TextButton(onClick = { showWatchDialog = false }) { Text(Strings.actionCancel) }
             },
         )
     }
@@ -198,41 +191,41 @@ private fun SessionContent(
     removeTarget?.let { target ->
         AlertDialog(
             onDismissRequest = { removeTarget = null },
-            title = { Text(stringResource(R.string.remove_player_title, target.displayName)) },
-            text  = { Text(stringResource(R.string.remove_player_text)) },
+            title = { Text(Strings.removePlayerTitle(target.displayName)) },
+            text  = { Text(Strings.removePlayerText) },
             confirmButton = {
                 TextButton(
                     onClick = { removeTarget = null; vm.removePlayer(target.id) },
                     colors  = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                ) { Text(stringResource(R.string.action_remove)) }
+                ) { Text(Strings.actionRemove) }
             },
             dismissButton = {
-                TextButton(onClick = { removeTarget = null }) { Text(stringResource(R.string.action_cancel)) }
+                TextButton(onClick = { removeTarget = null }) { Text(Strings.actionCancel) }
             },
         )
     }
 
-    BackHandler { showLeaveDialog = true }
+    LocalPlatform.current.BackHandler { showLeaveDialog = true }
 
     if (showLeaveDialog) {
         AlertDialog(
             onDismissRequest = { showLeaveDialog = false },
-            title = { Text(stringResource(R.string.leave_title)) },
+            title = { Text(Strings.leaveTitle) },
             text  = {
                 val successor = if (ui.isHost) vm.nextHost else null
                 Text(
-                    if (successor != null) stringResource(R.string.leave_text_host, successor.displayName)
-                    else stringResource(R.string.leave_text)
+                    if (successor != null) Strings.leaveTextHost(successor.displayName)
+                    else Strings.leaveText
                 )
             },
             confirmButton = {
                 TextButton(
                     onClick = { showLeaveDialog = false; vm.leaveSession() },
                     colors  = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                ) { Text(stringResource(R.string.leave_confirm)) }
+                ) { Text(Strings.leaveConfirm) }
             },
             dismissButton = {
-                TextButton(onClick = { showLeaveDialog = false }) { Text(stringResource(R.string.leave_stay)) }
+                TextButton(onClick = { showLeaveDialog = false }) { Text(Strings.leaveStay) }
             },
         )
     }
@@ -295,10 +288,10 @@ private fun SessionContent(
                 colors = topBarColors,
                 title  = {
                     Column {
-                        Text(stringResource(R.string.session_title))
+                        Text(Strings.sessionTitle)
                         if (ui.sessionCode.isNotEmpty()) {
                             Text(
-                                text  = stringResource(R.string.session_code, ui.sessionCode),
+                                text  = Strings.sessionCode(ui.sessionCode),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = if (hasBg) Color.White.copy(alpha = 0.7f)
                                         else MaterialTheme.colorScheme.primary,
@@ -308,57 +301,57 @@ private fun SessionContent(
                 },
                 navigationIcon = {
                     IconButton(onClick = { showLeaveDialog = true }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.session_leave))
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = Strings.sessionLeave)
                     }
                 },
                 actions = {
                     IconButton(onClick = { showFriendsSheet = true }) {
-                        Icon(Icons.Default.People, contentDescription = stringResource(R.string.friends))
+                        Icon(Icons.Default.People, contentDescription = Strings.friends)
                     }
                     if (ui.sessionCode.isNotEmpty()) {
                         IconButton(onClick = { showInvite = true }) {
-                            Icon(Icons.Default.QrCode2, contentDescription = stringResource(R.string.session_invite))
+                            Icon(Icons.Default.QrCode2, contentDescription = Strings.sessionInvite)
                         }
                     }
                     if (!ui.observing) {
                         IconButton(onClick = { showHistory = true }) {
-                            Icon(Icons.Default.History, contentDescription = stringResource(R.string.session_life_history))
+                            Icon(Icons.Default.History, contentDescription = Strings.sessionLifeHistory)
                         }
                     }
                     Box {
                         IconButton(onClick = { showMenu = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.session_more))
+                            Icon(Icons.Default.MoreVert, contentDescription = Strings.sessionMore)
                         }
                         DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                             DropdownMenuItem(
-                                text        = { Text(stringResource(R.string.session_game_rules)) },
+                                text        = { Text(Strings.sessionGameRules) },
                                 leadingIcon = { Icon(Icons.Default.Tune, contentDescription = null) },
                                 onClick     = { showMenu = false; showGameRules = true },
                             )
                             if (ui.observing) {
                                 DropdownMenuItem(
-                                    text        = { Text(stringResource(
-                                        if (ui.hasFreeSeat) R.string.session_play else R.string.session_play_full)) },
+                                    text        = { Text((
+                                        if (ui.hasFreeSeat) Strings.sessionPlay else Strings.sessionPlayFull)) },
                                     leadingIcon = { Icon(Icons.Default.PersonAdd, contentDescription = null) },
                                     enabled     = ui.hasFreeSeat,
                                     onClick     = { showMenu = false; vm.playInstead() },
                                 )
                             } else {
                                 DropdownMenuItem(
-                                    text        = { Text(stringResource(R.string.session_watch)) },
+                                    text        = { Text(Strings.sessionWatch) },
                                     leadingIcon = { Icon(Icons.Default.Visibility, contentDescription = null) },
                                     onClick     = { showMenu = false; showWatchDialog = true },
                                 )
                             }
                             if (ui.isHost) {
                                 DropdownMenuItem(
-                                    text        = { Text(stringResource(R.string.session_new_game)) },
+                                    text        = { Text(Strings.sessionNewGame) },
                                     leadingIcon = { Icon(Icons.Default.RestartAlt, contentDescription = null) },
                                     onClick     = { showMenu = false; showNewGame = true },
                                 )
                             }
                             DropdownMenuItem(
-                                text        = { Text(stringResource(R.string.settings)) },
+                                text        = { Text(Strings.settings) },
                                 leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) },
                                 onClick     = { showMenu = false; vm.openSettings() },
                             )
@@ -373,7 +366,7 @@ private fun SessionContent(
                 ExtendedFloatingActionButton(
                     onClick = { showStatPicker = true },
                     icon    = { Icon(Icons.Default.Add, contentDescription = null) },
-                    text    = { Text(stringResource(R.string.session_stats)) },
+                    text    = { Text(Strings.sessionStats) },
                 )
             }
         },
@@ -430,7 +423,7 @@ private fun SessionContent(
 
             if (ui.users.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(stringResource(R.string.session_waiting))
+                    Text(Strings.sessionWaiting)
                 }
             } else {
                 LazyColumn(
@@ -458,7 +451,7 @@ private fun SessionContent(
 
             ui.error?.let { msg ->
                 Spacer(Modifier.height(8.dp))
-                Text(stringResource(R.string.connection_error, msg), color = MaterialTheme.colorScheme.error)
+                Text(Strings.connectionError(msg), color = MaterialTheme.colorScheme.error)
             }
         }
         if (dayNightBrush != null) {
@@ -475,7 +468,7 @@ private fun SessionContent(
 @Composable
 private fun DayNightBanner(isDaytime: Boolean, onToggle: () -> Unit) {
     val icon  = if (isDaytime) Icons.Default.WbSunny else Icons.Default.Bedtime
-    val label = stringResource(if (isDaytime) R.string.day else R.string.night)
+    val label = (if (isDaytime) Strings.day else Strings.night)
     val color = if (isDaytime) MaterialTheme.colorScheme.tertiary
                 else           MaterialTheme.colorScheme.primary
     Surface(
@@ -506,7 +499,7 @@ private fun DayNightBanner(isDaytime: Boolean, onToggle: () -> Unit) {
                 modifier     = Modifier.height(32.dp),
             ) {
                 val nextIcon  = if (isDaytime) Icons.Default.Bedtime else Icons.Default.WbSunny
-                val nextLabel = stringResource(if (isDaytime) R.string.night else R.string.day)
+                val nextLabel = (if (isDaytime) Strings.night else Strings.day)
                 Icon(nextIcon, contentDescription = null, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(4.dp))
                 Text(nextLabel, style = MaterialTheme.typography.labelSmall)
@@ -524,9 +517,9 @@ private fun WatchersRow(ui: SessionUiState) {
     val others = ui.observers.filterKeys { it != ui.myUserId }.values.sorted()
     if (!ui.observing && others.isEmpty()) return
     val text = when {
-        ui.observing && others.isEmpty() -> stringResource(R.string.watching_you)
-        ui.observing                     -> stringResource(R.string.watching_you_and, others.joinToString())
-        else                             -> stringResource(R.string.watching_others, others.joinToString())
+        ui.observing && others.isEmpty() -> Strings.watchingYou
+        ui.observing                     -> Strings.watchingYouAnd(others.joinToString())
+        else                             -> Strings.watchingOthers(others.joinToString())
     }
     val color = onBackdropColor(
         backdropLuminance = LocalBackdropLuminance.current,
@@ -601,11 +594,11 @@ private fun GameTimerRow(
         )
         IconButton(onClick = onToggle, modifier = Modifier.size(36.dp)) {
             val icon = if (running) Icons.Default.Pause else Icons.Default.PlayArrow
-            Icon(icon, contentDescription = stringResource(if (running) R.string.timer_pause else R.string.timer_start), tint = tint)
+            Icon(icon, contentDescription = (if (running) Strings.timerPause else Strings.timerStart), tint = tint)
         }
         if (hasStarted) {
             IconButton(onClick = onReset, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.Default.Replay, contentDescription = stringResource(R.string.timer_reset),
+                Icon(Icons.Default.Replay, contentDescription = Strings.timerReset,
                     tint = idleTint)
             }
         }
@@ -622,9 +615,9 @@ private fun ConnectionBanner(state: ConnectionState) {
     val (text, color) = when (state) {
         ConnectionState.Connected    -> return
         ConnectionState.Closed       -> return
-        ConnectionState.Connecting   -> stringResource(R.string.connection_connecting)               to MaterialTheme.colorScheme.tertiary
-        ConnectionState.Reconnecting -> stringResource(R.string.connection_reconnecting)             to MaterialTheme.colorScheme.secondary
-        is ConnectionState.Failed    -> stringResource(R.string.connection_failed, state.reason) to MaterialTheme.colorScheme.error
+        ConnectionState.Connecting   -> Strings.connectionConnecting               to MaterialTheme.colorScheme.tertiary
+        ConnectionState.Reconnecting -> Strings.connectionReconnecting             to MaterialTheme.colorScheme.secondary
+        is ConnectionState.Failed    -> Strings.connectionFailed(state.reason) to MaterialTheme.colorScheme.error
     }
     Surface(
         color    = color.copy(alpha = 0.15f),
@@ -671,7 +664,7 @@ private fun StatPickerSheet(
             // ── Active per-player stats ───────────────────────────────────
             if (statDefs.isNotEmpty()) {
                 Text(
-                    text  = stringResource(R.string.stats_active).uppercase(),
+                    text  = Strings.statsActive.uppercase(),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -689,26 +682,26 @@ private fun StatPickerSheet(
 
             // ── Global options ────────────────────────────────────────────
             Text(
-                text  = stringResource(R.string.stats_global).uppercase(),
+                text  = Strings.statsGlobal.uppercase(),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
             )
             PickerRow(
-                label     = stringResource(R.string.stats_day_night),
-                typeLabel = stringResource(R.string.stats_day_night_hint),
+                label     = Strings.statsDayNight,
+                typeLabel = Strings.statsDayNightHint,
                 active    = dayNightEnabled,
                 onClick   = { if (!dayNightEnabled) onEnableDayNight() },
             )
             if (ui.monarch != null) {
                 ActiveStatRow(
-                    label     = stringResource(R.string.stat_monarch),
-                    typeLabel = stringResource(R.string.stats_monarch_held_by, monarchName ?: stringResource(R.string.history_unknown_player)),
+                    label     = Strings.statMonarch,
+                    typeLabel = Strings.statsMonarchHeldBy(monarchName ?: Strings.historyUnknownPlayer),
                     onRemove  = { onSetMonarch(null) },
                 )
             } else {
                 PickerRow(
-                    label     = stringResource(R.string.stat_monarch),
-                    typeLabel = stringResource(R.string.stats_monarch_hint),
+                    label     = Strings.statMonarch,
+                    typeLabel = Strings.statsMonarchHint,
                     active    = false,
                     onClick   = { onSetMonarch(ui.myUserId) },
                 )
@@ -720,7 +713,7 @@ private fun StatPickerSheet(
 
             // ── Add a per-player stat ─────────────────────────────────────
             Text(
-                text  = stringResource(R.string.stats_add).uppercase(),
+                text  = Strings.statsAdd.uppercase(),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
             )
@@ -740,7 +733,7 @@ private fun StatPickerSheet(
             ) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.stats_custom))
+                Text(Strings.statsCustom)
             }
         }
     }
@@ -759,7 +752,7 @@ private fun ActiveStatRow(label: String, typeLabel: String, onRemove: () -> Unit
                  color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         IconButton(onClick = onRemove) {
-            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.stats_remove, label),
+            Icon(Icons.Default.Close, contentDescription = Strings.statsRemove(label),
                  tint = MaterialTheme.colorScheme.error)
         }
     }
@@ -782,10 +775,10 @@ private fun PickerRow(label: String, typeLabel: String, active: Boolean, onClick
                 Text(typeLabel, style = MaterialTheme.typography.labelSmall)
             }
             if (active) {
-                Icon(Icons.Default.Check, contentDescription = stringResource(R.string.stats_already_added),
+                Icon(Icons.Default.Check, contentDescription = Strings.statsAlreadyAdded,
                      tint = MaterialTheme.colorScheme.primary)
             } else {
-                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.stats_add_named, label))
+                Icon(Icons.Default.Add, contentDescription = Strings.statsAddNamed(label))
             }
         }
     }
@@ -803,13 +796,13 @@ private fun FriendRequestDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDecline,
-        title = { Text(stringResource(R.string.friend_request_title)) },
-        text  = { Text(stringResource(R.string.friend_request_text, request.fromDisplayName)) },
+        title = { Text(Strings.friendRequestTitle) },
+        text  = { Text(Strings.friendRequestText(request.fromDisplayName)) },
         confirmButton = {
-            TextButton(onClick = onAccept) { Text(stringResource(R.string.friend_request_accept)) }
+            TextButton(onClick = onAccept) { Text(Strings.friendRequestAccept) }
         },
         dismissButton = {
-            TextButton(onClick = onDecline) { Text(stringResource(R.string.friend_request_decline)) }
+            TextButton(onClick = onDecline) { Text(Strings.friendRequestDecline) }
         },
     )
 }
@@ -831,20 +824,20 @@ private fun AddCustomStatDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.custom_stat_title)) },
+        title = { Text(Strings.customStatTitle) },
         text  = {
             OutlinedTextField(
                 value         = name,
                 onValueChange = { if (it.length <= MAX_STAT_NAME_LENGTH) name = it },
-                label         = { Text(stringResource(R.string.custom_stat_name)) },
-                placeholder   = { Text(stringResource(R.string.custom_stat_placeholder)) },
+                label         = { Text(Strings.customStatName) },
+                placeholder   = { Text(Strings.customStatPlaceholder) },
                 singleLine    = true,
                 isError       = showError,
                 supportingText = if (showError) {
                     {
                         Text(
-                            if (isReserved) stringResource(R.string.custom_stat_reserved, trimmed)
-                            else stringResource(R.string.custom_stat_invalid)
+                            if (isReserved) Strings.customStatReserved(trimmed)
+                            else Strings.customStatInvalid
                         )
                     }
                 } else null,
@@ -854,10 +847,10 @@ private fun AddCustomStatDialog(
             TextButton(
                 onClick  = { if (isValid) onConfirm(trimmed) },
                 enabled  = isValid,
-            ) { Text(stringResource(R.string.action_add)) }
+            ) { Text(Strings.actionAdd) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+            TextButton(onClick = onDismiss) { Text(Strings.actionCancel) }
         },
     )
 }
@@ -889,16 +882,16 @@ private fun HistorySheet(
                 verticalAlignment     = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text(stringResource(R.string.history_title), style = MaterialTheme.typography.titleMedium)
+                Text(Strings.historyTitle, style = MaterialTheme.typography.titleMedium)
                 TextButton(onClick = onUndo, enabled = history.isNotEmpty()) {
                     Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null)
                     Spacer(Modifier.width(4.dp))
-                    Text(stringResource(R.string.history_undo_last))
+                    Text(Strings.historyUndoLast)
                 }
             }
             if (history.isEmpty()) {
                 Text(
-                    stringResource(R.string.history_empty),
+                    Strings.historyEmpty,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -941,41 +934,39 @@ private fun describe(change: Change, users: List<UserState>, statDefs: Map<Strin
         is StatChange   -> ChangeLine(
             label  = changeLabel(change.stat),
             delta  = change.delta,
-            result = stringResource(R.string.history_value_after, valueText(change, statDefs)),
+            result = Strings.historyValueAfter(valueText(change, statDefs)),
         )
         is StatToggled  -> ChangeLine(
             label  = statLabel(change.stat),
             delta  = null,
-            result = stringResource(if (change.enabled) R.string.history_turned_on else R.string.history_turned_off),
+            result = (if (change.enabled) Strings.historyTurnedOn else Strings.historyTurnedOff),
         )
         is MonarchChange -> ChangeLine(
-            label  = stringResource(R.string.stat_monarch),
+            label  = Strings.statMonarch,
             delta  = null,
             result = change.after?.let { id ->
-                stringResource(R.string.history_value_after,
-                    users.find { it.id == id }?.displayName ?: stringResource(R.string.history_unknown_player))
-            } ?: stringResource(R.string.history_turned_off),
+                Strings.historyValueAfter(users.find { it.id == id }?.displayName ?: Strings.historyUnknownPlayer)
+            } ?: Strings.historyTurnedOff,
         )
         is GlobalChange -> ChangeLine(
-            label  = stringResource(R.string.stats_day_night),
+            label  = Strings.statsDayNight,
             delta  = null,
-            result = if (change.before == null) stringResource(R.string.history_turned_on)
-                     else stringResource(R.string.history_value_after,
-                              stringResource(if (change.after == 0u) R.string.day else R.string.night)),
+            result = if (change.before == null) Strings.historyTurnedOn
+                     else Strings.historyValueAfter((if (change.after == 0u) Strings.day else Strings.night)),
         )
     }
 
 @Composable
 private fun changeText(change: Change, users: List<UserState>, statDefs: Map<String, StatType>): String {
     val line = describe(change, users, statDefs)
-    return if (line.delta != null) stringResource(R.string.change_snackbar, line.label, line.delta.signed(), line.result)
-           else                    stringResource(R.string.change_snackbar_plain, line.label, line.result)
+    return if (line.delta != null) Strings.changeSnackbar(line.label, line.delta.signed(), line.result)
+           else                    Strings.changeSnackbarPlain(line.label, line.result)
 }
 
 /** Which counter a change was made to: life, or a stat by name. */
 @Composable
 private fun changeLabel(stat: String): String = when (val target = statTarget(stat)) {
-    StatTarget.Life      -> stringResource(R.string.stat_life)
+    StatTarget.Life      -> Strings.statLife
     is StatTarget.Custom -> statLabel(target.name)
 }
 
@@ -986,8 +977,8 @@ private fun valueText(change: StatChange, statDefs: Map<String, StatType>): Stri
     val toggle = target is StatTarget.Custom && statDefs[target.name] == StatType.TOGGLE
     return when {
         !toggle                  -> change.valueAfter.toString()
-        change.valueAfter > 0u   -> stringResource(R.string.history_toggle_on)
-        else                     -> stringResource(R.string.history_toggle_off)
+        change.valueAfter > 0u   -> Strings.historyToggleOn
+        else                     -> Strings.historyToggleOff
     }
 }
 
@@ -1003,38 +994,38 @@ private fun GameRulesDialog(
     onDismiss: () -> Unit,
 ) {
     var draft by remember(settings) { mutableStateOf(settings) }
-    val anyPlayers = stringResource(R.string.rules_any_players)
+    val anyPlayers = Strings.rulesAnyPlayers
     fun players(n: UInt) = if (n == 0u) anyPlayers else n.toString()
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.session_game_rules)) },
+        title = { Text(Strings.sessionGameRules) },
         text  = {
             Column(
                 modifier            = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (editable) {
-                    PresetRow(stringResource(R.string.rules_starting_life_short), draft.startLife, listOf(20u, 30u, 40u),
+                    PresetRow(Strings.rulesStartingLifeShort, draft.startLife, listOf(20u, 30u, 40u),
                         { draft = draft.copy(startLife = it) })
-                    PresetRow(stringResource(R.string.rules_commander_limit), draft.commanderDeathThreshold, listOf(21u, 15u, 10u),
+                    PresetRow(Strings.rulesCommanderLimit, draft.commanderDeathThreshold, listOf(21u, 15u, 10u),
                         { draft = draft.copy(commanderDeathThreshold = it) })
-                    PresetRow(stringResource(R.string.rules_infect_limit), draft.infectDeathThreshold, listOf(10u, 7u, 5u),
+                    PresetRow(Strings.rulesInfectLimit, draft.infectDeathThreshold, listOf(10u, 7u, 5u),
                         { draft = draft.copy(infectDeathThreshold = it) })
-                    PresetRow(stringResource(R.string.rules_max_players), draft.maxPlayers.toUInt(), listOf(0u, 2u, 4u, 6u),
+                    PresetRow(Strings.rulesMaxPlayers, draft.maxPlayers.toUInt(), listOf(0u, 2u, 4u, 6u),
                         { draft = draft.copy(maxPlayers = it.toInt()) }, valueText = ::players)
                     Text(
-                        stringResource(R.string.rules_next_game_hint),
+                        Strings.rulesNextGameHint,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
-                    Text(stringResource(R.string.rules_summary_starting_life, settings.startLife.toInt()))
-                    Text(stringResource(R.string.rules_summary_commander, settings.commanderDeathThreshold.toInt()))
-                    Text(stringResource(R.string.rules_summary_infect, settings.infectDeathThreshold.toInt()))
-                    Text(stringResource(R.string.rules_summary_players, players(settings.maxPlayers.toUInt())))
+                    Text(Strings.rulesSummaryStartingLife(settings.startLife.toInt()))
+                    Text(Strings.rulesSummaryCommander(settings.commanderDeathThreshold.toInt()))
+                    Text(Strings.rulesSummaryInfect(settings.infectDeathThreshold.toInt()))
+                    Text(Strings.rulesSummaryPlayers(players(settings.maxPlayers.toUInt())))
                     Text(
-                        stringResource(R.string.rules_host_only),
+                        Strings.rulesHostOnly,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1042,11 +1033,11 @@ private fun GameRulesDialog(
             }
         },
         confirmButton = {
-            if (editable) TextButton(onClick = { onSave(draft) }) { Text(stringResource(R.string.action_save)) }
-            else TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
+            if (editable) TextButton(onClick = { onSave(draft) }) { Text(Strings.actionSave) }
+            else TextButton(onClick = onDismiss) { Text(Strings.actionClose) }
         },
         dismissButton = if (editable) {
-            { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } }
+            { TextButton(onClick = onDismiss) { Text(Strings.actionCancel) } }
         } else null,
     )
 }

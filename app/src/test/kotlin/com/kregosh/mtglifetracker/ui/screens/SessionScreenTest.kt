@@ -1,5 +1,6 @@
 package com.kregosh.mtglifetracker.ui.screens
 
+import com.kregosh.mtglifetracker.ui.setPlatformContent
 import android.os.Looper
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -79,7 +80,7 @@ class SessionScreenTest {
             hostUserId = hostUserId,
         ))
         idle()
-        compose.setContent { SessionScreen(vm) }
+        compose.setPlatformContent { SessionScreen(vm) }
     }
 
     @Test
