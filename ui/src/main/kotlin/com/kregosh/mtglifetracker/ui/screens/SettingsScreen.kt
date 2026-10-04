@@ -46,7 +46,7 @@ fun SettingsScreen(vm: SessionViewModel) {
         )
     }
 
-    platform.BackHandler(onBack = vm::closeSettings)
+    platform.BackHandler(enabled = true, onBack = vm::closeSettings)
 
     val topBarColors = if (hasBg) TopAppBarDefaults.topAppBarColors(
         containerColor             = Color.Black.copy(alpha = 0.45f),

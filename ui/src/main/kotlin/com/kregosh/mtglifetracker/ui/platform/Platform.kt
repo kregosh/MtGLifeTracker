@@ -48,9 +48,12 @@ interface Platform {
     @Composable
     fun KeepScreenOn()
 
-    /** Handles the system back gesture while [enabled]; the browser has none. */
+    /**
+     * Handles the system back gesture while [enabled]; the browser has none. No default for
+     * [enabled]: Compose can't call default arguments of an interface's composable.
+     */
     @Composable
-    fun BackHandler(enabled: Boolean = true, onBack: () -> Unit)
+    fun BackHandler(enabled: Boolean, onBack: () -> Unit)
 }
 
 val LocalPlatform = staticCompositionLocalOf<Platform> { error("No Platform provided") }

@@ -205,7 +205,7 @@ private fun SessionContent(
         )
     }
 
-    LocalPlatform.current.BackHandler { showLeaveDialog = true }
+    LocalPlatform.current.BackHandler(enabled = true) { showLeaveDialog = true }
 
     if (showLeaveDialog) {
         AlertDialog(
