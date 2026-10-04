@@ -39,4 +39,13 @@ object SeatRules {
         val others = users.filter { it.id != myId }
         return if (othersWatching || others.any { it.online }) null else others.map { it.id }
     }
+
+    /**
+     * When [myId] leaves or closes the app: every seat to clear (their own too, if they kept
+     * it) before the session is deleted, or null while anyone else is online or watching.
+     */
+    fun seatsToClearBeforeDeleting(users: List<UserState>, myId: String, othersWatching: Boolean = false): List<String>? {
+        val ghosts = ghostsToClearAfterLeaving(users, myId, othersWatching) ?: return null
+        return ghosts + listOfNotNull(myId.takeIf { id -> users.any { it.id == id } })
+    }
 }

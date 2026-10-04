@@ -270,6 +270,19 @@ describe('session lifecycle (#59)', () => {
     await assertFails(alice().ref(`sessions/${SID}/hostUserId`).remove());
   });
 
+  test('the last one online closing the app can clear every seat and delete the session', async () => {
+    await seed({ [`sessions/${SID}/users/${ALICE}/online`]: false, [`sessions/${SID}/users/${BOB}/online`]: false });
+    await assertSucceeds(bob().ref(`sessions/${SID}`).update({
+      [`users/${ALICE}`]: null,
+      [`users/${BOB}`]: null,
+    }));
+    await assertSucceeds(bob().ref(`sessions/${SID}`).remove());
+  });
+
+  test('nobody can clear the seat of a player who is still online', async () => {
+    await assertFails(bob().ref(`sessions/${SID}/users/${ALICE}`).remove());
+  });
+
   test('an empty session can be deleted', async () => {
     await seed({ [`sessions/${SID}/users`]: null });
     await assertSucceeds(alice().ref(`sessions/${SID}`).remove());
