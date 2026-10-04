@@ -521,11 +521,7 @@ private fun WatchersRow(ui: SessionUiState) {
         ui.observing                     -> Strings.watchingYouAnd(others.joinToString())
         else                             -> Strings.watchingOthers(others.joinToString())
     }
-    val color = onBackdropColor(
-        backdropLuminance = LocalBackdropLuminance.current,
-        lightTheme    = MaterialTheme.colorScheme.background.luminance() > 0.5f,
-        themeColor    = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+    val color = backdropTextColor()
     Row(
         modifier              = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
         verticalAlignment     = Alignment.CenterVertically,
@@ -548,6 +544,14 @@ internal fun onBackdropColor(backdropLuminance: Float?, lightTheme: Boolean, the
     else                      -> themeColor
 }
 
+/** [onBackdropColor] for the current background and theme. */
+@Composable
+internal fun backdropTextColor(): Color = onBackdropColor(
+    backdropLuminance = LocalBackdropLuminance.current,
+    lightTheme        = MaterialTheme.colorScheme.background.luminance() > 0.5f,
+    themeColor        = MaterialTheme.colorScheme.onSurfaceVariant,
+)
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Game timer row
 // ─────────────────────────────────────────────────────────────────────────────
@@ -566,11 +570,7 @@ private fun GameTimerRow(
     val urgent     = countDown && display < 1.minutes &&
                      (running || elapsed > Duration.ZERO)
     val hasStarted = elapsed > Duration.ZERO || running
-    val idleTint   = onBackdropColor(
-        backdropLuminance = LocalBackdropLuminance.current,
-        lightTheme    = MaterialTheme.colorScheme.background.luminance() > 0.5f,
-        themeColor    = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+    val idleTint   = backdropTextColor()
     val tint       = if (urgent) MaterialTheme.colorScheme.error else idleTint
 
     Row(
@@ -612,11 +612,14 @@ private fun GameTimerRow(
 
 @Composable
 private fun ConnectionBanner(state: ConnectionState) {
+    // Over a background image the notices are black or white like the timer, so they stay
+    // readable; a failure stays red either way.
+    val onImage = if (LocalBackdropLuminance.current != null) backdropTextColor() else null
     val (text, color) = when (state) {
         ConnectionState.Connected    -> return
         ConnectionState.Closed       -> return
-        ConnectionState.Connecting   -> Strings.connectionConnecting               to MaterialTheme.colorScheme.tertiary
-        ConnectionState.Reconnecting -> Strings.connectionReconnecting             to MaterialTheme.colorScheme.secondary
+        ConnectionState.Connecting   -> Strings.connectionConnecting           to (onImage ?: MaterialTheme.colorScheme.tertiary)
+        ConnectionState.Reconnecting -> Strings.connectionReconnecting         to (onImage ?: MaterialTheme.colorScheme.secondary)
         is ConnectionState.Failed    -> Strings.connectionFailed(state.reason) to MaterialTheme.colorScheme.error
     }
     Surface(
