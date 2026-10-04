@@ -35,6 +35,9 @@ MtGLifeTracker/
 ├── firebase/     Firebase adapter: SessionSchema (pure mapping to the database
 │                 layout) plus thin FirebaseSessionApi / FirebaseSessionConnection
 ├── app/          Jetpack Compose UI, SharedPreferences-backed UserPrefs
+├── web/          Browser app (preview): Compose Multiplatform on Kotlin/Wasm. A
+│                 standalone Gradle build that compiles core and SessionSchema
+│                 with a Firebase JS SDK adapter and localStorage UserPrefs
 ├── rules-tests/  Emulator tests for database.rules.json
 └── docs/join/    Invite landing page served by GitHub Pages
 ```
@@ -104,10 +107,21 @@ restarts and is lost when the app's data is cleared; backups don't copy it.
 
    or paste the file into **Realtime Database → Rules** in the console.
 
-### Invite page
+### Invite page and browser app
 
-Enable **GitHub Pages** for the repository (**Settings → Pages → Deploy from a
-branch → `main` / `docs`**) so the invite links resolve.
+`.github/workflows/pages.yml` publishes `docs/` (the invite page) and the browser
+app (under `/app/`) to GitHub Pages on every push to `main`:
+
+1. **Settings → Pages → Source: GitHub Actions**.
+2. In Firebase, **Project settings → Your apps**: add a **Web** app, and under
+   **Authentication → Settings → Authorized domains** add `kregosh.github.io`.
+3. Copy the web app's config object as JSON (`apiKey`, `authDomain`, `databaseURL`,
+   `projectId`, `appId`, …) into the `FIREBASE_WEB_CONFIG` Actions secret. The
+   deploy writes it to `app/firebase-config.js`; it is never committed.
+
+The browser app needs WebAssembly GC: current Chrome, Firefox, and Safari 18.2+
+(iOS 18.2+). The player ID is the anonymous Firebase user, which the browser keeps
+in IndexedDB, so a player keeps their seat across reloads.
 
 ## Building and testing
 
@@ -123,6 +137,16 @@ branch → `main` / `docs`**) so the invite links resolve.
 ./gradlew lintDebug                 # Android lint for every module
 
 cd rules-tests && npm ci && npm test   # security rules against the database emulator
+
+./gradlew -p web wasmJsBrowserDevelopmentRun   # browser app on localhost:8080
+```
+
+Opened with `?emulator`, the browser app talks to a local Firebase emulator
+(database on port 9000, auth on 9099, project `demo-mtglifetracker`) instead of a
+real project:
+
+```bash
+npx firebase-tools emulators:start --only database,auth --project demo-mtglifetracker
 ```
 
 CI (`.github/workflows/ci.yml`) runs all of the above plus a minified release
