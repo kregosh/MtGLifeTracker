@@ -3,6 +3,11 @@
 
     <uses-permission android:name="android.permission.INTERNET"/>
 
+    <!-- Keeps the session's connection alive while the app is in the background -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
     <application
         android:name=".MtGLifeTrackerApp"
         android:allowBackup="false"
@@ -49,6 +54,15 @@
                     android:pathPrefix="/MtGLifeTracker/join"/>
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".SessionService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps a live multiplayer game session connected while the player briefly switches apps"/>
+        </service>
 
     </application>
 

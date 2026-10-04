@@ -2,4 +2,11 @@
 <resources>
     <!-- The rest of the app's text lives in ui/…/Strings.kt, shared with the browser app. -->
     <string name="app_name">MtG Life Tracker</string>
+
+    <!-- Android only: the notification that keeps a session connected in the background -->
+    <string name="session_channel_name">Active session</string>
+    <string name="session_channel_description">Keeps you connected to your game while the app is in the background</string>
+    <string name="session_notification_title">In a game</string>
+    <string name="session_notification_text">Session code %1$s · tap to return</string>
+    <string name="session_notification_text_no_code">Tap to return to the game</string>
 </resources>
