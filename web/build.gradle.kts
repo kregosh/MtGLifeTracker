@@ -1,9 +1,9 @@
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
-    kotlin("multiplatform") version "2.0.21"
-    kotlin("plugin.compose") version "2.0.21"
-    id("org.jetbrains.compose") version "1.7.3"
+    kotlin("multiplatform") version "2.4.20"
+    kotlin("plugin.compose") version "2.4.20"
+    id("org.jetbrains.compose") version "1.12.1"
 }
 
 // Built-in images come from the Android app's drawables: images/ (light) and images/night/.
@@ -17,7 +17,7 @@ val copyImages by tasks.registering(Sync::class) {
 kotlin {
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
-        moduleName = "mtglifetracker"
+        outputModuleName.set("mtglifetracker")
         browser {
             commonWebpackConfig { outputFileName = "mtglifetracker.js" }
         }
@@ -39,9 +39,9 @@ kotlin {
                 implementation(compose.material3)
                 implementation(compose.ui)
                 implementation(compose.materialIconsExtended)
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-                implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel:2.8.4")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+                implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel:2.11.0")
                 implementation(npm("firebase", "10.14.1"))
                 implementation(npm("qrcode-generator", "1.4.4"))
             }
