@@ -2,6 +2,8 @@
 // it compiles core and the Firebase data layout (SessionSchema) from their folders.
 pluginManagement {
     repositories {
+        // Compose Multiplatform pulls AndroidX's multiplatform libraries from Google's repository.
+        google()
         mavenCentral()
         gradlePluginPortal()
     }
@@ -9,6 +11,7 @@ pluginManagement {
 
 dependencyResolutionManagement {
     repositories {
+        google()
         mavenCentral()
     }
 }

@@ -1,13 +1,12 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.google.services)
 }
 
 android {
     namespace  = "com.kregosh.mtglifetracker"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.kregosh.mtglifetracker"
@@ -43,8 +42,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-
-    kotlinOptions { jvmTarget = "11" }
 }
 
 dependencies {
@@ -62,7 +59,6 @@ dependencies {
     implementation(libs.activity.compose)
 
     // ── Compose ──────────────────────────────────────────────────────
-    implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3)
@@ -74,10 +70,9 @@ dependencies {
     // ── Test ─────────────────────────────────────────────────────────────
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
-    testImplementation(kotlin("test"))
+    testImplementation(kotlin("test-junit"))  // AGP's built-in Kotlin doesn't pick the JUnit flavour itself
     testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation(platform(libs.compose.bom))
     testImplementation(libs.compose.ui.test.junit4)
     debugImplementation(libs.compose.ui.test.manifest)
 }

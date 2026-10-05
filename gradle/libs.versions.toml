@@ -1,11 +1,15 @@
 [versions]
-kotlin          = "2.0.21"
-agp             = "8.7.3"
-coroutines      = "1.9.0"
-coreKtx         = "1.15.0"
-lifecycle       = "2.8.7"
+kotlin          = "2.4.20"
+agp             = "9.1.0"
+coroutines      = "1.11.0"
+coreKtx         = "1.16.0"
+lifecycle       = "2.9.4"
 activityCompose = "1.10.0"
-composeBom      = "2024.12.01"
+# The same Compose as the browser build (web/): Compose Multiplatform 1.12.1 is built on
+# Jetpack Compose 1.12.1, its Material 3 on 1.9.0.
+compose          = "1.12.1"
+composeMaterial3 = "1.9.0"
+composeIcons     = "1.7.3"
 firebase-bom    = "33.7.0"
 google-services = "4.4.2"
 
@@ -25,14 +29,15 @@ lifecycle-runtime-ktx       = { group = "androidx.lifecycle",         name = "li
 lifecycle-viewmodel         = { group = "androidx.lifecycle",         name = "lifecycle-viewmodel-ktx",      version.ref = "lifecycle" }
 lifecycle-viewmodel-compose = { group = "androidx.lifecycle",         name = "lifecycle-viewmodel-compose",  version.ref = "lifecycle" }
 activity-compose            = { group = "androidx.activity",          name = "activity-compose",             version.ref = "activityCompose" }
-compose-bom                 = { group = "androidx.compose",           name = "compose-bom",                  version.ref = "composeBom" }
-compose-ui                  = { group = "androidx.compose.ui",        name = "ui" }
-compose-ui-tooling-preview  = { group = "androidx.compose.ui",        name = "ui-tooling-preview" }
-compose-ui-tooling          = { group = "androidx.compose.ui",        name = "ui-tooling" }
-compose-material3           = { group = "androidx.compose.material3", name = "material3" }
-compose-icons-extended      = { group = "androidx.compose.material",  name = "material-icons-extended" }
-compose-ui-test-junit4      = { group = "androidx.compose.ui",        name = "ui-test-junit4" }
-compose-ui-test-manifest    = { group = "androidx.compose.ui",        name = "ui-test-manifest" }
+# Compose Multiplatform coordinates, so Android gets the same versions as the browser
+# build; on Android they resolve to the matching Jetpack Compose artifacts.
+compose-ui                  = { group = "org.jetbrains.compose.ui",        name = "ui",                      version.ref = "compose" }
+compose-material3           = { group = "org.jetbrains.compose.material3", name = "material3",               version.ref = "composeMaterial3" }
+compose-icons-extended      = { group = "org.jetbrains.compose.material",  name = "material-icons-extended", version.ref = "composeIcons" }
+compose-ui-tooling-preview  = { group = "androidx.compose.ui",             name = "ui-tooling-preview",      version.ref = "compose" }
+compose-ui-tooling          = { group = "androidx.compose.ui",             name = "ui-tooling",              version.ref = "compose" }
+compose-ui-test-junit4      = { group = "androidx.compose.ui",             name = "ui-test-junit4",          version.ref = "compose" }
+compose-ui-test-manifest    = { group = "androidx.compose.ui",             name = "ui-test-manifest",        version.ref = "compose" }
 
 # ── Invite QR codes ──────────────────────────────────────────────────
 zxing-core = { module = "com.google.zxing:core", version = "3.5.3" }
@@ -46,6 +51,5 @@ androidx-test-core      = { group = "androidx.test",           name = "core-ktx"
 [plugins]
 android-application = { id = "com.android.application",              version.ref = "agp" }
 android-library     = { id = "com.android.library",                  version.ref = "agp" }
-kotlin-android      = { id = "org.jetbrains.kotlin.android",         version.ref = "kotlin" }
 kotlin-compose      = { id = "org.jetbrains.kotlin.plugin.compose",  version.ref = "kotlin" }
 google-services     = { id = "com.google.gms.google-services",       version.ref = "google-services" }
