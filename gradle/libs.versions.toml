@@ -1,6 +1,6 @@
 [versions]
 kotlin          = "2.4.20"
-agp             = "8.13.0"
+agp             = "9.1.0"
 coroutines      = "1.11.0"
 coreKtx         = "1.16.0"
 lifecycle       = "2.9.4"
@@ -51,6 +51,5 @@ androidx-test-core      = { group = "androidx.test",           name = "core-ktx"
 [plugins]
 android-application = { id = "com.android.application",              version.ref = "agp" }
 android-library     = { id = "com.android.library",                  version.ref = "agp" }
-kotlin-android      = { id = "org.jetbrains.kotlin.android",         version.ref = "kotlin" }
 kotlin-compose      = { id = "org.jetbrains.kotlin.plugin.compose",  version.ref = "kotlin" }
 google-services     = { id = "com.google.gms.google-services",       version.ref = "google-services" }
