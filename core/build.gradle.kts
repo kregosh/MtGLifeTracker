@@ -16,7 +16,7 @@ dependencies {
     implementation(libs.lifecycle.viewmodel)
     implementation(libs.kotlinx.coroutines.android)
 
-    testImplementation(kotlin("test"))
+    testImplementation(kotlin("test-junit"))  // AGP's built-in Kotlin doesn't pick the JUnit flavour itself
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
 }

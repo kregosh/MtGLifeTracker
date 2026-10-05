@@ -70,7 +70,7 @@ dependencies {
     // ── Test ─────────────────────────────────────────────────────────────
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
-    testImplementation(kotlin("test"))
+    testImplementation(kotlin("test-junit"))  // AGP's built-in Kotlin doesn't pick the JUnit flavour itself
     testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.compose.ui.test.junit4)

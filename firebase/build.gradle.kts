@@ -20,5 +20,5 @@ dependencies {
     implementation(libs.firebase.auth)
     implementation(libs.kotlinx.coroutines.play.services)
 
-    testImplementation(kotlin("test"))
+    testImplementation(kotlin("test-junit"))  // AGP's built-in Kotlin doesn't pick the JUnit flavour itself
 }
