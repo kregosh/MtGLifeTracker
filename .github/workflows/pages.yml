@@ -45,6 +45,21 @@ jobs:
           # The Firebase web config comes from a secret, never from the repository.
           printf 'window.MTG_FIREBASE_CONFIG = %s;\n' "${FIREBASE_WEB_CONFIG:-null}" > site/app/firebase-config.js
 
+      # The app's script and code keep their names from build to build, so browsers (above
+      # all home-screen web apps) would go on running a cached old version. Name them after
+      # the commit instead; index.html itself is only cached for minutes.
+      - name: Give each deploy fresh file names
+        working-directory: site/app
+        run: |
+          v="${GITHUB_SHA:0:12}"
+          mv mtglifetracker.wasm "mtglifetracker.$v.wasm"
+          sed -i "s#\"\./mtglifetracker\.wasm\"#\"./mtglifetracker.$v.wasm\"#" mtglifetracker.js
+          grep -q "mtglifetracker.$v.wasm" mtglifetracker.js
+          mv mtglifetracker.js "mtglifetracker.$v.js"
+          sed -i "s#src=\"mtglifetracker\.js\"#src=\"mtglifetracker.$v.js\"#; s#src=\"firebase-config\.js\"#src=\"firebase-config.js?v=$v\"#" index.html
+          grep -q "mtglifetracker.$v.js" index.html
+          grep -q "firebase-config.js?v=$v" index.html
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
