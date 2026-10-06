@@ -34,23 +34,35 @@ jobs:
       # Android only installs an update signed with the same key as the installed app. A fresh
       # runner would generate a new debug key every time, so every APK would need an uninstall.
       # The key is the default debug keystore (store/key password "android", alias
-      # "androiddebugkey"), kept base64-encoded in the DEBUG_KEYSTORE_BASE64 secret.
+      # "androiddebugkey"), kept base64-encoded in the DEBUG_KEYSTORE_BASE64 secret;
+      # app/build.gradle.kts signs with it when DEBUG_KEYSTORE names it.
       - name: Use the stable debug signing key
         env:
           DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
         run: |
           if [ -z "$DEBUG_KEYSTORE_BASE64" ]; then
-            echo "::warning::DEBUG_KEYSTORE_BASE64 is not set: this APK gets a throwaway key and won't install over the previous build."
-            exit 0
+            echo "::error::DEBUG_KEYSTORE_BASE64 is not set: the APK would get a throwaway key and not install over the previous build."
+            exit 1
           fi
-          mkdir -p ~/.android
-          echo "$DEBUG_KEYSTORE_BASE64" | base64 -d > ~/.android/debug.keystore
+          echo "$DEBUG_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/debug.keystore"
+          echo "DEBUG_KEYSTORE=$RUNNER_TEMP/debug.keystore" >> "$GITHUB_ENV"
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
       - name: Build debug APK
         run: ./gradlew --no-daemon :app:assembleDebug
+
+      # Publishing an APK signed with any other key would break updates for everyone again.
+      - name: Check the APK is signed with the stable key
+        run: |
+          apksigner=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          expected=$(keytool -list -v -keystore "$DEBUG_KEYSTORE" -storepass android -alias androiddebugkey \
+                     | awk '/SHA256:/ { print $2; exit }' | tr -d ':' | tr 'A-F' 'a-f')
+          actual=$("$apksigner" verify --print-certs app/build/outputs/apk/debug/app-debug.apk \
+                   | awk '/certificate SHA-256 digest:/ { print $NF; exit }')
+          echo "expected $expected, signed with $actual"
+          [ -n "$expected" ] && [ "$expected" = "$actual" ]
 
       - name: Rename APK
         run: |
