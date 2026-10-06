@@ -360,7 +360,7 @@ private fun SessionContent(
                                     onClick     = { showMenu = false; showWatchDialog = true },
                                 )
                             }
-                            ui.users.firstOrNull { it.id == ui.myUserId }?.let { me ->
+                            ui.users.firstOrNull { it.id == ui.myUserId }?.takeIf { !ui.observing }?.let { me ->
                                 DropdownMenuItem(
                                     text        = { Text(if (me.conceded) Strings.menuUndoConcede else Strings.menuConcede) },
                                     leadingIcon = { Icon(Icons.Default.Flag, contentDescription = null) },
@@ -440,8 +440,9 @@ private fun SessionContent(
                     Text(Strings.sessionWaiting)
                 }
             } else {
-                val me     = ui.users.firstOrNull { it.id == ui.myUserId }
-                val others = ui.users.filter { it.id != ui.myUserId }
+                // Watching, you get no panel, even before the server drops your seat.
+                val me     = if (ui.observing) null else ui.users.firstOrNull { it.id == ui.myUserId }
+                val others = ui.users.filter { it.id != me?.id }
                 OpponentStrip(
                     players  = others,
                     ui       = ui,
