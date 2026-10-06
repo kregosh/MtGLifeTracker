@@ -17,7 +17,6 @@ import com.kregosh.mtglifetracker.ui.screens.HomeScreen
 import com.kregosh.mtglifetracker.ui.screens.SessionScreen
 import com.kregosh.mtglifetracker.ui.screens.SettingsScreen
 import com.kregosh.mtglifetracker.ui.theme.LocalBackdropLuminance
-import com.kregosh.mtglifetracker.ui.theme.LocalCardBackground
 import com.kregosh.mtglifetracker.ui.theme.LocalHasBackground
 import com.kregosh.mtglifetracker.ui.theme.MtGLifeTrackerTheme
 import com.kregosh.mtglifetracker.viewmodel.Screen
@@ -30,7 +29,6 @@ import kotlinx.coroutines.withContext
 fun AppRoot(vm: SessionViewModel, platform: Platform) {
     val screen          by vm.screen.collectAsState()
     val bgUri           by vm.backgroundImageUri.collectAsState()
-    val cardBgUri       by vm.cardBackgroundImageUri.collectAsState()
     val isStormPreset   by vm.isStormPreset.collectAsState()
     val isManaOrbs      by vm.isManaOrbsPreset.collectAsState()
     val colorScheme     by vm.colorScheme.collectAsState()
@@ -44,14 +42,10 @@ fun AppRoot(vm: SessionViewModel, platform: Platform) {
 
     var bgBitmap     by remember { mutableStateOf<ImageBitmap?>(null) }
     var bgLuminance  by remember { mutableStateOf<Float?>(null) }
-    var cardBgBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 
     LaunchedEffect(bgUri, dark) {
         bgBitmap    = bgUri?.takeIf { it.isNotEmpty() }?.let { platform.loadImage(it, dark) }
         bgLuminance = bgBitmap?.let { withContext(Dispatchers.Default) { topBandLuminance(it) } }
-    }
-    LaunchedEffect(cardBgUri) {
-        cardBgBitmap = cardBgUri?.takeIf { it.isNotEmpty() }?.let { platform.loadImage(it, dark = false) }
     }
 
     CompositionLocalProvider(LocalPlatform provides platform) {
@@ -59,7 +53,6 @@ fun AppRoot(vm: SessionViewModel, platform: Platform) {
             CompositionLocalProvider(
                 LocalHasBackground     provides (bgBitmap != null),
                 LocalBackdropLuminance provides bgLuminance,
-                LocalCardBackground    provides cardBgBitmap,
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     bgBitmap?.let { bmp ->

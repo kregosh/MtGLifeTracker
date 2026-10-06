@@ -12,8 +12,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.res.painterResource
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import com.google.zxing.qrcode.encoder.Encoder
 import com.kregosh.mtglifetracker.ui.platform.BuiltInImage
@@ -40,11 +38,6 @@ class AndroidPlatform(private val activity: Activity) : Platform {
                 ?.use { BitmapFactory.decodeStream(it)?.asImageBitmap() }
         }.getOrNull()
     }
-
-    @Composable
-    override fun parchment(image: BuiltInImage): Painter = painterResource(
-        if (image == BuiltInImage.PARCHMENT_B) R.drawable.card_parchment_b else R.drawable.card_parchment_a,
-    )
 
     @Composable
     override fun rememberImagePicker(onPicked: (uri: String) -> Unit): () -> Unit {

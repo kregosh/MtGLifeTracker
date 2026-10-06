@@ -1,11 +1,7 @@
 package com.kregosh.mtglifetracker.web.platform
 
 import androidx.compose.runtime.*
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.painter.BitmapPainter
-import androidx.compose.ui.graphics.painter.ColorPainter
-import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import com.kregosh.mtglifetracker.ui.platform.BuiltInImage
 import com.kregosh.mtglifetracker.ui.platform.Platform
@@ -38,17 +34,6 @@ class WebPlatform : Platform {
         }
         org.jetbrains.skia.Image.makeFromEncoded(Base64.decode(base64)).toComposeImageBitmap()
     }.getOrNull()
-
-    // Loaded once and shared by every card.
-    private val parchments = mutableStateMapOf<BuiltInImage, ImageBitmap>()
-
-    @Composable
-    override fun parchment(image: BuiltInImage): Painter {
-        LaunchedEffect(image) {
-            if (image !in parchments) loadImage(builtInImageUri(image), dark = false)?.let { parchments[image] = it }
-        }
-        return parchments[image]?.let { remember(it) { BitmapPainter(it) } } ?: ColorPainter(Color.Transparent)
-    }
 
     @Composable
     override fun rememberImagePicker(onPicked: (uri: String) -> Unit): () -> Unit {

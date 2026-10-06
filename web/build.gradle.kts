@@ -9,7 +9,7 @@ plugins {
 // Built-in images come from the Android app's drawables: images/ (light) and images/night/.
 val copyImages by tasks.registering(Sync::class) {
     val res = rootDir.resolve("../app/src/main/res")
-    from(res.resolve("drawable")) { include("bg_*.webp", "card_*.webp"); into("images") }
+    from(res.resolve("drawable")) { include("bg_*.webp"); into("images") }
     from(res.resolve("drawable-night")) { include("bg_*.webp"); into("images/night") }
     into(layout.buildDirectory.dir("generated/images"))
 }
