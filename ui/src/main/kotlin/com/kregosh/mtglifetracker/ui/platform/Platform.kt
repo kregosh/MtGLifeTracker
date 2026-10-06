@@ -3,14 +3,11 @@ package com.kregosh.mtglifetracker.ui.platform
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.painter.Painter
 
 /** The built-in images, by the name both apps store and look them up under. */
 enum class BuiltInImage(val fileName: String) {
     ARCANE_STORM("bg_arcane_storm"),
     MANA_ORBS("bg_mana_orbs"),
-    PARCHMENT_A("card_parchment_a"),
-    PARCHMENT_B("card_parchment_b"),
 }
 
 /**
@@ -26,10 +23,6 @@ interface Platform {
      * [dark] or light variant. Null if it can't be read.
      */
     suspend fun loadImage(uri: String, dark: Boolean): ImageBitmap?
-
-    /** A card texture, drawn while the player hasn't chosen their own card image. */
-    @Composable
-    fun parchment(image: BuiltInImage): Painter
 
     /**
      * Returns a function that lets the player pick an image from their device; [onPicked]

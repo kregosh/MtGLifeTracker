@@ -103,9 +103,43 @@ class SessionScreenTest {
     }
 
     @Test
-    fun `only the host sees remove buttons on other players`() {
+    fun `the host can remove another player from their details`() {
         showSession(hostUserId = "me")
-        compose.onNodeWithContentDescription("Remove Bob from the session").assertExists()
+        compose.onNodeWithText("Bob").performClick()
+        compose.onNodeWithText("Remove Bob from the session").performClick()
+        compose.onNodeWithText("Remove").performClick()
+
+        verify { connection.removePlayer("bob") }
+    }
+
+    @Test
+    fun `other players can't remove anyone`() {
+        showSession(hostUserId = "bob")
+        compose.onNodeWithText("Bob").performClick()
+        compose.onNodeWithText("Send friend request").assertExists()
+        compose.onNodeWithText("Remove Bob from the session").assertDoesNotExist()
+    }
+
+    @Test
+    fun `conceding is in the menu and can be undone`() {
+        showSession(hostUserId = "bob")
+        compose.onNodeWithContentDescription("More").performClick()
+        compose.onNodeWithText("Concede").performClick()
+        verify { connection.setConceded(true) }
+
+        compose.onNodeWithContentDescription("More").performClick()
+        compose.onNodeWithText("Undo concede").performClick()
+        verify { connection.setConceded(false) }
+    }
+
+    @Test
+    fun `tapping the halves of your panel changes your life`() {
+        showSession(hostUserId = "bob")
+        compose.onNodeWithContentDescription("Increase Life").performClick()
+        compose.onNodeWithContentDescription("Decrease Life").performClick()
+        compose.onNodeWithContentDescription("Decrease Life").performClick()
+
+        assertEquals(19u, vm.sessionUi.value.users.first { it.id == "me" }.life)
     }
 
     @Test
@@ -154,7 +188,7 @@ class SessionScreenTest {
 
         verify { connection.watch() }
         compose.onNodeWithText("You are watching").assertExists()
-        compose.onNodeWithText("Stats").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Add a stat").assertDoesNotExist()
     }
 
     @Test

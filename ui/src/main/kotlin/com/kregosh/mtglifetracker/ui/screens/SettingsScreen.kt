@@ -40,7 +40,6 @@ fun SettingsScreen(vm: SessionViewModel) {
     var showNameDialog by remember { mutableStateOf(false) }
 
     val pickAppBackground  = platform.rememberImagePicker(vm::setBackgroundImage)
-    val pickCardBackground = platform.rememberImagePicker(vm::setCardBackgroundImage)
 
     if (showNameDialog) {
         DisplayNameDialog(
@@ -154,25 +153,6 @@ fun SettingsScreen(vm: SessionViewModel) {
                     OutlinedButton(onClick = {
                         vm.setBackgroundImage(platform.builtInImageUri(BuiltInImage.MANA_ORBS))
                     }) { Text(Strings.settingsPresetManaOrbs) }
-                }
-
-                Spacer(Modifier.height(12.dp))
-
-                val cardBgUri by vm.cardBackgroundImageUri.collectAsState()
-                Text(Strings.settingsCardBackground, style = MaterialTheme.typography.labelMedium)
-                Spacer(Modifier.height(4.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { pickCardBackground() }) {
-                        Icon(Icons.Default.Image, contentDescription = null)
-                        Spacer(Modifier.width(4.dp))
-                        Text((if (cardBgUri != null) Strings.actionChange else Strings.actionChoose))
-                    }
-                    if (cardBgUri != null) {
-                        OutlinedButton(
-                            onClick = { vm.setCardBackgroundImage(null) },
-                            colors  = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                        ) { Text(Strings.actionRemove) }
-                    }
                 }
             }
 

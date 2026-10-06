@@ -6,7 +6,6 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.ui.graphics.ImageBitmap
 import com.kregosh.mtglifetracker.data.AppColorScheme
 
 /** True when a user-chosen background image is visible behind the app. */
@@ -18,8 +17,6 @@ val LocalHasBackground  = compositionLocalOf { false }
  */
 val LocalBackdropLuminance = compositionLocalOf<Float?> { null }
 
-/** Non-null when the local player has chosen a card background image. */
-val LocalCardBackground = compositionLocalOf<ImageBitmap?> { null }
 
 
 @Composable

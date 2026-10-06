@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -40,7 +39,9 @@ import com.kregosh.mtglifetracker.ui.components.FriendsSheet
 import com.kregosh.mtglifetracker.ui.signed
 import com.kregosh.mtglifetracker.ui.toTimerString
 import com.kregosh.mtglifetracker.ui.components.InviteDialog
-import com.kregosh.mtglifetracker.ui.components.PlayerCard
+import com.kregosh.mtglifetracker.ui.components.MyPanel
+import com.kregosh.mtglifetracker.ui.components.OpponentStrip
+import com.kregosh.mtglifetracker.ui.components.PlayerDetailsDialog
 import com.kregosh.mtglifetracker.ui.components.statLabel
 import com.kregosh.mtglifetracker.ui.components.statTypeLabel
 import com.kregosh.mtglifetracker.ui.theme.LocalBackdropLuminance
@@ -123,6 +124,7 @@ private fun SessionContent(
     var showWatchDialog  by remember { mutableStateOf(false) }
     var showMenu         by remember { mutableStateOf(false) }
     var removeTarget     by remember { mutableStateOf<UserState?>(null) }
+    var detailsTarget    by remember { mutableStateOf<String?>(null) }
 
     val history      by vm.history.collectAsState()
     val snackbarHost = remember { SnackbarHostState() }
@@ -188,6 +190,18 @@ private fun SessionContent(
             dismissButton = {
                 TextButton(onClick = { showWatchDialog = false }) { Text(Strings.actionCancel) }
             },
+        )
+    }
+
+    // Looked up by id so the dialog follows live changes and closes if the player leaves.
+    ui.users.firstOrNull { it.id == detailsTarget }?.let { target ->
+        PlayerDetailsDialog(
+            user        = target,
+            ui          = ui,
+            isFriend    = target.id in friendIds,
+            onAddFriend = { vm.sendFriendRequest(target.id) },
+            onRemove    = if (ui.isHost) { { removeTarget = target } } else null,
+            onDismiss   = { detailsTarget = null },
         )
     }
 
@@ -346,6 +360,13 @@ private fun SessionContent(
                                     onClick     = { showMenu = false; showWatchDialog = true },
                                 )
                             }
+                            ui.users.firstOrNull { it.id == ui.myUserId }?.let { me ->
+                                DropdownMenuItem(
+                                    text        = { Text(if (me.conceded) Strings.menuUndoConcede else Strings.menuConcede) },
+                                    leadingIcon = { Icon(Icons.Default.Flag, contentDescription = null) },
+                                    onClick     = { showMenu = false; if (me.conceded) vm.unconcede() else vm.concede() },
+                                )
+                            }
                             if (ui.isHost) {
                                 DropdownMenuItem(
                                     text        = { Text(Strings.sessionNewGame) },
@@ -362,16 +383,6 @@ private fun SessionContent(
                     }
                 },
             )
-        },
-        snackbarHost = { SnackbarHost(snackbarHost) },
-        floatingActionButton = {
-            if (!ui.observing) {
-                ExtendedFloatingActionButton(
-                    onClick = { showStatPicker = true },
-                    icon    = { Icon(Icons.Default.Add, contentDescription = null) },
-                    text    = { Text(Strings.sessionStats) },
-                )
-            }
         },
     ) { padding ->
         // Radial gradient emanating from the sun/moon icon in the Day/Night banner.
@@ -429,26 +440,25 @@ private fun SessionContent(
                     Text(Strings.sessionWaiting)
                 }
             } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding      = PaddingValues(bottom = 80.dp),
-                ) {
-                    itemsIndexed(ui.users, key = { _, user -> user.id }) { index, user ->
-                        val isMe = user.id == ui.myUserId
-                        PlayerCard(
-                            user        = user,
-                            isMe        = isMe,
-                            sessionUi   = ui,
-                            onAdjust    = { stat, delta -> if (isMe) vm.adjust(stat, delta) },
-                            onConcede   = if (isMe) vm::concede   else null,
-                            onUnconcede = if (isMe) vm::unconcede else null,
-                            isFriend    = user.id in friendIds,
-                            onAddFriend = if (!isMe) { { vm.sendFriendRequest(user.id) } } else null,
-                            onRemove    = if (ui.isHost && !isMe) { { removeTarget = user } } else null,
-                            onTakeMonarch = if (isMe) { { vm.setMonarch(user.id) } } else null,
-                            playerIndex = index,
-                        )
-                    }
+                val me     = ui.users.firstOrNull { it.id == ui.myUserId }
+                val others = ui.users.filter { it.id != ui.myUserId }
+                OpponentStrip(
+                    players  = others,
+                    ui       = ui,
+                    onOpen   = { detailsTarget = it.id },
+                    modifier = if (me == null) Modifier.verticalScroll(rememberScrollState()) else Modifier,
+                )
+                if (me != null) {
+                    Spacer(Modifier.height(14.dp))
+                    MyPanel(
+                        me            = me,
+                        ui            = ui,
+                        onAdjust      = vm::adjust,
+                        onTrack       = { stat -> vm.addCustomStat(stat, StatType.NUMERIC) },
+                        onAddStat     = { showStatPicker = true },
+                        onTakeMonarch = { vm.setMonarch(me.id) },
+                        modifier      = Modifier.weight(1f).fillMaxWidth().padding(bottom = 12.dp),
+                    )
                 }
             }
 
@@ -460,6 +470,11 @@ private fun SessionContent(
         if (dayNightBrush != null) {
             Box(modifier = Modifier.matchParentSize().background(dayNightBrush))
         }
+        // Up top, over the other players, so it never covers your own controls.
+        SnackbarHost(
+            hostState = snackbarHost,
+            modifier  = Modifier.align(Alignment.TopCenter).padding(top = padding.calculateTopPadding()),
+        )
         }
     }
 }

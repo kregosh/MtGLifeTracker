@@ -40,8 +40,11 @@ fun statLabel(id: String): String =
     PredefinedStat.fromId(id)?.let { it.label() } ?: id
 
 @Composable
-fun statShortLabel(id: String): String =
-    PredefinedStat.fromId(id)?.let { it.shortLabel() } ?: id
+fun statShortLabel(id: String): String = statShortLabelPlain(id)
+
+/** [statShortLabel] for use outside composition, e.g. in semantics. */
+internal fun statShortLabelPlain(id: String): String =
+    PredefinedStat.fromId(id)?.shortLabel() ?: id
 
 @Composable
 fun statTypeLabel(type: StatType): String = type.label()
