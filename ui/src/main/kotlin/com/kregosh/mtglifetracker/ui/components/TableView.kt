@@ -13,6 +13,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
@@ -89,45 +90,40 @@ internal fun TableCard(
             Column(
                 modifier            = Modifier.fillMaxSize().padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(
-                    text       = if (monarch) "👑 " + user.displayName else user.displayName,
-                    style      = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    maxLines   = 1,
-                    overflow   = TextOverflow.Ellipsis,
-                )
-                if (!user.online) Text(Strings.playerOffline, style = MaterialTheme.typography.labelMedium)
-
-                BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    val size = (maxHeight.value * 0.6f).coerceIn(40f, 160f)
-                    StatIcon(LIFE_STAT, Modifier.size((size * 1.4f).dp).alpha(0.10f))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        text       = user.life.toString(),
-                        fontSize   = size.sp,
-                        lineHeight = size.sp,
+                        text       = if (monarch) "👑 " + user.displayName else user.displayName,
+                        style      = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color      = if (dead) MaterialTheme.colorScheme.error else LocalContentColor.current,
+                        maxLines   = 1,
+                        overflow   = TextOverflow.Ellipsis,
                     )
+                    if (!user.online) Text(Strings.playerOffline, style = MaterialTheme.typography.labelMedium)
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
-                    LimitValue(COMMANDER_STAT, user.customStats[COMMANDER_STAT] ?: 0u, ui.settings.commanderDeathThreshold)
-                    LimitValue(POISON_STAT, user.customStats[POISON_STAT] ?: 0u, ui.settings.infectDeathThreshold)
+                // Life, commander damage and poison side by side, each as prominent as the others:
+                // on a table any of them can end the game.
+                Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    StatBlock(LIFE_STAT, user.life, limit = null, dead = dead, modifier = Modifier.weight(1f).fillMaxHeight())
+                    StatBlock(COMMANDER_STAT, user.customStats[COMMANDER_STAT] ?: 0u, ui.settings.commanderDeathThreshold,
+                              modifier = Modifier.weight(1f).fillMaxHeight())
+                    StatBlock(POISON_STAT, user.customStats[POISON_STAT] ?: 0u, ui.settings.infectDeathThreshold,
+                              modifier = Modifier.weight(1f).fillMaxHeight())
                 }
 
                 val minor = user.stats.filterKeys { it != COMMANDER_STAT && it != POISON_STAT }
                 if (minor.isNotEmpty()) {
                     FlowRow(
-                        modifier              = Modifier.padding(top = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
                         verticalArrangement   = Arrangement.spacedBy(8.dp),
                     ) {
                         minor.forEach { (name, type) ->
                             Text(
                                 text     = "${statShortLabel(name)} ${statValueText(type, user.customStats[name] ?: 0u)}",
-                                style    = MaterialTheme.typography.labelLarge,
-                                modifier = Modifier.inset(RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 6.dp),
+                                style    = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.inset(RoundedCornerShape(14.dp)).padding(horizontal = 16.dp, vertical = 8.dp),
                             )
                         }
                     }
@@ -145,15 +141,55 @@ internal fun TableCard(
     }
 }
 
-/** A symbol with its value out of the limit that knocks a player out, e.g. 5/21. */
+/**
+ * One counter as a well of its own: symbol, a number as large as the well allows and, for
+ * counters with a limit, how close it is: "/21" and a meter that warms up as it fills.
+ */
 @Composable
-private fun LimitValue(stat: String, value: UInt, limit: UInt) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        StatIcon(stat, Modifier.size(28.dp))
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(value.toString(), fontSize = 28.sp, fontWeight = FontWeight.Bold)
-            Text("/$limit", fontSize = 14.sp, color = LocalContentColor.current.copy(alpha = 0.6f),
-                 modifier = Modifier.padding(bottom = 4.dp))
+private fun StatBlock(stat: String, value: UInt, limit: UInt?, modifier: Modifier, dead: Boolean = false) {
+    BoxWithConstraints(modifier.inset(RoundedCornerShape(18.dp)), contentAlignment = Alignment.Center) {
+        val numberSize = minOf(maxHeight.value * 0.42f, maxWidth.value * 0.42f).coerceIn(28f, 140f)
+        val iconSize   = (numberSize * 0.4f).coerceIn(20f, 48f)
+        Column(
+            modifier            = Modifier.fillMaxSize().padding(10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceEvenly,
+        ) {
+            StatIcon(stat, Modifier.size(iconSize.dp))
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text       = value.toString(),
+                    fontSize   = numberSize.sp,
+                    lineHeight = numberSize.sp,
+                    fontWeight = FontWeight.Bold,
+                    color      = if (dead) MaterialTheme.colorScheme.error else LocalContentColor.current,
+                )
+                if (limit != null) {
+                    Text(
+                        text     = "/$limit",
+                        fontSize = (numberSize * 0.3f).sp,
+                        color    = LocalContentColor.current.copy(alpha = 0.6f),
+                        modifier = Modifier.padding(bottom = (numberSize * 0.1f).dp),
+                    )
+                }
+            }
+            if (limit != null) LimitMeter(value, limit, Modifier.fillMaxWidth(0.8f).height(10.dp))
+            else Spacer(Modifier.height(10.dp))
         }
+    }
+}
+
+/** How far [value] is toward [limit]: calm at first, amber from half way, red from three quarters. */
+@Composable
+private fun LimitMeter(value: UInt, limit: UInt, modifier: Modifier) {
+    val fraction = if (limit == 0u) 1f else (value.toFloat() / limit.toFloat()).coerceIn(0f, 1f)
+    val color = when {
+        fraction >= 0.75f -> MaterialTheme.colorScheme.error
+        fraction >= 0.5f  -> Color(0xFFE0A030)
+        else              -> LocalContentColor.current.copy(alpha = 0.55f)
+    }
+    val shape = RoundedCornerShape(50)
+    Box(modifier.clip(shape).background(LocalContentColor.current.copy(alpha = 0.12f))) {
+        Box(Modifier.fillMaxHeight().fillMaxWidth(fraction).clip(shape).background(color))
     }
 }
