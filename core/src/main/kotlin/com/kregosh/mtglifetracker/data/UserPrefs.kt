@@ -20,7 +20,6 @@ interface UserPrefs {
     // Ordered newest-first by last-seen time.
     val knownPlayers: List<KnownPlayer>
     fun touchKnownPlayer(userId: String, displayName: String)
-    fun forgetKnownPlayer(userId: String)
 
     // ── Friends (explicit, device-local, no size limit) ───────────────────
     val friendList: List<Friend>

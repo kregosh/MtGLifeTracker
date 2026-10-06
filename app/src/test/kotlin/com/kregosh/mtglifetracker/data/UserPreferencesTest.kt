@@ -176,23 +176,6 @@ class UserPreferencesTest {
         assertEquals("uid-1", prefs.knownPlayers.first().userId)
     }
 
-    @Test
-    fun `forgetKnownPlayer removes the correct entry`() {
-        prefs.touchKnownPlayer("uid-1", "Alice")
-        prefs.touchKnownPlayer("uid-2", "Bob")
-        prefs.forgetKnownPlayer("uid-1")
-        val known = prefs.knownPlayers
-        assertEquals(1, known.size)
-        assertEquals("uid-2", known.first().userId)
-    }
-
-    @Test
-    fun `forgetKnownPlayer on non-existent userId is a no-op`() {
-        prefs.touchKnownPlayer("uid-1", "Alice")
-        prefs.forgetKnownPlayer("uid-999")
-        assertEquals(1, prefs.knownPlayers.size)
-    }
-
     // ── numeric settings ─────────────────────────────────────────────────────
 
     @Test

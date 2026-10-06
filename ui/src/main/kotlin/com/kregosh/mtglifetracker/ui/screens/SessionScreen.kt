@@ -267,7 +267,6 @@ private fun SessionContent(
             onJoinSession    = { sessionId, watch -> vm.joinFriendSession(sessionId, watch) },
             onRemoveFriend    = vm::removeFriend,
             onAddFriend       = { uid, name -> vm.addFriend(uid, name) },
-            onForgetPlayer    = vm::forgetPlayer,
             onDismiss         = { showFriendsSheet = false },
         )
     }

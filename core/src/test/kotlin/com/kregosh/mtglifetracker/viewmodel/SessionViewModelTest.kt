@@ -1096,15 +1096,6 @@ class SessionViewModelTest {
         assertTrue(vm.friendList.value.isEmpty())
     }
 
-    @Test
-    fun `forgetPlayer persists and updates knownPlayers flow`() {
-        every { prefs.knownPlayers } returns emptyList()
-        val vm = makeVm()
-        vm.forgetPlayer("u1")
-        verify { prefs.forgetKnownPlayer("u1") }
-        assertTrue(vm.knownPlayers.value.isEmpty())
-    }
-
     // ── friend presence ──────────────────────────────────────────────────────
 
     @Test

@@ -334,11 +334,6 @@ class SessionViewModel(
         }
     }
 
-    fun forgetPlayer(userId: String) {
-        prefs.forgetKnownPlayer(userId)
-        _knownPlayers.value = prefs.knownPlayers
-    }
-
     fun addFriend(userId: String, displayName: String) {
         prefs.addFriend(userId, displayName)
         _friendList.value = prefs.friendList

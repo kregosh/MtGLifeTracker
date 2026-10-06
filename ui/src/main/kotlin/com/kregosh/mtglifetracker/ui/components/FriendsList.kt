@@ -4,7 +4,6 @@ import com.kregosh.mtglifetracker.ui.Strings
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Login
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PersonRemove
@@ -102,13 +101,12 @@ fun FriendsList(
     }
 }
 
-/** Recently seen players, with add-as-friend and forget actions. */
+/** Recently seen players, each with an add-as-friend action. The list keeps itself to the latest few. */
 @Composable
 fun RecentPlayersList(
     players       : List<KnownPlayer>,
     friendIds     : Set<String>,
     onAddFriend   : (userId: String, displayName: String) -> Unit,
-    onForgetPlayer: (userId: String) -> Unit,
     modifier      : Modifier = Modifier,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -127,12 +125,6 @@ fun RecentPlayersList(
                         onClick     = { onAddFriend(player.userId, player.displayName) },
                     )
                 }
-                RowAction(
-                    icon        = Icons.Default.Close,
-                    description = Strings.playerForget(player.displayName),
-                    tint        = MaterialTheme.colorScheme.onSurfaceVariant,
-                    onClick     = { onForgetPlayer(player.userId) },
-                )
             }
         }
     }

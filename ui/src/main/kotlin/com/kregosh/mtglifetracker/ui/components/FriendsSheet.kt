@@ -23,7 +23,6 @@ fun FriendsSheet(
     onJoinSession   : (sessionId: String, watch: Boolean) -> Unit,
     onRemoveFriend  : (String) -> Unit,
     onAddFriend     : (String, String) -> Unit,
-    onForgetPlayer  : (String) -> Unit,
     onDismiss       : () -> Unit,
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -70,7 +69,6 @@ fun FriendsSheet(
                         players        = knownPlayers,
                         friendIds      = friendIds,
                         onAddFriend    = onAddFriend,
-                        onForgetPlayer = onForgetPlayer,
                         modifier       = listModifier,
                     )
                 }

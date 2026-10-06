@@ -101,12 +101,6 @@ class UserPreferences(
         prefs.edit().putStringSet(KEY_KNOWN_PLAYERS, updated.toEncodedSet()).apply()
     }
 
-    override fun forgetKnownPlayer(userId: String) {
-        val updated = parseKnownSet(prefs.getStringSet(KEY_KNOWN_PLAYERS, emptySet()))
-            .filter { it.userId != userId }
-        prefs.edit().putStringSet(KEY_KNOWN_PLAYERS, updated.toEncodedSet()).apply()
-    }
-
     // ── Friends ───────────────────────────────────────────────────────────
     // Stored as StringSet; each entry: "$userId$SEP$displayName"
 
