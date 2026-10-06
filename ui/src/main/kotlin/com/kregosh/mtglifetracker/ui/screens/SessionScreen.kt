@@ -42,6 +42,8 @@ import com.kregosh.mtglifetracker.ui.components.InviteDialog
 import com.kregosh.mtglifetracker.ui.components.MyPanel
 import com.kregosh.mtglifetracker.ui.components.OpponentStrip
 import com.kregosh.mtglifetracker.ui.components.PlayerDetailsDialog
+import com.kregosh.mtglifetracker.ui.components.TABLE_VIEW_MIN_WIDTH
+import com.kregosh.mtglifetracker.ui.components.TableView
 import com.kregosh.mtglifetracker.ui.components.statLabel
 import com.kregosh.mtglifetracker.ui.components.statTypeLabel
 import com.kregosh.mtglifetracker.ui.theme.LocalBackdropLuminance
@@ -443,13 +445,27 @@ private fun SessionContent(
                 // Watching, you get no panel, even before the server drops your seat.
                 val me     = if (ui.observing) null else ui.users.firstOrNull { it.id == ui.myUserId }
                 val others = ui.users.filter { it.id != me?.id }
-                OpponentStrip(
-                    players  = others,
-                    ui       = ui,
-                    onOpen   = { detailsTarget = it.id },
-                    modifier = if (me == null) Modifier.verticalScroll(rememberScrollState()) else Modifier,
-                )
-                if (me != null) {
+                if (me == null) {
+                    // Watching: on a tablet every player in detail, otherwise the tiles.
+                    BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                        if (maxWidth >= TABLE_VIEW_MIN_WIDTH) {
+                            TableView(
+                                players  = others,
+                                ui       = ui,
+                                onOpen   = { detailsTarget = it.id },
+                                modifier = Modifier.fillMaxSize().padding(bottom = 12.dp),
+                            )
+                        } else {
+                            OpponentStrip(
+                                players  = others,
+                                ui       = ui,
+                                onOpen   = { detailsTarget = it.id },
+                                modifier = Modifier.verticalScroll(rememberScrollState()),
+                            )
+                        }
+                    }
+                } else {
+                    OpponentStrip(players = others, ui = ui, onOpen = { detailsTarget = it.id })
                     Spacer(Modifier.height(14.dp))
                     MyPanel(
                         me            = me,
