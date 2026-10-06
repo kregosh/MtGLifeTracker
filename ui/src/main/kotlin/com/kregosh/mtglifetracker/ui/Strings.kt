@@ -193,7 +193,6 @@ object Strings {
     fun friendJoin(a1: Any) = "Join ${a1}'s session"
     fun friendRemove(a1: Any) = "Remove ${a1}"
     fun friendAdd(a1: Any) = "Add ${a1} as friend"
-    fun playerForget(a1: Any) = "Forget ${a1}"
     const val friendsTab = "Friends"
     const val recentTab = "Recently Played"
     const val friendsEmpty = "No friends yet — send a friend request during a session"

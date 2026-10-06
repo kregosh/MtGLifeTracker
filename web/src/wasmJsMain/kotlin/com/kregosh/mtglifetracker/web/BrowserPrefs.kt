@@ -87,9 +87,6 @@ class BrowserPrefs : UserPrefs {
         savePlayers("knownPlayers", (listOf(StoredPlayer(userId, displayName, nowMillis().toLong())) + others).take(MAX_KNOWN_PLAYERS))
     }
 
-    override fun forgetKnownPlayer(userId: String) =
-        savePlayers("knownPlayers", players("knownPlayers").filter { it.userId != userId })
-
     override val friendList: List<Friend>
         get() = players("friends").map { Friend(it.userId, it.displayName) }
 

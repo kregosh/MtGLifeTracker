@@ -241,7 +241,6 @@ fun SettingsScreen(vm: SessionViewModel) {
                         players        = knownPlayers,
                         friendIds      = friendIds,
                         onAddFriend    = vm::addFriend,
-                        onForgetPlayer = vm::forgetPlayer,
                     )
                 }
             }
