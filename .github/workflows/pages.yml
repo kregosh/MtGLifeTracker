@@ -45,16 +45,24 @@ jobs:
           # The Firebase web config comes from a secret, never from the repository.
           printf 'window.MTG_FIREBASE_CONFIG = %s;\n' "${FIREBASE_WEB_CONFIG:-null}" > site/app/firebase-config.js
 
-      # The app's script and code keep their names from build to build, so browsers (above
-      # all home-screen web apps) would go on running a cached old version. Name them after
-      # the commit instead; index.html itself is only cached for minutes.
+      # The app's entry script (and any code file it loads by a fixed name) would keep its name
+      # from build to build, so browsers (above all home-screen web apps) would go on running a
+      # cached old version. Name them after the commit instead; index.html itself is only
+      # cached for minutes. Files webpack already names by content hash are left alone.
       - name: Give each deploy fresh file names
         working-directory: site/app
         run: |
+          shopt -s nullglob
           v="${GITHUB_SHA:0:12}"
-          mv mtglifetracker.wasm "mtglifetracker.$v.wasm"
-          sed -i "s#\"\./mtglifetracker\.wasm\"#\"./mtglifetracker.$v.wasm\"#" mtglifetracker.js
-          grep -q "mtglifetracker.$v.wasm" mtglifetracker.js
+          ls -la
+          for wasm in *.wasm; do
+            if [[ "$wasm" =~ ^[0-9a-f]{16,}\.wasm$ ]]; then continue; fi
+            base="${wasm%.wasm}"
+            mv "$wasm" "$base.$v.wasm"
+            sed -i "s#\([\"'/]\)$base\.wasm\([\"']\)#\1$base.$v.wasm\2#g" *.js *.mjs
+            grep -q "$base.$v.wasm" *.js *.mjs
+            echo "renamed $wasm"
+          done
           mv mtglifetracker.js "mtglifetracker.$v.js"
           sed -i "s#src=\"mtglifetracker\.js\"#src=\"mtglifetracker.$v.js\"#; s#src=\"firebase-config\.js\"#src=\"firebase-config.js?v=$v\"#" index.html
           grep -q "mtglifetracker.$v.js" index.html
