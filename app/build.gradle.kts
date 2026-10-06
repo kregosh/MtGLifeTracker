@@ -17,6 +17,21 @@ android {
         versionName   = "1.0"
     }
 
+    // Android installs an update only when it is signed with the same key as the installed app.
+    // CI points DEBUG_KEYSTORE at the stable debug key (from the DEBUG_KEYSTORE_BASE64 secret);
+    // AGP 9 no longer picks it up from ~/.android on its own, so it is named here. Locally the
+    // usual per-machine debug key is used.
+    signingConfigs {
+        getByName("debug") {
+            providers.environmentVariable("DEBUG_KEYSTORE").orNull?.let { path ->
+                storeFile     = file(path)
+                storePassword = "android"
+                keyAlias      = "androiddebugkey"
+                keyPassword   = "android"
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled   = true
