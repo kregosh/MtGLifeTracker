@@ -43,7 +43,10 @@ import com.kregosh.mtglifetracker.ui.components.MyPanel
 import com.kregosh.mtglifetracker.ui.components.OpponentStrip
 import com.kregosh.mtglifetracker.ui.components.PlayerDetailsDialog
 import com.kregosh.mtglifetracker.ui.components.TABLE_VIEW_MIN_WIDTH
+import com.kregosh.mtglifetracker.ui.components.TABLE_BACKDROP_LUMINANCE
+import com.kregosh.mtglifetracker.ui.components.TableBackdrop
 import com.kregosh.mtglifetracker.ui.components.TableView
+import com.kregosh.mtglifetracker.ui.platform.BuiltInImage
 import com.kregosh.mtglifetracker.ui.components.statLabel
 import com.kregosh.mtglifetracker.ui.components.statTypeLabel
 import com.kregosh.mtglifetracker.ui.theme.LocalBackdropLuminance
@@ -95,11 +98,33 @@ fun SessionScreen(vm: SessionViewModel) {
         )
     }
 
-    SessionContent(
-        vm, ui, friendIds, friendList, knownPlayers,
-        timerElapsed, timerRunning, timerVisible, timerCountDown, timerLimitMinutes,
-        hasBg,
-    )
+    val bgUri by vm.backgroundImageUri.collectAsState()
+    // A photo the player picked themselves; the built-in backgrounds are only defaults.
+    val ownPicture = !bgUri.isNullOrEmpty() && BuiltInImage.entries.none { platform.builtInImageUri(it) == bgUri }
+
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        // Watching on a tablet: every player in detail, on the table's own background.
+        val tableView = ui.observing && maxWidth >= TABLE_VIEW_MIN_WIDTH
+        if (tableView && !ownPicture) {
+            TableBackdrop(Modifier.fillMaxSize())
+            CompositionLocalProvider(
+                LocalHasBackground     provides true,
+                LocalBackdropLuminance provides TABLE_BACKDROP_LUMINANCE,
+            ) {
+                SessionContent(
+                    vm, ui, friendIds, friendList, knownPlayers,
+                    timerElapsed, timerRunning, timerVisible, timerCountDown, timerLimitMinutes,
+                    hasBg = true, tableView = true,
+                )
+            }
+        } else {
+            SessionContent(
+                vm, ui, friendIds, friendList, knownPlayers,
+                timerElapsed, timerRunning, timerVisible, timerCountDown, timerLimitMinutes,
+                hasBg, tableView,
+            )
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -116,6 +141,7 @@ private fun SessionContent(
     timerCountDown    : Boolean,
     timerLimitMinutes : UInt,
     hasBg             : Boolean,
+    tableView         : Boolean,
 ) {
 
     var showStatPicker   by remember { mutableStateOf(false) }
@@ -447,8 +473,8 @@ private fun SessionContent(
                 val others = ui.users.filter { it.id != me?.id }
                 if (me == null) {
                     // Watching: on a tablet every player in detail, otherwise the tiles.
-                    BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-                        if (maxWidth >= TABLE_VIEW_MIN_WIDTH) {
+                    Box(Modifier.weight(1f).fillMaxWidth()) {
+                        if (tableView) {
                             TableView(
                                 players  = others,
                                 ui       = ui,
