@@ -29,6 +29,9 @@ import com.kregosh.mtglifetracker.ui.Strings
 import com.kregosh.mtglifetracker.viewmodel.SessionUiState
 import com.kregosh.mtglifetracker.viewmodel.isDead
 
+/** Life's share of a card's width against commander damage and poison together. */
+private const val GOLDEN_RATIO = 1.618f
+
 /** From this width on, a watching device shows the table view instead of the tile strip. */
 internal val TABLE_VIEW_MIN_WIDTH: Dp = 600.dp
 
@@ -103,14 +106,17 @@ internal fun TableCard(
                     if (!user.online) Text(Strings.playerOffline, style = MaterialTheme.typography.labelMedium)
                 }
 
-                // Life, commander damage and poison side by side, each as prominent as the others:
-                // on a table any of them can end the game.
+                // Golden ratio: life takes the larger part, commander damage and poison share
+                // the smaller one, one above the other.
                 Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    StatBlock(LIFE_STAT, user.life, limit = null, dead = dead, modifier = Modifier.weight(1f).fillMaxHeight())
-                    StatBlock(COMMANDER_STAT, user.customStats[COMMANDER_STAT] ?: 0u, ui.settings.commanderDeathThreshold,
-                              modifier = Modifier.weight(1f).fillMaxHeight())
-                    StatBlock(POISON_STAT, user.customStats[POISON_STAT] ?: 0u, ui.settings.infectDeathThreshold,
-                              modifier = Modifier.weight(1f).fillMaxHeight())
+                    StatBlock(LIFE_STAT, user.life, limit = null, dead = dead,
+                              modifier = Modifier.weight(GOLDEN_RATIO).fillMaxHeight())
+                    Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        StatBlock(COMMANDER_STAT, user.customStats[COMMANDER_STAT] ?: 0u, ui.settings.commanderDeathThreshold,
+                                  modifier = Modifier.weight(1f).fillMaxWidth())
+                        StatBlock(POISON_STAT, user.customStats[POISON_STAT] ?: 0u, ui.settings.infectDeathThreshold,
+                                  modifier = Modifier.weight(1f).fillMaxWidth())
+                    }
                 }
 
                 val minor = user.stats.filterKeys { it != COMMANDER_STAT && it != POISON_STAT }
