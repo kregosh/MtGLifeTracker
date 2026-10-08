@@ -25,8 +25,7 @@ class WebPlatform : Platform {
         val base64 = when {
             uri.startsWith(BUILT_IN) -> {
                 val name = uri.removePrefix(BUILT_IN)
-                // Only the backgrounds have a night variant.
-                val night = dark && name.startsWith("bg_")
+                val night = dark && BuiltInImage.entries.any { it.fileName == name && it.hasNightVariant }
                 fetchBase64(if (night) "images/night/$name.webp" else "images/$name.webp").await<JsString>().toString()
             }
             uri.startsWith("data:") -> uri.substringAfter(',')
