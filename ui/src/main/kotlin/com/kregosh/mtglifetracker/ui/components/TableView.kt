@@ -1,6 +1,7 @@
 package com.kregosh.mtglifetracker.ui.components
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
@@ -10,13 +11,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -27,6 +32,8 @@ import com.kregosh.mtglifetracker.shared.LIFE_STAT
 import com.kregosh.mtglifetracker.shared.POISON_STAT
 import com.kregosh.mtglifetracker.shared.UserState
 import com.kregosh.mtglifetracker.ui.Strings
+import com.kregosh.mtglifetracker.ui.platform.BuiltInImage
+import com.kregosh.mtglifetracker.ui.platform.LocalPlatform
 import com.kregosh.mtglifetracker.viewmodel.SessionUiState
 import com.kregosh.mtglifetracker.viewmodel.isDead
 
@@ -219,10 +226,19 @@ private fun LimitMeter(value: UInt, limit: UInt, modifier: Modifier) {
 internal const val TABLE_BACKDROP_LUMINANCE = 0.05f
 
 /**
- * The table view's own background: dark green baize until it gets a picture of its own (#117).
- * Shown instead of the app's built-in backgrounds; a photo the user picked stays.
+ * The table view's own background (#117), drawn over dark green baize that shows while it
+ * loads or if it can't be read. Used instead of the app's built-in backgrounds; a photo the
+ * player picked stays.
  */
 @Composable
 internal fun TableBackdrop(modifier: Modifier = Modifier) {
-    Box(modifier.background(Brush.radialGradient(listOf(Color(0xFF2F5B3C), Color(0xFF12241A)))))
+    val platform = LocalPlatform.current
+    val image by produceState<ImageBitmap?>(null) {
+        value = platform.loadImage(platform.builtInImageUri(BuiltInImage.TABLE), dark = true)
+    }
+    Box(modifier.background(Brush.radialGradient(listOf(Color(0xFF2F5B3C), Color(0xFF12241A))))) {
+        image?.let {
+            Image(it, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        }
+    }
 }
