@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy policy · MtG Life Tracker</title>
+  <style>
+    :root { color-scheme: light dark; --bg: #f6f1e4; --fg: #1e0a00; --muted: #5a3010; --accent: #15254a; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #17130d; --fg: #f1e6cc; --muted: #c9b38a; --accent: #9fb4e6; } }
+    body { margin: 0; padding: 24px; box-sizing: border-box; background: var(--bg); color: var(--fg);
+           font: 16px/1.6 Georgia, "Times New Roman", serif; }
+    main { max-width: 40rem; margin: 0 auto; }
+    h1 { font-size: 1.6rem; margin: 0 0 .25rem; }
+    h2 { font-size: 1.15rem; margin: 1.75rem 0 .5rem; }
+    p, li { color: var(--fg); }
+    .updated { color: var(--muted); margin-top: 0; }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Privacy policy</h1>
+    <p class="updated">MtG Life Tracker · last updated 18 October 2026</p>
+
+    <p>MtG Life Tracker is a free life counter for Magic: The Gathering games, shared live between
+      the players' phones and browsers. This page explains what the app stores, where, and why.
+      There are no accounts, no ads, no analytics and no tracking.</p>
+
+    <h2>What is sent to our game server</h2>
+    <p>Games are synchronised through Google Firebase (Realtime Database and anonymous
+      Authentication). While you play, it stores:</p>
+    <ul>
+      <li>an <strong>anonymous ID</strong> that Firebase creates for your installation. It isn't
+        linked to your name, email, phone number or Google account;</li>
+      <li>the <strong>display name</strong> you choose (it can be anything);</li>
+      <li>your <strong>game state</strong>: life total, the counters you track (such as commander
+        damage or poison), whether you conceded, and whether you are connected;</li>
+      <li>the session's code, rules and timer settings;</li>
+      <li>if you use friends: <strong>friend requests</strong> (your ID and display name, sent to the
+        player you add) and which session you are currently in, so your friends can join you.</li>
+    </ul>
+    <p>Everyone in a session sees the names and game state of the players in it. Sessions are
+      deleted when the last player leaves, and abandoned ones after a day at most.</p>
+
+    <h2>What stays on your device</h2>
+    <p>Your display name, settings, chosen background picture, friends list and the players you
+      recently played with are kept only on your device. A background picture you choose is never
+      uploaded. Uninstalling the app removes all of it.</p>
+
+    <h2>Permissions</h2>
+    <ul>
+      <li><strong>Internet</strong>, to synchronise the game.</li>
+      <li><strong>Notifications and foreground service</strong>, to keep a game connected for a
+        while when you switch to another app, with a notification showing it is running.</li>
+    </ul>
+
+    <h2>Sharing</h2>
+    <p>Nothing is sold or shared with anyone. Google processes the data above only to run
+      Firebase for the app; see <a href="https://firebase.google.com/support/privacy">Firebase's
+      privacy information</a>.</p>
+
+    <h2>Children</h2>
+    <p>The app is not directed at children under 13 and does not knowingly collect personal
+      information from them.</p>
+
+    <h2>Your choices</h2>
+    <p>You can leave a session at any time, which removes your seat from it. To have anything else
+      deleted, or for any question about this policy, open an issue at
+      <a href="https://github.com/kregosh/MtGLifeTracker/issues">github.com/kregosh/MtGLifeTracker/issues</a>.</p>
+
+    <h2>Changes</h2>
+    <p>If this policy changes, the new version will be published on this page with a new date.</p>
+
+    <p class="updated">MtG Life Tracker is unofficial fan content and is not approved or endorsed by
+      Wizards of the Coast. Magic: The Gathering is a trademark of Wizards of the Coast LLC.</p>
+  </main>
+</body>
+</html>
