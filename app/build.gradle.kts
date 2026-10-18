@@ -11,10 +11,12 @@ android {
     defaultConfig {
         applicationId = "com.kregosh.mtglifetracker"
         minSdk        = 26
-        targetSdk     = 35
-        // CI run number keeps every published build installable over the previous one
-        versionCode   = providers.environmentVariable("GITHUB_RUN_NUMBER").orElse("1").get().toInt()
-        versionName   = "1.0"
+        targetSdk     = 36
+        // Every published build needs a higher version code than the one before. CI passes its
+        // run number; the Play release workflow its own counter (VERSION_CODE).
+        versionCode   = providers.environmentVariable("VERSION_CODE")
+            .orElse(providers.environmentVariable("GITHUB_RUN_NUMBER")).orElse("1").get().toInt()
+        versionName   = providers.environmentVariable("VERSION_NAME").orElse("0.1.0").get()
     }
 
     // Android installs an update only when it is signed with the same key as the installed app.
@@ -30,6 +32,16 @@ android {
                 keyPassword   = "android"
             }
         }
+        // Play uploads are signed with the upload key; Google re-signs them for the store (Play
+        // App Signing). The Play release workflow provides it from repository secrets.
+        providers.environmentVariable("UPLOAD_KEYSTORE").orNull?.let { path ->
+            create("upload") {
+                storeFile     = file(path)
+                storePassword = providers.environmentVariable("UPLOAD_KEYSTORE_PASSWORD").get()
+                keyAlias      = providers.environmentVariable("UPLOAD_KEY_ALIAS").get()
+                keyPassword   = providers.environmentVariable("UPLOAD_KEY_PASSWORD").get()
+            }
+        }
     }
 
     buildTypes {
@@ -37,6 +49,7 @@ android {
             isMinifyEnabled   = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfigs.findByName("upload")?.let { signingConfig = it }
         }
     }
 
