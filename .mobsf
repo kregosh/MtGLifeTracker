@@ -1,0 +1,10 @@
+# mobsfscan (MobSF's static scanner), run by .github/workflows/security.yml.
+- ignore-rules:
+    # Task hijacking (StrandHogg 1.0/2.0) only affects apps targeting SDK < 28/29. The source
+    # manifest carries no targetSdk (Gradle sets it, to 36), so mobsfscan assumes Android 8.
+    - android_task_hijacking1
+    - android_task_hijacking2
+  # Report hardening suggestions (INFO) without failing the build on them.
+  severity-filter:
+    - ERROR
+    - WARNING

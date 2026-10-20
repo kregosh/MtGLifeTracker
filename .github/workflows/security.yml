@@ -1,0 +1,101 @@
+name: Security
+
+# Automated security checks, next to the database rules' attack tests in ci.yml:
+#  - CodeQL: GitHub's code scanner, for the Android/Kotlin code, the JavaScript (rules tests,
+#    invite page) and the workflows themselves. Findings appear under Security → Code scanning.
+#  - mobsfscan: MobSF's static scanner for Android (manifest, Kotlin), configured in .mobsf.
+#    It fails the check on any ERROR or WARNING finding.
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    - cron: '17 4 * * 1'   # weekly, to catch newly published vulnerability patterns
+
+permissions:
+  contents: read
+
+jobs:
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: actions
+            build-mode: none
+          - language: javascript-typescript
+            build-mode: none
+          - language: java-kotlin
+            build-mode: manual
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-extended
+
+      - name: Set up JDK 17
+        if: matrix.language == 'java-kotlin'
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Build the Android app for analysis
+        if: matrix.language == 'java-kotlin'
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          echo "$GOOGLE_SERVICES_JSON" > app/google-services.json
+          chmod +x gradlew
+          ./gradlew --no-daemon --no-build-cache :app:compileDebugKotlin
+
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}
+
+  mobsfscan:
+    name: MobSF scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install mobsfscan
+        run: pip install mobsfscan semgrep
+
+      - name: Scan
+        run: |
+          set +e
+          mobsfscan --config .mobsf --sarif -o mobsfscan.sarif app/src/main core/src/main firebase/src/main ui/src/main
+          echo "status=$?" >> "$GITHUB_ENV"
+          mobsfscan --config .mobsf app/src/main core/src/main firebase/src/main ui/src/main
+          exit 0
+
+      - name: Upload the findings to code scanning
+        if: always() && hashFiles('mobsfscan.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: mobsfscan.sarif
+          category: mobsfscan
+
+      - name: Fail on findings
+        run: exit "$status"
