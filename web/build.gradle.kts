@@ -1,9 +1,9 @@
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
-    kotlin("multiplatform") version "2.4.20"
-    kotlin("plugin.compose") version "2.4.20"
-    id("org.jetbrains.compose") version "1.12.1"
+    kotlin("multiplatform") version "2.4.21"
+    kotlin("plugin.compose") version "2.4.21"
+    id("org.jetbrains.compose") version "1.12.2"
 }
 
 // Built-in images come from the Android app's drawables: images/ (light) and images/night/.
