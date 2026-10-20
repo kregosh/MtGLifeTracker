@@ -404,3 +404,98 @@ describe('everything else', () => {
     await assertFails(alice().ref('admin').get());
   });
 });
+
+// ── Attacks ──────────────────────────────────────────────────────────────
+// What someone could try with a script: anonymous sign-in gives anyone an auth token, so
+// the rules are the only defence. Each case here must be refused.
+describe('attacks', () => {
+  const OUTSIDER = 'outsiderUid0000000000000004';
+  const outsider = () => env.authenticatedContext(OUTSIDER).database();
+  const big = 'x'.repeat(65);
+
+  test('signed-out clients cannot write anywhere', async () => {
+    await assertFails(anon().ref(`presence/${ALICE}`).set(SID));
+    await assertFails(anon().ref('sessionCodes/ZZZZZZZZ').set('s'));
+    await assertFails(anon().ref('sessions/new').set({ code: 'ZZZZZZZZ', createdAt: Date.now() }));
+    await assertFails(anon().ref(`sessions/${SID}/users/${ALICE}/life`).set(0));
+  });
+
+  test('outsiders cannot crown a monarch or end it', async () => {
+    await seed({ [`sessions/${SID}/monarch`]: ALICE });
+    await assertFails(outsider().ref(`sessions/${SID}/monarch`).set(BOB));
+    await assertFails(outsider().ref(`sessions/${SID}/monarch`).remove());
+  });
+
+  test('outsiders cannot flip day and night', async () => {
+    await assertFails(outsider().ref(`sessions/${SID}/globalStats/daynight`).set(1));
+    await seed({ [`sessions/${SID}/globalStats/daynight`]: 0 });
+    await assertFails(outsider().ref(`sessions/${SID}/globalStats/daynight`).remove());
+  });
+
+  test('watchers may change the monarch and day/night like players', async () => {
+    await seed({ [`sessions/${SID}/observers/${OUTSIDER}`]: 'Olly' });
+    await assertSucceeds(outsider().ref(`sessions/${SID}/monarch`).set(BOB));
+    await assertSucceeds(outsider().ref(`sessions/${SID}/globalStats/daynight`).set(1));
+  });
+
+  test('outsiders cannot send friend requests or acceptances into a game', async () => {
+    const request = to => `sessions/${SID}/friendRequests/${to}/${OUTSIDER}`;
+    await assertFails(outsider().ref(request(ALICE)).set({ displayName: 'Spam' }));
+    await assertFails(outsider().ref(`sessions/${SID}/friendAccepted/${ALICE}/${OUTSIDER}`).set({ displayName: 'Spam' }));
+    await seed({ [`sessions/${SID}/observers/${OUTSIDER}`]: 'Olly' });
+    await assertSucceeds(outsider().ref(request(ALICE)).set({ displayName: 'Olly' }));
+  });
+
+  test('friend requests carry nothing but a display name', async () => {
+    const request = `sessions/${SID}/friendRequests/${BOB}/${ALICE}`;
+    await assertFails(alice().ref(request).set({ displayName: 'Alice', payload: 'x'.repeat(10000) }));
+    await assertFails(alice().ref(request).set({ displayName: big }));
+    await assertFails(bob().ref(`sessions/${SID}/friendAccepted/${ALICE}/${BOB}`).set({ displayName: 'Bob', extra: 1 }));
+  });
+
+  test('presence cannot be used to store bulk data', async () => {
+    await assertFails(alice().ref(`presence/${ALICE}`).set('x'.repeat(10000)));
+    await assertFails(alice().ref(`presence/${ALICE}`).set(''));
+    await assertFails(alice().ref(`presence/${ALICE}`).set({ any: 'thing' }));
+  });
+
+  test('session codes cannot be used to store bulk data', async () => {
+    await assertFails(outsider().ref('sessionCodes/ZZZZZZZZ').set('x'.repeat(10000)));
+    await assertFails(outsider().ref('sessionCodes/ZZZZZZZZ').set(''));
+    await assertSucceeds(outsider().ref('sessionCodes/ZZZZZZZZ').set('7d3e1a52-5f1c-4b43-9a59-0c0f8f1f3f1e'));
+  });
+
+  test('a seat cannot be stuffed with extra data or impossible values', async () => {
+    const seat = alice().ref(`sessions/${SID}/users/${ALICE}`);
+    await assertFails(seat.update({ notes: 'x'.repeat(10000) }));
+    await assertFails(seat.update({ displayName: big }));
+    await assertFails(seat.update({ life: -1 }));
+    await assertFails(seat.update({ life: 1e9 }));
+    await assertFails(seat.child('customStats/energy').set(-5));
+    await assertFails(seat.child('stats/energy').set('ADMIN'));
+  });
+
+  test('outsiders cannot take over or wipe a running game', async () => {
+    const session = outsider().ref(`sessions/${SID}`);
+    await assertFails(session.remove());
+    await assertFails(session.set({ code: 'ABCDEFGH', createdAt: Date.now(), hostUserId: OUTSIDER }));
+    await assertFails(session.child('hostUserId').set(OUTSIDER));
+    await assertFails(session.child('settings/startLife').set(1));
+    await assertFails(session.child('game').set(99));
+    await assertFails(session.child(`users/${ALICE}/life`).set(0));
+    await assertFails(session.child(`users/${ALICE}`).remove());
+    await assertFails(outsider().ref('sessionCodes/ABCDEFGH').set('elsewhere'));
+    await assertFails(outsider().ref('sessionCodes/ABCDEFGH').remove());
+  });
+
+  test('a code cannot be pointed at another game, and the session cannot be backdated', async () => {
+    await assertFails(alice().ref(`sessions/${SID}/code`).set('ZZZZZZZZ'));
+    await assertFails(alice().ref(`sessions/${SID}/createdAt`).set(0));
+  });
+
+  test('nobody can read the whole database or list players across games', async () => {
+    await assertFails(outsider().ref().get());
+    await assertFails(outsider().ref('presence').get());
+    await assertFails(outsider().ref('sessionCodes').get());
+  });
+});

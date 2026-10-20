@@ -43,16 +43,12 @@
                     android:host="join"/>
             </intent-filter>
 
-            <!-- Invite page links (docs/join on GitHub Pages) open the app where Android allows it -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW"/>
-                <category android:name="android.intent.category.DEFAULT"/>
-                <category android:name="android.intent.category.BROWSABLE"/>
-                <data
-                    android:scheme="https"
-                    android:host="kregosh.github.io"
-                    android:pathPrefix="/MtGLifeTracker/join"/>
-            </intent-filter>
+            <!--
+                Invite page links (https://kregosh.github.io/MtGLifeTracker/join) are not claimed
+                here: without a verified assetlinks.json at the domain root (a separate repository)
+                any app could claim them too and receive the session code. The invite page itself
+                opens the app through the mtgtracker:// link above.
+            -->
         </activity>
 
         <service

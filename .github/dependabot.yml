@@ -1,0 +1,31 @@
+# Opens pull requests for dependency updates; security fixes come as soon as an advisory is
+# published (with Dependabot alerts on in the repository settings), the rest weekly, grouped.
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: "/"
+    schedule: { interval: weekly }
+    groups:
+      gradle-minor:
+        update-types: [ minor, patch ]
+
+  - package-ecosystem: gradle
+    directory: "/web"
+    schedule: { interval: weekly }
+    groups:
+      web-minor:
+        update-types: [ minor, patch ]
+
+  - package-ecosystem: npm
+    directory: "/rules-tests"
+    schedule: { interval: weekly }
+    groups:
+      rules-tests-minor:
+        update-types: [ minor, patch ]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule: { interval: weekly }
+    groups:
+      actions:
+        patterns: [ "*" ]

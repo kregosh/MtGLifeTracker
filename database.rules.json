@@ -8,7 +8,7 @@
         ".read":  "auth != null",
         // Claim a free code, or release one whose session is gone.
         ".write": "auth != null && ((!data.exists() && newData.exists()) || (!newData.exists() && !root.child('sessions').child(data.val()).exists()))",
-        ".validate": "$code.matches(/^[A-Z0-9]{6,8}$/) && newData.isString()"
+        ".validate": "$code.matches(/^[A-Z0-9]{6,8}$/) && newData.isString() && newData.val().length > 0 && newData.val().length <= 64"
       }
     },
 
@@ -82,38 +82,42 @@
           }
         },
 
-        // ── Monarch: any player can pass it to someone seated, or end it ──
+        // ── Monarch: anyone in the game can pass it to someone seated, or end it ──
         "monarch": {
-          ".write": "auth != null",
+          ".write": "auth != null && (root.child('sessions').child($sessionId).child('users').child(auth.uid).exists() || root.child('sessions').child($sessionId).child('observers').child(auth.uid).exists())",
           ".validate": "newData.isString() && root.child('sessions').child($sessionId).child('users').child(newData.val()).exists()"
         },
 
-        // ── Global stats (day/night, etc.) ─────────────────────────────
+        // ── Global stats (day/night, etc.): anyone in the game ───────────
         "globalStats": {
           "$stat": {
-            ".write": "auth != null",
+            ".write": "auth != null && (root.child('sessions').child($sessionId).child('users').child(auth.uid).exists() || root.child('sessions').child($sessionId).child('observers').child(auth.uid).exists())",
             ".validate": "$stat.matches(/^[A-Za-z0-9_]{1,32}$/) && newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000"
           }
         },
 
         // ── Friend requests ────────────────────────────────────────────
-        // Only the sender can send; only the recipient can dismiss.
+        // Only someone in the game sends, in their own name; only the recipient dismisses.
         "friendRequests": {
           "$toUserId": {
             "$fromUserId": {
-              ".write": "auth != null && ((newData.exists() && $fromUserId == auth.uid) || (!newData.exists() && $toUserId == auth.uid))",
-              ".validate": "newData.hasChildren(['displayName']) && newData.child('displayName').isString() && newData.child('displayName').val().length > 0 && newData.child('displayName').val().length <= 64"
+              ".write": "auth != null && ((newData.exists() && $fromUserId == auth.uid && (root.child('sessions').child($sessionId).child('users').child(auth.uid).exists() || root.child('sessions').child($sessionId).child('observers').child(auth.uid).exists())) || (!newData.exists() && $toUserId == auth.uid))",
+              ".validate": "newData.hasChildren(['displayName'])",
+              "displayName": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 64" },
+              "$other": { ".validate": false }
             }
           }
         },
 
         // ── Friend acceptances ─────────────────────────────────────────
-        // Only the accepting player can write; only the original sender can dismiss.
+        // Only the accepting player, in the game, writes; only the original sender dismisses.
         "friendAccepted": {
           "$toUserId": {
             "$fromUserId": {
-              ".write": "auth != null && ((newData.exists() && $fromUserId == auth.uid) || (!newData.exists() && $toUserId == auth.uid))",
-              ".validate": "newData.hasChildren(['displayName']) && newData.child('displayName').isString() && newData.child('displayName').val().length > 0 && newData.child('displayName').val().length <= 64"
+              ".write": "auth != null && ((newData.exists() && $fromUserId == auth.uid && (root.child('sessions').child($sessionId).child('users').child(auth.uid).exists() || root.child('sessions').child($sessionId).child('observers').child(auth.uid).exists())) || (!newData.exists() && $toUserId == auth.uid))",
+              ".validate": "newData.hasChildren(['displayName'])",
+              "displayName": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 64" },
+              "$other": { ".validate": false }
             }
           }
         },
@@ -122,12 +126,12 @@
       }
     },
 
-    // ── Presence (which session a player is in) ──────────────────────────
+    // ── Presence (which session a player is in, by its ID) ───────────────
     "presence": {
       "$userId": {
         ".read":     "auth != null",
         ".write":    "auth != null && $userId == auth.uid",
-        ".validate": "newData.isString()"
+        ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 64"
       }
     },
 
