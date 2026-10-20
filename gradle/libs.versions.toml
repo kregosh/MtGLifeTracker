@@ -1,8 +1,8 @@
 [versions]
-kotlin          = "2.4.20"
-agp             = "9.1.0"
+kotlin          = "2.4.21"
+agp             = "9.4.1"
 coroutines      = "1.11.0"
-coreKtx         = "1.16.0"
+coreKtx         = "1.19.1"
 lifecycle       = "2.9.4"
 activityCompose = "1.10.0"
 # The same Compose as the browser build (web/): Compose Multiplatform 1.12.1 is built on
@@ -11,7 +11,7 @@ compose          = "1.12.1"
 composeMaterial3 = "1.9.0"
 composeIcons     = "1.7.3"
 firebase-bom    = "33.7.0"
-google-services = "4.4.2"
+google-services = "4.5.0"
 
 [libraries]
 # ── Firebase ─────────────────────────────────────────────────────────
@@ -40,12 +40,12 @@ compose-ui-test-junit4      = { group = "androidx.compose.ui",             name 
 compose-ui-test-manifest    = { group = "androidx.compose.ui",             name = "ui-test-manifest",        version.ref = "compose" }
 
 # ── Invite QR codes ──────────────────────────────────────────────────
-zxing-core = { module = "com.google.zxing:core", version = "3.5.3" }
+zxing-core = { module = "com.google.zxing:core", version = "3.5.4" }
 
 # ── Test ─────────────────────────────────────────────────────────────
-mockk                   = { group = "io.mockk",              name = "mockk",                   version = "1.13.12" }
+mockk                   = { group = "io.mockk",              name = "mockk",                   version = "1.14.11" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
-robolectric             = { group = "org.robolectric",        name = "robolectric",              version = "4.14.1" }
+robolectric             = { group = "org.robolectric",        name = "robolectric",              version = "4.17" }
 androidx-test-core      = { group = "androidx.test",           name = "core-ktx",                 version = "1.6.1" }
 
 [plugins]
