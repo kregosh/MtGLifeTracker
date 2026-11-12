@@ -198,4 +198,25 @@ class SessionPanelsTest {
         compose.onNodeWithText("Remove Bob from the session").performClick()
         assertTrue(removed)
     }
+
+    // ── Table view ─────────────────────────────────────────────────────
+
+    @Test
+    fun `a table card shows life, the limits and the minor stats`() {
+        compose.setPlatformContent { TableCard(bob, ui(), turned = false, onOpen = {}) }
+        compose.onNodeWithText("17").assertExists()
+        compose.onNodeWithText("/21").assertExists()
+        compose.onNodeWithText("/10").assertExists()
+        compose.onNodeWithText("Energy 3").assertExists()
+    }
+
+    @Test
+    fun `the table view shows every player and opens their details`() {
+        var opened: String? = null
+        compose.setPlatformContent { TableView(listOf(me, bob, carol), ui(), onOpen = { opened = it.id }) }
+        compose.onNodeWithText("Alice").assertExists()
+        compose.onNodeWithText("Carol").assertExists()
+        compose.onNodeWithText("Bob").performClick()
+        assertEquals("bob", opened)
+    }
 }

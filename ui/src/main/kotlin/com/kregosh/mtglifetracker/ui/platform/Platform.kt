@@ -4,10 +4,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.ImageBitmap
 
-/** The built-in images, by the name both apps store and look them up under. */
-enum class BuiltInImage(val fileName: String) {
+/**
+ * The built-in images, by the name both apps store and look them up under, and whether there
+ * is a separate version for the dark theme.
+ */
+enum class BuiltInImage(val fileName: String, val hasNightVariant: Boolean = true) {
     ARCANE_STORM("bg_arcane_storm"),
     MANA_ORBS("bg_mana_orbs"),
+    /** The table view's own background (#117). */
+    TABLE("bg_table", hasNightVariant = false),
 }
 
 /**

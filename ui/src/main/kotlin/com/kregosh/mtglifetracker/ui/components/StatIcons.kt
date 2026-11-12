@@ -71,10 +71,9 @@ internal fun onDarkSurface(): Boolean = MaterialTheme.colorScheme.surface.lumina
 /** Whether [stat] has a symbol of its own. */
 internal fun hasStatIcon(stat: String): Boolean = stat == LIFE_STAT || stat == COMMANDER_STAT || stat == POISON_STAT
 
-/** The symbol for [stat] (life, commander damage or poison) at [size]. */
+/** The symbol for [stat] (life, commander damage or poison); [dark] picks the tints for dark ground. */
 @Composable
-internal fun StatIcon(stat: String, modifier: Modifier = Modifier) {
-    val dark = onDarkSurface()
+internal fun StatIcon(stat: String, modifier: Modifier = Modifier, dark: Boolean = onDarkSurface()) {
     when (stat) {
         LIFE_STAT      -> Icon(HeartIcon, contentDescription = null, modifier = modifier,
                                tint = if (dark) LIFE_RED_DARK else LIFE_RED_LIGHT)
